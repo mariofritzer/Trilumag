@@ -40,7 +40,11 @@ Ab Version 0.2 gibt es zwei Betriebsarten, umschaltbar in der App: **Simulation*
 
 ## Home Assistant
 
-In der App unter Einstellungen die Adresse des MQTT-Brokers eintragen. Jedes Panel erscheint dann automatisch als eigenes Licht, dazu ein Licht „Alle Panels“.
+In der App unter Einstellungen die Adresse des MQTT-Brokers eintragen. Jedes Panel erscheint dann automatisch als eigenes Licht, dazu ein Licht „Alle Panels“. Bei „Alle Panels“ stehen die Effekte in der Effektliste, und ein Schieberegler „Effekt-Tempo“ stellt die Geschwindigkeit ein.
+
+## Effekte
+
+Effekte laufen immer über die ganze Wand: Regenbogen, Regenbogenwelle, Atmen, Farbwechsel, Funkeln, Ausbreiten (Wellen vom Hauptpanel nach außen), Feuer und Polarlicht. Atmen, Funkeln und Ausbreiten benutzen eine wählbare Effektfarbe. Das Hauptpanel rechnet die Bilder selbst und schickt etwa 25 pro Sekunde mit einem FRAME-Befehl an alle Panels. Neu angeklipste Panels laufen sofort mit. Sobald ein Panel eine feste Farbe bekommt, endet der Effekt und alle Panels kehren zu ihren festen Farben zurück. Der zuletzt gewählte Effekt läuft nach einem Neustart weiter.
 
 ## API
 
@@ -48,5 +52,7 @@ In der App unter Einstellungen die Adresse des MQTT-Brokers eintragen. Jedes Pan
 | --- | --- |
 | `GET /api/state` | alle Panels mit Position, Drehung und Farbe |
 | `POST /api/set` | Farbe setzen: `{"id":"A3F2C1D0" oder "alle","state":"ON","brightness":180,"color":{"r":255,"g":0,"b":0,"w":0}}` |
+| `POST /api/effect` | Effekt wählen oder ändern: `{"effect":"regenbogen","speed":50,"brightness":180,"color":{"r":255,"g":120,"b":30,"w":0}}`, alle Felder optional, `"aus"` beendet ihn |
+| `GET /api/live` | aktuelles Effektbild aller Panels als RRGGBBWW |
 | `POST /api/sim/attach` | Simulation: Panel anklipsen |
 | `POST /api/sim/detach` | Simulation: Panel abklipsen |

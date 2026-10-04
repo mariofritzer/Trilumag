@@ -17,7 +17,7 @@ h1{font-size:22px;margin:0;font-weight:650;letter-spacing:-.01em}
 .wall{background:#090b0e;border:1px solid var(--line);border-radius:14px;overflow:hidden;position:relative}
 #wall{display:block;width:100%;height:min(62vh,560px);touch-action:none;user-select:none;-webkit-user-select:none}
 .hint{position:absolute;left:12px;bottom:10px;font:12px ui-monospace,Menlo,monospace;color:var(--muted);pointer-events:none}
-.tri{stroke:#05060a;stroke-width:1.5;cursor:grab}
+.tri{stroke:#05060a;stroke-width:1.5;cursor:grab;transition:fill .12s linear}
 .tri.main{cursor:default;stroke:#7d8796;stroke-width:2}
 .tri.sel{stroke:#fff;stroke-width:2.5}
 .dark{fill:#1b1e24}
@@ -50,6 +50,10 @@ summary h2::after{content:" ▾"}
 details[open] summary h2::after{content:" ▴"}
 input[type=color]{width:100%;height:40px;border:1px solid var(--line);border-radius:8px;background:none;padding:2px}
 .row{display:flex;gap:8px;flex-wrap:wrap}
+.fxs{grid-column:1/-1;display:flex;flex-wrap:wrap;gap:8px}
+.fx{display:flex;align-items:center;gap:8px;padding:8px 14px 8px 8px}
+.fx i{width:22px;height:22px;border-radius:50%;flex:none;border:1px solid rgba(255,255,255,.15)}
+.fx.on i{border-color:#0d0f13}
 .toast{position:fixed;left:50%;bottom:20px;transform:translateX(-50%);background:#232935;border:1px solid var(--line);padding:10px 14px;border-radius:10px;font-size:14px;opacity:0;transition:opacity .2s;pointer-events:none}
 .toast.show{opacity:1}
 </style></head><body>
@@ -70,6 +74,13 @@ input[type=color]{width:100%;height:40px;border:1px solid var(--line);border-rad
     <h2>Ablage · abgeklipste Panels</h2>
     <div class="items" id="tray"></div>
     <div class="row"><button id="newBtn">Neues Panel</button></div>
+  </div>
+  <div class="ctl" id="fxBox">
+    <h2>Effekte · ganze Wand</h2>
+    <div class="fxs" id="fxList"></div>
+    <label>Tempo <span id="fsv">50</span><input type="range" id="fspeed" min="1" max="100" value="50"></label>
+    <label>Helligkeit <span id="fbv">180</span><input type="range" id="fbri" min="1" max="255" value="180"></label>
+    <label id="fcolL">Effektfarbe<input type="color" id="fcol" value="#ff781e"></label>
   </div>
   <div class="ctl">
     <h2 id="selTitle">Kein Panel ausgewählt</h2>
@@ -148,7 +159,7 @@ function render(){
   st.panels.forEach(p=>{
     const g=geom(p.x,p.y,p.up);
     const cls=['tri'];if(p.main)cls.push('main');if(sel===p.id)cls.push('sel');
-    let fill=null;if(p.state===0)cls.push('dark');else if(p.state===1)cls.push('pulse');else fill=shade(p);
+    let fill=null;if(p.state===0)cls.push('dark');else if(fxOn()&&live[p.id])fill=liveCol(live[p.id]);else if(p.state===1)cls.push('pulse');else fill=shade(p);
     const poly=el('polygon',{points:pts(shrink(g,.94)),class:cls.join(' ')});if(fill)poly.setAttribute('fill',fill);
     poly.dataset.id=p.id;gP.append(poly);
     if(!p.main){const m=edge1Mid(p);gP.append(el('circle',{cx:m[0],cy:m[1],r:2.4,class:'edge1'}));}
@@ -168,8 +179,39 @@ function render(){
   $('newBtn').hidden=!st.sim;
   $('wifiBox').hidden=!st.ap;
   $('hint').textContent=!st.sim?'Echte Panels: anklipsen, und sie erscheinen hier':st.loose.length?'Panel aus der Ablage an eine freie Kante ziehen':'Panel antippen zum Einstellen, wegziehen zum Abklipsen';
-  updateCtl();
+  updateCtl();renderFx();
 }
+
+// ----- Effekte -----
+const FX_ICON={aus:'#2a303a',regenbogen:'conic-gradient(red,yellow,lime,cyan,blue,magenta,red)',welle:'linear-gradient(90deg,red,yellow,lime,cyan,blue,magenta)',
+  atmen:'radial-gradient(circle,var(--c) 0,#111 75%)',farbwechsel:'linear-gradient(135deg,#ff4f8b,#4f9dff,#59e38c)',funkeln:'radial-gradient(circle,#fff 0 18%,var(--c) 22%,#221 80%)',
+  ausbreiten:'repeating-radial-gradient(circle,var(--c) 0 3px,#111 3px 6px)',feuer:'linear-gradient(0deg,#ff3a00,#ffb000)',polarlicht:'linear-gradient(160deg,#16e39a,#2bb6ff,#9a4dff)'};
+let live={},fxBuilt=false,tFx=null;
+function fxOn(){return st&&st.fx&&st.fx.id!=='aus';}
+function liveCol(h){const v=[0,2,4,6].map(i=>parseInt(h.slice(i,i+2),16));const f=c=>Math.round(255*Math.pow(Math.min(1,(c+v[3]*.85)/255),.55));return`rgb(${f(v[0])},${f(v[1])},${f(v[2])})`;}
+function hex2(c){const h=v=>v.toString(16).padStart(2,'0');return'#'+h(c.r)+h(c.g)+h(c.b);}
+function renderFx(){
+  if(!st.effects)return;
+  const box=$('fxList');
+  if(!fxBuilt){fxBuilt=true;box.innerHTML='';st.effects.forEach(e=>{const b=document.createElement('button');b.className='fx';b.dataset.fx=e.id;
+    const i=document.createElement('i');i.style.background=FX_ICON[e.id]||'#444';b.append(i,document.createTextNode(e.name));
+    b.addEventListener('click',()=>setFx(e.id));box.append(b);});}
+  const f=st.fx;document.documentElement.style.setProperty('--c',hex2(f));
+  box.querySelectorAll('.fx').forEach(b=>b.classList.toggle('on',b.dataset.fx===f.id));
+  const def=st.effects.find(e=>e.id===f.id);$('fcolL').hidden=!(def&&def.color);
+  if(document.activeElement.tagName!=='INPUT'){$('fspeed').value=f.speed;$('fsv').textContent=f.speed;$('fbri').value=f.bri;$('fbv').textContent=f.bri;$('fcol').value=hex2(f);}
+}
+function fxBody(){const c=$('fcol').value;return{speed:+$('fspeed').value,brightness:+$('fbri').value,color:{r:parseInt(c.slice(1,3),16),g:parseInt(c.slice(3,5),16),b:parseInt(c.slice(5,7),16),w:0}};}
+async function setFx(id){const r=await api('/api/effect',{effect:id,...fxBody()});if(r){if(id==='aus')live={};render();}}
+function fxInput(){$('fsv').textContent=$('fspeed').value;$('fbv').textContent=$('fbri').value;
+  clearTimeout(tFx);tFx=setTimeout(async()=>{await api('/api/effect',fxBody());render();},120);}
+['fspeed','fbri','fcol'].forEach(k=>$(k).addEventListener('input',fxInput));
+async function pollLive(){
+  if(!fxOn()||drag||document.hidden)return;
+  try{const j=await (await fetch('/api/live')).json();if(j.fx==='aus')return;live=j.c;
+    svg.querySelectorAll('polygon[data-id]').forEach(p=>{const h=live[p.dataset.id];if(h){p.classList.remove('pulse');p.style.fill=liveCol(h);}});}catch(e){}
+}
+setInterval(pollLive,120);
 
 function drawDrag(){
   const ov=$('ov');if(!ov||!drag||!drag.moved)return;ov.innerHTML='';
@@ -231,7 +273,8 @@ let tSend=null;
 function send(extra){
   const target=applyAll?'alle':sel;if(!target)return;
   const c=$('col').value;const body={id:target,color:{r:parseInt(c.slice(1,3),16),g:parseInt(c.slice(3,5),16),b:parseInt(c.slice(5,7),16),w:+$('w').value},brightness:+$('bri').value,state:'ON',...extra};
-  clearTimeout(tSend);tSend=setTimeout(async()=>{await api('/api/set',body);render();},120);
+  const wasFx=fxOn();
+  clearTimeout(tSend);tSend=setTimeout(async()=>{await api('/api/set',body);if(wasFx&&!fxOn()){live={};toast('Effekt beendet, feste Farben');}render();},120);
 }
 $('col').addEventListener('input',()=>send());
 $('w').addEventListener('input',()=>{$('wv').textContent=$('w').value;send();});

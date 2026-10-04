@@ -1,5 +1,5 @@
 /*
-  Trilumag – Firmware für das Hauptpanel, Version 0.2
+  Trilumag – Firmware für das Hauptpanel, Version 0.3
   ---------------------------------------------------
   Läuft auf jedem ESP32 (klassischer ESP32, ESP32-S3, ESP32-C3, ESP32-C6).
   Am einfachsten über den Webinstaller: https://mariofritzer.github.io/Trilumag/
@@ -12,6 +12,7 @@
        Bus:        echte Panels über RS-485, Erkennung über die SNS-Leitungen (docs/protokoll.md)
    - Pinbelegung pro Board in der App einstellbar, mit Vorlagen und Prüfung
    - eigener WS2814-Strip des Hauptpanels
+   - Effekte für die ganze Wand (Regenbogen, Atmen, Feuer …), über App, API und Home Assistant
    - Farben bleiben pro Panel (Chip-ID) gespeichert, auch über einen Neustart
    - HTTP-API und Home Assistant über MQTT mit Auto-Discovery, Broker in der App einstellbar
 
@@ -29,6 +30,7 @@
 #include <ArduinoJson.h>
 #include <Adafruit_NeoPixel.h>
 #include <stdarg.h>
+#include <math.h>
 #include "webapp.h"
 #include "improv.h"
 #include "pins.h"
@@ -42,7 +44,7 @@ const uint32_t DETECT_MS    = 1200;   // simulierte Erkennungszeit nach dem Ankl
 // ====================================================
 
 const char* FW_NAME    = "Trilumag";
-const char* FW_VERSION = "0.2.0";
+const char* FW_VERSION = "0.3.0";
 const char* HOSTNAME   = "trilumag";
 const char* SETUP_SSID = "Trilumag-Setup";
 const char* SETUP_PASS = "trilumag";
@@ -82,6 +84,7 @@ struct Panel {
   int8_t x = 0, y = 0;
   uint8_t rot = 0;        // welche Weltkante die eigene Kante 1 ist
   int8_t parent = -1;
+  uint8_t depth = 0;      // Schritte bis zum Hauptpanel
   uint8_t addr = 0;       // Kurzadresse auf dem Bus (nur Busbetrieb)
   uint8_t miss = 0;       // verpasste Antworten in Folge
   uint8_t state = DARK;
@@ -101,8 +104,12 @@ struct Config {
   String mqttUser, mqttPass;
 };
 
+// Effekt für die ganze Wand (Liste FX[] weiter unten)
+struct FxCfg { uint8_t id = 0, speed = 50, bri = 180, r = 255, g = 120, b = 30, w = 0; };
+
 Panel P[SLOTS];
 Config cfg;
+FxCfg fx;
 WebServer server(80);
 WiFiClient netClient;
 PubSubClient mqtt(netClient);
@@ -132,6 +139,7 @@ void startSetupAp();
 void publishDiscovery(int i);
 void publishAvail(int i, bool online);
 void publishState(int i);
+void publishFx();
 
 // ---------- Raster ----------
 bool isUp(int x, int y) { return ((((x + y) % 2) + 2) % 2) == 0; }
@@ -376,7 +384,7 @@ void busLoop() {
       bus::Reply r;
       if (bus::receive(r, 4) && r.addr == p.addr) {
         p.miss = 0;
-        if (r.len >= 1 && r.data[0] == DARK && p.state != DARK) bus::sendColor(i);   // Panel hat Zustand verloren
+        if (!fx.id && r.len >= 1 && r.data[0] == DARK && p.state != DARK) bus::sendColor(i);   // Panel hat Zustand verloren
       } else if (++p.miss >= 3) {
         logf("[BUS] %s antwortet nicht mehr, gilt als abgeklipst\n", hex(p.chip).c_str());
         p.attached = false; p.addr = 0; p.state = DARK; publishAvail(i, false); lost = true;
@@ -407,12 +415,185 @@ void busLoop() {
 // ---------- LEDs des Hauptpanels ----------
 void showMain() {
   if (cfg.pins.led < 0) return;
+  if (fx.id) return;               // Effekt läuft, fxSend kümmert sich um den Strip
   const Panel& p = P[0];
   uint32_t c = 0;
   if (p.on) c = strip.Color((uint16_t)p.r * p.bri / 255, (uint16_t)p.g * p.bri / 255,
                             (uint16_t)p.b * p.bri / 255, (uint16_t)p.w * p.bri / 255);
   for (int k = 0; k < 3; k++) strip.setPixelColor(k, c);
   strip.show();
+}
+
+// ---------- Effekte ----------
+// Das Hauptpanel rechnet jeden Effekt selbst und schickt etwa 25 Bilder pro Sekunde
+// mit einem einzigen FRAME-Befehl an alle Panels. Die Panel-Firmware braucht dafür nichts Neues.
+struct FxDef { const char* id; const char* name; bool color; };
+const FxDef FX[] = {
+  {"aus",         "Kein Effekt",     false},
+  {"regenbogen",  "Regenbogen",      false},
+  {"welle",       "Regenbogenwelle", false},
+  {"atmen",       "Atmen",           true},
+  {"farbwechsel", "Farbwechsel",     false},
+  {"funkeln",     "Funkeln",         true},
+  {"ausbreiten",  "Ausbreiten",      true},
+  {"feuer",       "Feuer",           false},
+  {"polarlicht",  "Polarlicht",      false},
+};
+const uint8_t FX_COUNT = sizeof(FX) / sizeof(FX[0]);
+const uint32_t FX_FRAME_MS = 40;
+
+float fxPhase = 0, fxA[SLOTS], fxB[SLOTS], fxT[SLOTS];
+uint32_t fxLast = 0, fxDirtyAt = 0;
+bool fxDirty = false;
+uint8_t OUT[SLOTS][4];          // aktuelles Effektbild pro Panel, Helligkeit schon eingerechnet
+
+int fxFind(const char* key) {
+  for (uint8_t k = 0; k < FX_COUNT; k++) if (!strcasecmp(key, FX[k].id) || !strcasecmp(key, FX[k].name)) return k;
+  return -1;
+}
+float frand() { return (esp_random() & 0xFFFFFF) / 16777216.0f; }
+
+// Farbton 0..1 → RGB 0..255
+void hue(float h, float* c) {
+  h = h - floorf(h);
+  float x = h * 6; int k = (int)x; float f = x - k;
+  float q = 1 - f;
+  float r = 0, g = 0, b = 0;
+  switch (k % 6) {
+    case 0: r = 1; g = f; break;   case 1: r = q; g = 1; break;
+    case 2: g = 1; b = f; break;   case 3: g = q; b = 1; break;
+    case 4: r = f; b = 1; break;   default: r = 1; b = q;
+  }
+  c[0] = r * 255; c[1] = g * 255; c[2] = b * 255; c[3] = 0;
+}
+void base(float k, float* c) { c[0] = fx.r * k; c[1] = fx.g * k; c[2] = fx.b * k; c[3] = fx.w * k; }
+
+void fxReset() {
+  for (int i = 0; i < SLOTS; i++) { fxA[i] = frand(); fxB[i] = frand(); fxT[i] = frand(); }
+  fxLast = millis();
+}
+
+void fxCompute() {
+  uint32_t now = millis();
+  float dt = (now - fxLast) / 1000.0f; fxLast = now;
+  if (dt > 0.2f) dt = 0.2f;
+  float rate = powf(4.0f, (fx.speed - 50) / 50.0f);   // Tempo 1..100 → 0,25- bis 4-fach
+  fxPhase += dt * rate;
+  if (fxPhase > 100000) fxPhase = 0;
+
+  float minX = 1e9, maxX = -1e9;
+  for (int i = 0; i < SLOTS; i++) if (P[i].used && P[i].attached) { minX = fminf(minX, P[i].x * 0.5f); maxX = fmaxf(maxX, P[i].x * 0.5f); }
+  float spanX = fmaxf(1.0f, maxX - minX);
+  const float TAU = 6.2831853f;
+
+  for (int i = 0; i < SLOTS; i++) {
+    float c[4] = {0, 0, 0, 0};
+    const Panel& p = P[i];
+    if (!p.used || !p.attached || p.state == DARK) { memset(OUT[i], 0, 4); continue; }
+    float u = (p.x * 0.5f - minX) / spanX;                 // 0 links … 1 rechts
+    float v = p.y * 0.866f;
+    switch (fx.id) {
+      case 1: hue(fxPhase * 0.1f, c); break;                                  // ganze Wand im Farbkreis
+      case 2: hue(fxPhase * 0.15f + u * 0.85f, c); break;                     // Farbkreis wandert von links nach rechts
+      case 3: base(0.06f + 0.94f * (0.5f - 0.5f * cosf(fxPhase * TAU / 4)), c); break;
+      case 4: {                                                               // jedes Panel blendet zu eigener Zufallsfarbe
+        fxT[i] += dt * rate / 3.5f;
+        if (fxT[i] >= 1) { fxA[i] = fxB[i]; fxB[i] = frand(); fxT[i] = 0; }
+        float d = fxB[i] - fxA[i]; if (d > 0.5f) d -= 1; if (d < -0.5f) d += 1;
+        float t = fxT[i] * fxT[i] * (3 - 2 * fxT[i]);
+        hue(fxA[i] + d * t, c); break;
+      }
+      case 5: {                                                               // Grundfarbe, einzelne Panels blitzen weiß auf
+        fxA[i] = fmaxf(0, fxA[i] - dt * rate * 2.2f);
+        if (frand() < dt * rate * 0.35f) fxA[i] = 1;
+        float a = fxA[i] * fxA[i];
+        base(0.18f + 0.5f * a, c); c[3] = fminf(255, c[3] + 255 * a); break;
+      }
+      case 6: {                                                               // Wellen laufen vom Hauptpanel nach außen
+        float w = 0.5f + 0.5f * cosf(TAU * (fxPhase * 0.5f - p.depth * 0.17f));
+        base(0.05f + 0.95f * w * w * w, c); break;
+      }
+      case 7: {                                                               // flackernde Glut
+        fxA[i] += (frand() - fxA[i]) * fminf(1, dt * rate * 9);
+        fxB[i] += (fxA[i] - fxB[i]) * fminf(1, dt * rate * 5);
+        float h = 0.3f + 0.7f * fxB[i];
+        c[0] = 255 * h; c[1] = 85 * h * h; c[2] = 0; c[3] = 20 * h * h * h; break;
+      }
+      case 8: {                                                               // Polarlicht: grün bis violett, langsam ziehend
+        float s = 0.5f + 0.5f * sinf(u * 5.0f + fxPhase * 0.9f + v * 0.7f) * sinf(u * 2.3f - fxPhase * 0.55f);
+        hue(0.36f + 0.36f * (0.5f + 0.5f * sinf(fxPhase * 0.25f + u * 3.0f)), c);
+        for (int k = 0; k < 3; k++) c[k] *= 0.15f + 0.85f * s; break;
+      }
+    }
+    float k = p.on ? fx.bri / 255.0f : 0;
+    for (int ch = 0; ch < 4; ch++) OUT[i][ch] = (uint8_t)fminf(255, fmaxf(0, c[ch] * k));
+  }
+}
+
+void fxSend() {
+  if (cfg.pins.led >= 0) {
+    uint32_t c = strip.Color(OUT[0][0], OUT[0][1], OUT[0][2], OUT[0][3]);
+    for (int k = 0; k < 3; k++) strip.setPixelColor(k, c);
+    strip.show();
+  }
+  if (!cfg.bus) return;
+  uint8_t lo = 0xFF, hi = 0;
+  for (int i = 1; i < SLOTS; i++) if (P[i].used && P[i].attached && P[i].addr) { if (P[i].addr < lo) lo = P[i].addr; if (P[i].addr > hi) hi = P[i].addr; }
+  if (lo > hi) return;
+  // höchstens 48 Panels pro Rahmen (Datenlänge bis 200 Byte)
+  for (uint8_t first = lo; first <= hi; first += 48) {
+    uint8_t n = (hi - first + 1) > 48 ? 48 : (hi - first + 1);
+    uint8_t d[2 + 48 * 4] = {first, n};
+    for (int i = 1; i < SLOTS; i++) {
+      const Panel& p = P[i];
+      if (!p.used || !p.attached || p.addr < first || p.addr >= first + n) continue;
+      memcpy(d + 2 + 4 * (p.addr - first), OUT[i], 4);
+    }
+    bus::send(bus::ALL, bus::C_FRAME, d, 2 + 4 * n);
+  }
+}
+
+void fxLoop() {
+  static uint32_t lastFrame = 0;
+  if (!fx.id || millis() - lastFrame < FX_FRAME_MS) return;
+  lastFrame = millis();
+  fxCompute();
+  fxSend();
+}
+
+void sendToPanel(int i);
+void fxStart(int id) {
+  if (id < 0 || id >= FX_COUNT) return;
+  bool was = fx.id;
+  fx.id = id;
+  fxDirty = true; fxDirtyAt = millis();
+  if (id && !was) fxReset();
+  if (!id && was) for (int i = 0; i < SLOTS; i++) if (P[i].used && P[i].attached) sendToPanel(i);   // zurück zu den festen Farben
+  logf("[FX] %s\n", FX[fx.id].name);
+  publishFx();
+}
+
+void fxSave() {
+  prefs.putBytes("fx", &fx, sizeof fx);
+  fxDirty = false;
+}
+void fxLoad() {
+  FxCfg f;
+  if (prefs.getBytes("fx", &f, sizeof f) == sizeof f && f.id < FX_COUNT) fx = f;
+  fxReset();
+}
+
+// Befehl {"effect":"regenbogen","speed":50,"brightness":180,"color":{...}}
+void applyFx(JsonVariantConst cmd) {
+  if (cmd["speed"].is<int>()) fx.speed = constrain(cmd["speed"].as<int>(), 1, 100);
+  if (cmd["brightness"].is<int>()) fx.bri = constrain(cmd["brightness"].as<int>(), 1, 255);
+  JsonVariantConst c = cmd["color"];
+  if (!c.isNull()) { fx.r = c["r"] | fx.r; fx.g = c["g"] | fx.g; fx.b = c["b"] | fx.b; fx.w = c["w"] | fx.w; }
+  int id = fx.id;
+  if (cmd["effect"].is<const char*>()) id = fxFind(cmd["effect"].as<const char*>());
+  else if (cmd["effect"].is<int>()) id = cmd["effect"].as<int>();
+  if (id >= 0 && id != fx.id) fxStart(id);
+  else { fxDirty = true; fxDirtyAt = millis(); publishFx(); }
 }
 
 // ---------- Ausgabe an ein Panel ----------
@@ -477,12 +658,49 @@ void publishAllLight() {
   d["command_topic"] = "trilumag/alle/set";
   d["brightness"] = true;
   d["supported_color_modes"].to<JsonArray>().add("rgbw");
+  d["state_topic"] = "trilumag/alle/state";
+  d["effect"] = true;
+  JsonArray el = d["effect_list"].to<JsonArray>();
+  for (uint8_t k = 0; k < FX_COUNT; k++) el.add(FX[k].name);
   d["availability_topic"] = "trilumag/bridge/avail";
   JsonObject dev = d["device"].to<JsonObject>();
   dev["identifiers"].to<JsonArray>().add("trilumag_" + hex(P[0].chip));
   dev["name"] = "Trilumag";
-  char buf[600]; size_t n = serializeJson(d, buf, sizeof buf);
+  char buf[900]; size_t n = serializeJson(d, buf, sizeof buf);
   mqtt.publish(("homeassistant/light/trilumag_alle_" + hex(P[0].chip) + "/config").c_str(), (const uint8_t*)buf, n, true);
+
+  // Tempo der Effekte als Schieberegler in Home Assistant
+  JsonDocument t;
+  t["name"] = "Effekt-Tempo";
+  t["unique_id"] = "trilumag_tempo_" + hex(P[0].chip);
+  t["command_topic"] = "trilumag/tempo/set";
+  t["state_topic"] = "trilumag/tempo/state";
+  t["min"] = 1; t["max"] = 100; t["step"] = 1; t["mode"] = "slider"; t["icon"] = "mdi:speedometer";
+  t["availability_topic"] = "trilumag/bridge/avail";
+  JsonObject td = t["device"].to<JsonObject>();
+  td["identifiers"].to<JsonArray>().add("trilumag_" + hex(P[0].chip));
+  td["name"] = "Trilumag";
+  n = serializeJson(t, buf, sizeof buf);
+  mqtt.publish(("homeassistant/number/trilumag_tempo_" + hex(P[0].chip) + "/config").c_str(), (const uint8_t*)buf, n, true);
+}
+
+// Zustand von "Alle Panels" und Effekt-Tempo
+void publishFx() {
+  if (!mqtt.connected()) return;
+  bool any = false;
+  for (int i = 0; i < SLOTS; i++) if (P[i].used && P[i].attached && P[i].on && P[i].state != DARK) any = true;
+  JsonDocument d;
+  d["state"] = any ? "ON" : "OFF";
+  d["effect"] = FX[fx.id].name;
+  d["brightness"] = fx.id ? fx.bri : P[0].bri;
+  d["color_mode"] = "rgbw";
+  JsonObject c = d["color"].to<JsonObject>();
+  if (fx.id) { c["r"] = fx.r; c["g"] = fx.g; c["b"] = fx.b; c["w"] = fx.w; }
+  else { c["r"] = P[0].r; c["g"] = P[0].g; c["b"] = P[0].b; c["w"] = P[0].w; }
+  char buf[200]; size_t n = serializeJson(d, buf, sizeof buf);
+  mqtt.publish("trilumag/alle/state", (const uint8_t*)buf, n, true);
+  String sp(fx.speed);
+  mqtt.publish("trilumag/tempo/state", sp.c_str(), true);
 }
 
 // ---------- Farbe setzen (gemeinsam für App, API, MQTT) ----------
@@ -501,12 +719,25 @@ void applyCommand(int i, JsonVariantConst cmd) {
   if (!p.hasColor && p.on) { p.w = 255; p.hasColor = true; }   // nur "Ein" ohne Farbe: weiß
   if (p.state != DARK) p.state = ACTIVE;                         // erste Farbzuordnung beendet das Pulsieren
   colorsDirty = true; colorsDirtyAt = millis();
+  if (fx.id && !c.isNull()) fxStart(0);   // eine feste Farbe beendet den Effekt
   sendToPanel(i);
   publishState(i);
 }
 
 void applyAll(JsonVariantConst cmd) {
+  // Effekt starten, ändern oder (mit "Kein Effekt") beenden
+  if (!cmd["effect"].isNull() || (fx.id && cmd["color"].isNull())) {
+    const char* st = cmd["state"] | "";
+    bool on = strcmp(st, "OFF") != 0;
+    if (*st || !cmd["effect"].isNull())
+      for (int i = 0; i < SLOTS; i++) if (P[i].used && P[i].attached) { P[i].on = on; colorsDirty = true; colorsDirtyAt = millis(); }
+    if (fx.id || !cmd["effect"].isNull()) {
+      applyFx(cmd);
+      if (fx.id) { for (int i = 0; i < SLOTS; i++) if (P[i].used && P[i].attached) publishState(i); return; }
+    }
+  }
   for (int i = 0; i < SLOTS; i++) if (P[i].used && P[i].attached) applyCommand(i, cmd);
+  publishFx();
 }
 
 // ---------- Topologie ----------
@@ -514,7 +745,7 @@ void applyAll(JsonVariantConst cmd) {
 void reconcile() {
   int8_t q[SLOTS]; bool seen[SLOTS] = {false};
   int head = 0, tail = 0;
-  q[tail++] = 0; seen[0] = true; P[0].parent = -1;
+  q[tail++] = 0; seen[0] = true; P[0].parent = -1; P[0].depth = 0;
   while (head < tail) {
     int i = q[head++];
     for (uint8_t e = 0; e < 3; e++) {
@@ -524,7 +755,7 @@ void reconcile() {
       if (j < 0 || seen[j]) continue;
       int ej = edgeFacing(j, opposite(d));
       if (ej < 0 || !hasConnector(j, ej)) continue;
-      seen[j] = true; P[j].parent = i; q[tail++] = j;
+      seen[j] = true; P[j].parent = i; P[j].depth = P[i].depth + 1; q[tail++] = j;
     }
   }
   for (int i = 1; i < SLOTS; i++) {
@@ -630,6 +861,11 @@ String stateJson() {
   d["ap"] = apMode;
   d["ver"] = FW_VERSION;
   d["chip"] = CHIP_FAMILY;
+  JsonObject f = d["fx"].to<JsonObject>();
+  f["id"] = FX[fx.id].id; f["speed"] = fx.speed; f["bri"] = fx.bri;
+  f["r"] = fx.r; f["g"] = fx.g; f["b"] = fx.b; f["w"] = fx.w;
+  JsonArray fl = d["effects"].to<JsonArray>();
+  for (uint8_t k = 0; k < FX_COUNT; k++) { JsonObject e = fl.add<JsonObject>(); e["id"] = FX[k].id; e["name"] = FX[k].name; e["color"] = FX[k].color; }
   JsonArray pa = d["panels"].to<JsonArray>();
   JsonArray lo = d["loose"].to<JsonArray>();
   for (int i = 0; i < SLOTS; i++) {
@@ -679,6 +915,26 @@ void setupWeb() {
     if (!strcmp(id, "alle")) applyAll(d.as<JsonVariantConst>());
     else { int i = findChip(parseHex(id)); if (i < 0) return replyError("Panel unbekannt"); applyCommand(i, d.as<JsonVariantConst>()); }
     replyState();
+  });
+  server.on("/api/effect", HTTP_POST, [] {
+    JsonDocument d; if (!readBody(d)) return replyError("JSON fehlt");
+    if (d["effect"].is<const char*>() && fxFind(d["effect"].as<const char*>()) < 0) return replyError("Effekt unbekannt");
+    if (d["effect"].is<const char*>() && fxFind(d["effect"].as<const char*>()) > 0)
+      for (int i = 0; i < SLOTS; i++) if (P[i].used && P[i].attached && !P[i].on) { P[i].on = true; colorsDirty = true; colorsDirtyAt = millis(); }
+    applyFx(d.as<JsonVariantConst>());
+    replyState();
+  });
+  // aktuelles Effektbild, damit die App mitleuchtet
+  server.on("/api/live", HTTP_GET, [] {
+    String out = "{\"fx\":\""; out += FX[fx.id].id; out += "\",\"c\":{";
+    bool first = true;
+    for (int i = 0; i < SLOTS; i++) {
+      if (!P[i].used || !P[i].attached) continue;
+      char b[32]; snprintf(b, sizeof b, "%s\"%08X\":\"%02X%02X%02X%02X\"", first ? "" : ",", (unsigned)P[i].chip, OUT[i][0], OUT[i][1], OUT[i][2], OUT[i][3]);
+      out += b; first = false;
+    }
+    out += "}}";
+    server.send(200, "application/json", out);
   });
   server.on("/api/test", HTTP_POST, [] {
     JsonDocument d; if (!readBody(d)) return replyError("JSON fehlt");
@@ -732,7 +988,7 @@ void setupWeb() {
       prefs.putString("mqttUser", (const char*)(m["user"] | ""));
       if (m["pass"].is<const char*>()) prefs.putString("mqttPass", (const char*)m["pass"]);
     }
-    saveColors();
+    saveColors(); fxSave();
     server.send(200, "application/json", "{\"ok\":true,\"restart\":true}");
     logf("Einstellungen gespeichert, starte neu\n");
     delay(600);
@@ -765,6 +1021,11 @@ void setupWeb() {
 
 // ---------- MQTT-Empfang ----------
 void onMqtt(char* topic, byte* payload, unsigned int len) {
+  if (!strcmp(topic, "trilumag/tempo/set")) {
+    char b[8]; unsigned n = len < 7 ? len : 7; memcpy(b, payload, n); b[n] = 0;
+    fx.speed = constrain(atoi(b), 1, 100); fxDirty = true; fxDirtyAt = millis(); publishFx();
+    return;
+  }
   JsonDocument d;
   if (deserializeJson(d, payload, len)) return;
   String t(topic);                       // trilumag/<ID>/set
@@ -786,6 +1047,7 @@ void mqttLoop() {
     mqtt.publish("trilumag/bridge/avail", "online", true);
     mqtt.subscribe("trilumag/+/set");
     publishAllLight();
+    publishFx();
     for (int i = 0; i < SLOTS; i++) if (P[i].used) {
       publishDiscovery(i); publishAvail(i, P[i].attached);
       if (P[i].attached) publishState(i);
@@ -919,6 +1181,8 @@ void setup() {
   P[0].x = 0; P[0].y = 0; P[0].rot = 0;
   P[0].state = ACTIVE; P[0].hasColor = true; P[0].w = 200;
   loadColor(0);
+  fxLoad();
+  if (fx.id) logf("[FX] Effekt %s läuft weiter\n", FX[fx.id].name);
 
   strip.updateType(neoType(cfg.order) + NEO_KHZ800);
   strip.setPin(cfg.pins.led);
@@ -960,5 +1224,7 @@ void loop() {
       }
     }
   }
+  fxLoop();
   if (colorsDirty && millis() - colorsDirtyAt > 5000) saveColors();
+  if (fxDirty && millis() - fxDirtyAt > 5000) fxSave();
 }
