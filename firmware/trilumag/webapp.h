@@ -60,6 +60,8 @@ main{max-width:720px;margin:0 auto;padding:12px 14px;display:flex;flex-direction
 .tri{stroke:#000;stroke-width:1.6;transition:fill .12s linear;cursor:pointer}
 .tri.main{stroke:#666;stroke-width:2}
 .tri.sel{stroke:#fff;stroke-width:3}
+.tri.part{stroke-width:.8}
+.selo{fill:none;stroke:#fff;stroke-width:3;pointer-events:none}
 .dark{fill:#1a1a1a}
 .pulse{animation:pl 1.6s ease-in-out infinite}
 @keyframes pl{0%,100%{fill:#0f2350}50%{fill:#3d6dff}}
@@ -222,6 +224,8 @@ nav.tabs button.on{color:var(--acc)}
       <div class="kv" id="pInfo"></div>
       <div class="sl">Helligkeit<input type="range" id="pbri" min="1" max="100" value="71"><output id="pbrio">71 %</output></div>
       <div class="btnrow"><button class="btn" id="pOn">Ein / Aus</button><button class="btn pri" id="pCol">Farbe wählen</button></div>
+      <label class="tog"><input type="checkbox" id="pEdges"><span class="sw"></span>Kanten einzeln</label>
+      <p class="note">Effekte bekommen dann drei Farben pro Panel, eine je Kante. Feste Farben bleiben pro Panel.</p>
     </div>
   </section>
 
@@ -440,8 +444,14 @@ function drawWall(svg,big){
     else if(fxOn()&&live[p.id])fill=st.on?liveCol(live[p.id]):'#141414';
     else if(p.state===1&&st.on)cls.push('pulse');
     else fill=staticCol(p);
+    const lv=fxOn()&&live[p.id]&&!joining.includes(p.id)&&live[p.id].includes(',')?live[p.id].split(','):null;
+    if(lv&&p.state!==0){                                  // Kanten einzeln: drei Teildreiecke
+      const sh=shrink(g,.94);fan(p,sh,g.c).forEach((tri,e)=>{const q=el('polygon',{points:pts(tri),class:cls.filter(c=>c!=='sel').join(' ')+' part'});
+        q.style.fill=st.on?liveCol(lv[e]):'#141414';q.dataset.id=p.id;q.dataset.e=e;gP.append(q);});
+      if(cls.includes('sel'))gP.append(el('polygon',{points:pts(sh),class:'selo'}));
+    }else{
     const poly=el('polygon',{points:pts(shrink(g,.94)),class:cls.join(' ')});if(fill)poly.style.fill=fill;
-    poly.dataset.id=p.id;if(cls.includes('pulse'))syncPulse(poly);gP.append(poly);
+    poly.dataset.id=p.id;if(cls.includes('pulse'))syncPulse(poly);gP.append(poly);}
     if(big){
       if(!p.main){const m=edge1Mid(p);gP.append(el('circle',{cx:m[0],cy:m[1],r:2.4,class:'edge1'}));}
       else{const a=g.p[0],b=g.p[1];gP.append(el('line',{x1:a[0]+8,y1:a[1]+5,x2:b[0]-8,y2:b[1]+5,stroke:'#777','stroke-width':3,'stroke-linecap':'round'}));}
@@ -451,10 +461,18 @@ function drawWall(svg,big){
   if(big)drawDrag(svg);
 }
 function paintLive(){
+  let rebuild=false;
   ['mini','big'].forEach(id=>$(id).querySelectorAll('polygon[data-id]').forEach(p=>{const i=p.dataset.id,h=live[i];
+    if(h&&(h.includes(',')!==(p.dataset.e!==undefined)))rebuild=true;            // Kanten ein-/ausgeschaltet: neu zeichnen
     if(joining.includes(i)){if(!p.classList.contains('pulse')){p.style.fill='';p.classList.add('pulse');syncPulse(p);}}
-    else if(h){p.classList.remove('pulse');p.style.fill=st.on?liveCol(h):'#141414';}}));
+    else if(h){const c=h.split(',')[p.dataset.e||0];p.classList.remove('pulse');p.style.fill=st.on?liveCol(c):'#141414';}}));
+  if(rebuild&&!drag)render();
 }
+
+// Teildreiecke für Kanten einzeln: Kante e (eigene Zählung) → Seite des Dreiecks in der Welt
+function fan(p,sh,c){const L=p.up?['B','R','L']:['T','L','R'];const [a,b,t]=sh;
+  const side=d=>p.up?(d==='B'?[a,b]:d==='R'?[b,t]:[a,t]):(d==='T'?[a,b]:d==='L'?[a,t]:[b,t]);
+  return [0,1,2].map(e=>{const s2=side(L[(e+p.rot)%3]);return[c,s2[0],s2[1]];});}
 
 // Vorschau oben: Panels antippen wählt sie für die Farbe aus
 // beim Antippen auswerten: die Vorschau wird laufend neu gezeichnet, ein "click" ginge dabei verloren
@@ -623,11 +641,14 @@ function renderWall(){
       .forEach(([k,v])=>{const a=document.createElement('span');a.textContent=k;const b=document.createElement('span');b.textContent=v;$('pInfo').append(a,b);});
     if(document.activeElement!==$('pbri')){setRange('pbri',pct(p.bri));$('pbrio').textContent=pct(p.bri)+' %';}
     $('pOn').classList.toggle('pri',p.on);$('pOn').textContent=p.on?'Ein':'Aus';
+    if(document.activeElement!==$('pEdges'))$('pEdges').checked=!!p.edges;
   }
 }
 $('newBtn').addEventListener('click',async()=>{if(await api('/api/sim/new',{}))render();});
 $('pbri').addEventListener('input',()=>{$('pbrio').textContent=$('pbri').value+' %';const id=focus;later('pb',async()=>{await api('/api/set',{id,brightness:fromPct(+$('pbri').value)});render();});});
 $('pOn').addEventListener('click',async()=>{const p=st.panels.find(q=>q.id===focus);if(!p)return;await api('/api/set',{id:p.id,state:p.on?'OFF':'ON'});render();});
+$('pEdges').addEventListener('change',async()=>{if(!focus)return;await api('/api/set',{id:focus,edges:$('pEdges').checked});
+  toast($('pEdges').checked?'Kanten einzeln an: wirkt bei Effekten':'Kanten einzeln aus');render();});
 $('pCol').addEventListener('click',()=>{if(!focus)return;sel=new Set([focus]);showTab('col');});
 
 // ---------- Tab Presets ----------
@@ -663,8 +684,9 @@ async function loadCfg(){
   $('lpwrOn').checked=L.pwrMax>0;$('lpwrBox').classList.toggle('off',!(L.pwrMax>0));
   $('lpwrMax').value=L.pwrMax?(L.pwrMax/1000).toLocaleString('de-AT'):'';$('lpwrCh').value=L.pwrCh||12;
   ['sda','scl'].forEach(k=>{const s=$('p_'+k);s.innerHTML='<option value="-1">kein Sensor</option>';const def=k==='sda'?L.defSda:L.defScl;
-    cfg.validPins.forEach(p=>{const o=document.createElement('option');o.value=p;o.textContent='GPIO '+p+(p===def?' (Vorgabe)':'');s.append(o);});s.value=L[k]??-1;});
+    cfg.validPins.forEach(p=>{const o=document.createElement('option');o.value=p;o.textContent='GPIO '+p+(p===def?' ★':'');s.append(o);});s.value=L[k]??-1;});
   $('p_shunt').value=((L.shunt||50)/10).toLocaleString('de-AT');
+  sensDef=L.defSda>=0?`★ = Vorgabe für dein Board: SDA GPIO ${L.defSda}, SCL GPIO ${L.defScl}. `:'';
   renderSensor(L.sda,L.sensor);
   $('m_on').checked=!!cfg.mqtt.on;$('mqttFields').classList.toggle('off',!cfg.mqtt.on);$('m_host').value=cfg.mqtt.host;$('m_port').value=cfg.mqtt.port;$('m_user').value=cfg.mqtt.user;
   $('info').innerHTML='';[['Chip',cfg.chip],['Firmware',cfg.ver],['Betriebsart',cfg.mode==='bus'?'Bus':'Simulation'],['WLAN',st&&st.ssid||'–']]
@@ -723,7 +745,8 @@ function sendPwr(){const on=$('lpwrOn').checked;$('lpwrBox').classList.toggle('o
 $('lpwrOn').addEventListener('change',sendPwr);
 $('lpwrMax').addEventListener('change',sendPwr);$('lpwrCh').addEventListener('change',sendPwr);
 
-function renderSensor(sda,found){$('sensInfo').textContent=sda>=0?(found?'Sensor gefunden: Trilumag misst den echten Strom und regelt danach.':'Sensor nicht gefunden. Verkabelung prüfen (SDA, SCL, 3,3 V, GND), dann hier die Pins neu wählen.'):'Kein Sensor eingestellt. Der Strom wird aus den Farben geschätzt.';}
+let sensDef='';
+function renderSensor(sda,found){$('sensInfo').textContent=sensDef+(sda>=0?(found?'Sensor gefunden: Trilumag misst den echten Strom und regelt danach.':'Sensor nicht gefunden. Verkabelung prüfen (SDA, SCL, 3,3 V, GND), dann hier die Pins neu wählen.'):'Kein Sensor eingestellt. Der Strom wird aus den Farben geschätzt.');}
 async function sendSensor(){
   const sda=+$('p_sda').value,scl=+$('p_scl').value;
   if((sda<0)!==(scl<0)){$('sensInfo').textContent='Bitte beide Pins wählen oder bei beiden „kein Sensor“.';return;}

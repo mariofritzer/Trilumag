@@ -84,5 +84,9 @@ In der App unter Optionen „MQTT aktiv“ einschalten und die Adresse des Broke
 | `POST /api/effect` | `{"effect":"welle","speed":50,"intensity":128,"palette":"ozean"}`, alle Felder optional, `"aus"` heißt Einfarbig |
 | `POST /api/presets` | `{"action":"save","name":"Abend"}`, `{"action":"load","id":0}`, `{"action":"delete","id":0}` |
 | `GET /api/live` | aktuelles Effektbild aller Panels als RRGGBBWW |
+| `GET /api/diag` | Bus-Diagnose: Zähler, Antwortzeiten pro Panel, Ereignisprotokoll |
+| `GET /api/backup`, `POST /api/restore` | Sicherung herunterladen und einspielen |
+| `POST /api/light` | Übergangszeit, Stromlimit und Stromsensor-Pins |
+| `/json`, `/json/state`, `/json/info`, `/presets.json` | WLED-kompatible Schnittstelle (eine Wand = ein Segment) |
 | `POST /api/sim/attach` | Simulation: Panel anklipsen |
 | `POST /api/sim/detach` | Simulation: Panel abklipsen |

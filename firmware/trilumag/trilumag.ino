@@ -245,6 +245,7 @@ uint32_t parseHex(const char* s) { return (uint32_t)strtoul(s, nullptr, 16); }
 
 // ---------- Farben dauerhaft merken ----------
 void loadColor(int i) {
+  P[i].edges = prefs.getBool(("e" + hex(P[i].chip)).c_str(), false);
   uint8_t c[6];
   if (prefs.getBytes(("c" + hex(P[i].chip)).c_str(), c, 6) == 6) {
     P[i].r = c[0]; P[i].g = c[1]; P[i].b = c[2]; P[i].w = c[3]; P[i].bri = c[4]; P[i].on = c[5];
@@ -282,7 +283,7 @@ void orderBytes(const String& o, uint8_t* out) {
 // ---------- Bus ----------
 namespace bus {
 const uint8_t SYNC = 0xA5, ALL = 0x00, BYID = 0x7F, REPLY = 0x80;
-enum { C_PING = 0x01, C_COLOR = 0x02, C_EDGES = 0x03, C_FRAME = 0x04, C_PULSE = 0x05, C_ORDER = 0x06,
+enum { C_PING = 0x01, C_COLOR = 0x02, C_EDGES = 0x03, C_FRAME = 0x04, C_PULSE = 0x05, C_ORDER = 0x06, C_FRAME3 = 0x07,
        C_BEACON = 0x10, C_DISCOVER = 0x11, C_PROBE = 0x12, C_ASSIGN = 0x14, C_RESET = 0x15 };
 
 HardwareSerial& port = Serial1;
@@ -689,7 +690,7 @@ void fxCompute() {
 // Alles, was die Panels zeigen, läuft hier durch: Ziel berechnen (Effekt, feste Farbe oder Pulsieren),
 // Stromlimit anwenden, weich überblenden und als FRAME an alle Panels schicken (etwa 25-mal pro Sekunde,
 // aber nur, wenn sich etwas ändert, sonst einmal pro Sekunde zur Sicherheit).
-uint8_t FROM[SLOTS][4], SENT[SLOTS][4];
+uint8_t FROM[SLOTS][3][4], SENT[SLOTS][3][4];
 bool isPulse[SLOTS];
 uint32_t transStart = 0, transDur = 0, lastKeep = 0;
 bool transOn = false;
@@ -715,25 +716,27 @@ void computeTargets() {
   for (int i = 0; i < SLOTS; i++) {
     const Panel& p = P[i];
     isPulse[i] = false;
-    if (!p.used || !p.attached || p.state == DARK || !masterOn) { memset(TGT[i], 0, 4); continue; }
+    if (!p.used || !p.attached || p.state == DARK || !masterOn) { memset(TGT[i], 0, sizeof TGT[i]); continue; }
     bool joining = fx.id && p.joinAt && (int32_t)(now - p.joinAt) < 0;
     if (joining || (!fx.id && p.state == PULSE)) {               // blau pulsieren wie bisher die Panels selbst
       uint32_t t = (now - (joining ? p.joinAt - FX_JOIN_MS : p.since)) % 1600;
       t = t < 800 ? t : 1600 - t;
-      TGT[i][0] = 0; TGT[i][1] = 0; TGT[i][2] = (uint8_t)(6 + (t * 26) / 800); TGT[i][3] = 0;
+      uint8_t lv = (uint8_t)(6 + (t * 26) / 800);
+      for (int e = 0; e < 3; e++) { TGT[i][e][0] = 0; TGT[i][e][1] = 0; TGT[i][e][2] = lv; TGT[i][e][3] = 0; }
       isPulse[i] = true;
       continue;
     }
     if (fx.id) continue;                                         // Effektbild steht schon in TGT
     uint32_t k = p.on ? (uint32_t)p.bri * master : 0;
-    TGT[i][0] = p.r * k / 65025; TGT[i][1] = p.g * k / 65025; TGT[i][2] = p.b * k / 65025; TGT[i][3] = p.w * k / 65025;
+    uint8_t c[4] = {(uint8_t)(p.r * k / 65025), (uint8_t)(p.g * k / 65025), (uint8_t)(p.b * k / 65025), (uint8_t)(p.w * k / 65025)};
+    for (int e = 0; e < 3; e++) memcpy(TGT[i][e], c, 4);
   }
   // Stromlimit: Strom schätzen und bei Bedarf alles gleichmäßig dunkler machen (wie WLED)
   uint32_t led = 0, idle = 0;
   for (int i = 0; i < SLOTS; i++) {
     if (!P[i].used || !P[i].attached) continue;
     idle += i == 0 ? IDLE_MAIN_MA : IDLE_PANEL_MA;
-    led += (uint32_t)(TGT[i][0] + TGT[i][1] + TGT[i][2] + TGT[i][3]) * cfg.pwrCh * SEG_PER_PANEL / 255;
+    for (int e = 0; e < 3; e++) led += (uint32_t)(TGT[i][e][0] + TGT[i][e][1] + TGT[i][e][2] + TGT[i][e][3]) * cfg.pwrCh / 255;
   }
   powerScale = 1;
   if (cfg.pwrMax && led) {
@@ -742,38 +745,58 @@ void computeTargets() {
   }
   float sc = powerScale * measScale;
   estMa = idle + (uint32_t)(led * sc);
-  if (sc < 0.999f) for (int i = 0; i < SLOTS; i++) if (!isPulse[i]) for (int c = 0; c < 4; c++) TGT[i][c] = (uint8_t)(TGT[i][c] * sc);
+  if (sc < 0.999f) for (int i = 0; i < SLOTS; i++) if (!isPulse[i]) for (int e = 0; e < 3; e++) for (int c = 0; c < 4; c++) TGT[i][e][c] = (uint8_t)(TGT[i][e][c] * sc);
 }
 
+// FRAME: eine Farbe pro Panel; FRAME3: drei Farben pro Panel (ab Panel-Firmware 2).
+// Panels mit Kanten einzeln und alter Firmware bekommen ihre drei Farben zusätzlich per EDGES.
 void sendOutput(bool force) {
-  bool mainChanged = force || memcmp(SENT[0], CUR[0], 4);
+  bool mainChanged = force || memcmp(SENT[0], CUR[0], sizeof CUR[0]);
   if (cfg.pins.led >= 0 && mainChanged) {
-    uint32_t c = strip.Color(CUR[0][0], CUR[0][1], CUR[0][2], CUR[0][3]);
-    for (int k = 0; k < 3; k++) strip.setPixelColor(k, c);
+    for (int k = 0; k < 3; k++) strip.setPixelColor(k, strip.Color(CUR[0][k][0], CUR[0][k][1], CUR[0][k][2], CUR[0][k][3]));   // Pixel k = Kante k
     strip.show();
   }
-  memcpy(SENT[0], CUR[0], 4);
+  memcpy(SENT[0], CUR[0], sizeof CUR[0]);
   if (!cfg.bus) { memcpy(SENT, CUR, sizeof CUR); return; }
-  bool changed = force;
+  bool changed = force, anyEdges = false, allNew = true;
   uint8_t lo = 0xFF, hi = 0;
   for (int i = 1; i < SLOTS; i++) {
     const Panel& p = P[i];
     if (!p.used || !p.attached || !p.addr) continue;
     if (p.addr < lo) lo = p.addr; if (p.addr > hi) hi = p.addr;
-    if (memcmp(SENT[i], CUR[i], 4)) changed = true;
+    if (memcmp(SENT[i], CUR[i], sizeof CUR[i])) changed = true;
+    if (p.edges) anyEdges = true;
+    if (p.fw < 2) allNew = false;
   }
   if (lo > hi || !changed) return;
-  // höchstens 48 Panels pro Rahmen (Datenlänge bis 200 Byte)
-  for (uint8_t first = lo; first <= hi; first += 48) {
-    uint8_t n = (hi - first + 1) > 48 ? 48 : (hi - first + 1);
-    uint8_t d[2 + 48 * 4] = {first, n};
-    for (int i = 1; i < SLOTS; i++) {
-      const Panel& p = P[i];
-      if (!p.used || !p.attached || p.addr < first || p.addr >= first + n) continue;
-      memcpy(d + 2 + 4 * (p.addr - first), CUR[i], 4);
+  if (anyEdges && allNew) {
+    for (uint8_t first = lo; first <= hi; first += 16) {        // 16 Panels × 12 Byte pro Rahmen
+      uint8_t n = (hi - first + 1) > 16 ? 16 : (hi - first + 1);
+      uint8_t d[2 + 16 * 12] = {first, n};
+      for (int i = 1; i < SLOTS; i++) {
+        const Panel& p = P[i];
+        if (!p.used || !p.attached || p.addr < first || p.addr >= first + n) continue;
+        memcpy(d + 2 + 12 * (p.addr - first), CUR[i], 12);
+      }
+      bus::send(bus::ALL, bus::C_FRAME3, d, 2 + 12 * n);
+      busFramesSent++;
     }
-    bus::send(bus::ALL, bus::C_FRAME, d, 2 + 4 * n);
-    busFramesSent++;
+  } else {
+    for (uint8_t first = lo; first <= hi; first += 48) {        // höchstens 48 Panels pro Rahmen (Datenlänge bis 200 Byte)
+      uint8_t n = (hi - first + 1) > 48 ? 48 : (hi - first + 1);
+      uint8_t d[2 + 48 * 4] = {first, n};
+      for (int i = 1; i < SLOTS; i++) {
+        const Panel& p = P[i];
+        if (!p.used || !p.attached || p.addr < first || p.addr >= first + n) continue;
+        memcpy(d + 2 + 4 * (p.addr - first), CUR[i][0], 4);
+      }
+      bus::send(bus::ALL, bus::C_FRAME, d, 2 + 4 * n);
+      busFramesSent++;
+    }
+    for (int i = 1; i < SLOTS; i++) {                            // Kanten einzeln mit alter Panel-Firmware
+      const Panel& p = P[i];
+      if (p.used && p.attached && p.addr && p.edges && (force || memcmp(SENT[i], CUR[i], sizeof CUR[i]))) bus::send(p.addr, bus::C_EDGES, &CUR[i][0][0], 12);
+    }
   }
   memcpy(SENT, CUR, sizeof CUR);
 }
@@ -788,8 +811,8 @@ void outLoop() {
     e = (float)(uint32_t)(now - transStart) / transDur;
     if (e >= 1) { e = 1; transOn = false; } else e = e * e * (3 - 2 * e);
   }
-  for (int i = 0; i < SLOTS; i++) for (int c = 0; c < 4; c++)
-    CUR[i][c] = e >= 1 ? TGT[i][c] : (uint8_t)(FROM[i][c] + (TGT[i][c] - FROM[i][c]) * e + 0.5f);
+  for (int i = 0; i < SLOTS; i++) for (int k = 0; k < 3; k++) for (int c = 0; c < 4; c++)
+    CUR[i][k][c] = e >= 1 ? TGT[i][k][c] : (uint8_t)(FROM[i][k][c] + (TGT[i][k][c] - FROM[i][k][c]) * e + 0.5f);
   bool keep = now - lastKeep > 1000;               // einmal pro Sekunde alles neu schicken, falls ein Panel neu gestartet ist
   if (keep) lastKeep = now;
   sendOutput(outForce || keep);
@@ -1166,6 +1189,12 @@ void applyCommand(int i, JsonVariantConst cmd) {
     if (!masterOn) { masterOn = true; resendAll(); publishFx(); }   // ein Panel einschalten weckt die Wand
   }
   if (cmd["brightness"].is<int>()) p.bri = constrain(cmd["brightness"].as<int>(), 0, 255);
+  if (cmd["edges"].is<bool>()) {                       // Kanten einzeln für dieses Panel
+    p.edges = cmd["edges"].as<bool>();
+    String k = "e" + hex(p.chip);
+    if (p.edges) prefs.putBool(k.c_str(), true); else prefs.remove(k.c_str());
+    if (cmd["color"].isNull() && cmd["state"].isNull()) { outForce = true; return; }
+  }
   JsonVariantConst c = cmd["color"];
   if (!c.isNull()) {
     p.r = c["r"] | p.r; p.g = c["g"] | p.g; p.b = c["b"] | p.b; p.w = c["w"] | p.w;
@@ -1417,7 +1446,7 @@ String stateJson(bool meta) {
     o["id"] = hex(p.chip); o["main"] = (i == 0);
     o["x"] = p.x; o["y"] = p.y; o["up"] = isUp(p.x, p.y); o["rot"] = p.rot;
     o["parent"] = p.parent >= 0 ? hex(P[p.parent].chip) : String();
-    o["state"] = p.state; o["on"] = p.on;
+    o["state"] = p.state; o["on"] = p.on; o["edges"] = p.edges; o["fw"] = p.fw;
     o["r"] = p.r; o["g"] = p.g; o["b"] = p.b; o["w"] = p.w; o["bri"] = p.bri;
   }
   JsonArray gh = d["ghosts"].to<JsonArray>();
@@ -1629,6 +1658,8 @@ String backupJson() {
   }
   JsonObject col = d["colors"].to<JsonObject>();
   JsonArray sim = d["sim"].to<JsonArray>();
+  JsonArray eg = d["edges"].to<JsonArray>();
+  for (int i = 0; i < SLOTS; i++) if (P[i].used && P[i].edges) eg.add(hex(P[i].chip));
   for (int i = 0; i < SLOTS; i++) {
     const Panel& q = P[i];
     if (!q.used) continue;
@@ -1681,6 +1712,7 @@ const char* restoreBackup(JsonDocument& d) {
     uint8_t c6[6] = {a[0], a[1], a[2], a[3], a[4], a[5]};
     prefs.putBytes(("c" + String(kv.key().c_str())).c_str(), c6, 6);
   }
+  for (JsonVariant v : d["edges"].as<JsonArray>()) prefs.putBool(("e" + String((const char*)(v | ""))).c_str(), true);
   JsonArray sim = d["sim"];
   if (sim.size()) {
     SimRec r[SLOTS]; uint8_t n = 0;
@@ -1892,7 +1924,11 @@ String liveJson() {
   bool first = true;
   for (int i = 0; i < SLOTS; i++) {
     if (!P[i].used || !P[i].attached) continue;
-    char b[32]; snprintf(b, sizeof b, "%s\"%08X\":\"%02X%02X%02X%02X\"", first ? "" : ",", (unsigned)P[i].chip, CUR[i][0], CUR[i][1], CUR[i][2], CUR[i][3]);
+    char b[64];
+    int n = snprintf(b, sizeof b, "%s\"%08X\":\"", first ? "" : ",", (unsigned)P[i].chip);
+    for (int e = 0; e < (P[i].edges ? 3 : 1); e++)                // Kanten einzeln: drei Farben, durch Komma getrennt
+      n += snprintf(b + n, sizeof b - n, "%s%02X%02X%02X%02X", e ? "," : "", CUR[i][e][0], CUR[i][e][1], CUR[i][e][2], CUR[i][e][3]);
+    snprintf(b + n, sizeof b - n, "\"");
     out += b; first = false;
   }
   out += "},\"j\":[";

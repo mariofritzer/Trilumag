@@ -2,6 +2,33 @@
 
 Die Versionsnummer im Webinstaller und in der App setzt sich aus der Version in der Firmware und der Nummer des automatischen Builds zusammen, zum Beispiel **0.5.11** = Version 0.5, Build 11. Bis Build 9 hat der Build die Nummer immer als 0.2.x ausgegeben, die tatsächlichen Stände stehen deshalb unten mit beiden Nummern.
 
+## Nächster Build
+
+**Stromlimit**
+- Eigenes Kästchen „Stromlimit“ unter Optionen, mit Anzeige des aktuellen Stroms.
+- Die Pins für den Stromsensor INA226 wählst du direkt dort. Sie gelten sofort, ohne Neustart.
+- Jedes Board hat eine Vorgabe, die mit ★ markiert ist: S3-DevKitC SDA 1 / SCL 2, ESP32-DevKit 21 / 22, C3 SuperMini 5 / 6, C6 6 / 7.
+- Ist ein Sensor-Pin schon für den Bus oder die LEDs belegt, wird er abgelehnt.
+
+**Bus-Diagnose**
+- Neues Kästchen unter Optionen: pro Panel Adresse, Antwortzeit, verpasste Antworten und Panel-Firmware.
+- Dazu Zähler für gesendete Bilder, Erkennungsrunden, verpasste Antworten und gestörte Übertragungen.
+- Ein Ereignisprotokoll zeigt Anklipsen, Abklipsen, Probleme bei der Erkennung und Neustarts.
+- Die Bus-Werte stehen auch beim angetippten Panel unter Wand.
+
+**Kanten einzeln**
+- Unter Wand lässt sich „Kanten einzeln“ pro Panel einschalten. Effekte geben dem Panel dann drei Farben, eine je Kante.
+- Wellen und Verläufe laufen so sichtbar durch die Dreiecke. Die Vorschau zeigt die drei Teile.
+- Panel-Firmware 2 bringt dafür den Sammelbefehl FRAME3 mit. Panels mit Firmware 1 bekommen die drei Farben über den vorhandenen Befehl EDGES und funktionieren ohne neue Firmware.
+
+**WLED-kompatible Schnittstelle**
+- Trilumag meldet sich zusätzlich als WLED-Gerät mit einem Segment, der ganzen Wand.
+- Unterstützt werden `/json`, `/json/state`, `/json/info`, `/json/eff`, `/json/pal` und `/presets.json`.
+- Damit funktionieren die WLED-Integration von Home Assistant und andere WLED-Programme: Ein/Aus, Helligkeit, Farbe, Effekt, Tempo, Intensität, Palette und Presets.
+
+**Schaltplan**
+- Der optionale Stromsensor U6 (INA226) mit Shunt R14 (5 mΩ) ist im Schaltplan des Hauptpanels eingetragen.
+
 ## 0.7.18 · 4. Oktober 2026
 
 **Update-Absicherung**
