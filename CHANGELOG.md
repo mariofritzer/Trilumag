@@ -2,7 +2,7 @@
 
 Die Versionsnummer im Webinstaller und in der App setzt sich aus der Version in der Firmware und der Nummer des automatischen Builds zusammen, zum Beispiel **0.5.11** = Version 0.5, Build 11. Bis Build 9 hat der Build die Nummer immer als 0.2.x ausgegeben, die tatsächlichen Stände stehen deshalb unten mit beiden Nummern.
 
-## Nächster Build
+## 0.6.16 · 4. Oktober 2026
 
 **Simulation**
 - Die simulierte Wand bleibt erhalten. Angeklipste Panels mit Position und Drehung und die Ablage übersteht jetzt Neustarts und Updates. Vorher fing die Simulation nach jedem Neustart mit leerer Wand an.
