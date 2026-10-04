@@ -519,7 +519,7 @@ enum PalDefault : uint8_t { D_HUE, D_COLOR, D_FIRE, D_AURORA };
 void fireColor(float h, float* c) { c[0] = 255 * h; c[1] = 85 * h * h; c[2] = 0; c[3] = 20 * h * h * h; }
 
 // Farbe an Stelle t (0..1, wiederholt sich) aus der gewählten Palette
-void pcol(float t, float* c, PalDefault def) {
+void pcol(float t, float* c, uint8_t def) {   // def: PalDefault (als uint8_t, wegen der automatischen Arduino-Prototypen)
   t = t - floorf(t);
   if (fx.pal == 0) {
     switch (def) {
