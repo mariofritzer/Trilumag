@@ -1,0 +1,88 @@
+name: Firmware bauen und Installer veröffentlichen
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+env:
+  ESP32_CORE: "3.0.7"
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: arduino/setup-arduino-cli@v2
+
+      - name: Cache für ESP32-Werkzeuge
+        uses: actions/cache@v4
+        with:
+          path: ~/.arduino15
+          key: arduino15-esp32-${{ env.ESP32_CORE }}
+
+      - name: ESP32-Kern und Bibliotheken installieren
+        run: |
+          arduino-cli config init --overwrite
+          arduino-cli config add board_manager.additional_urls https://espressif.github.io/arduino-esp32/package_esp32_index.json
+          arduino-cli core update-index
+          arduino-cli core install "esp32:esp32@${ESP32_CORE}"
+          arduino-cli lib install "ArduinoJson@7.2.1" "PubSubClient@2.8"
+
+      - name: Firmware kompilieren
+        run: |
+          set -euo pipefail
+          pip install --quiet esptool
+          VERSION="0.1.${GITHUB_RUN_NUMBER}"
+          sed -i "s/const char\* FW_VERSION = \"[^\"]*\";/const char* FW_VERSION = \"${VERSION}\";/" firmware/trilumag/trilumag.ino
+          BOOT_APP0=$(find ~/.arduino15/packages/esp32/hardware/esp32 -name boot_app0.bin | head -n1)
+
+          build () {
+            NAME="$1"; FQBN="$2"; CHIP="$3"; BOOT_OFFSET="$4"
+            echo "::group::Baue ${NAME}"
+            arduino-cli compile --fqbn "$FQBN" --build-path "build/${NAME}" --warnings default firmware/trilumag
+            mkdir -p "site/firmware/${NAME}"
+            if [ -f "build/${NAME}/trilumag.ino.merged.bin" ]; then
+              cp "build/${NAME}/trilumag.ino.merged.bin" "site/firmware/${NAME}/trilumag.bin"
+            else
+              python -m esptool --chip "$CHIP" merge_bin -o "site/firmware/${NAME}/trilumag.bin" \
+                "$BOOT_OFFSET" "build/${NAME}/trilumag.ino.bootloader.bin" \
+                0x8000 "build/${NAME}/trilumag.ino.partitions.bin" \
+                0xe000 "$BOOT_APP0" \
+                0x10000 "build/${NAME}/trilumag.ino.bin"
+            fi
+            ls -l "site/firmware/${NAME}"
+            echo "::endgroup::"
+          }
+
+          build esp32   "esp32:esp32:esp32"                    esp32   0x1000
+          build esp32s3 "esp32:esp32:esp32s3:CDCOnBoot=cdc"    esp32s3 0x0
+          build esp32c3 "esp32:esp32:esp32c3:CDCOnBoot=cdc"    esp32c3 0x0
+
+          cp installer/* site/
+          sed -i "s/__VERSION__/${VERSION}/g" site/manifest.json site/index.html
+          touch site/.nojekyll
+
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: site
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4

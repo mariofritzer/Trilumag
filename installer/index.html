@@ -1,0 +1,96 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Trilumag Installer</title>
+<meta name="description" content="Firmware für das Trilumag-Hauptpanel direkt aus dem Browser auf einen ESP32 spielen.">
+<script type="module" src="https://unpkg.com/esp-web-tools@10/dist/web/install-button.js?module"></script>
+<style>
+:root{--bg:#0d0f13;--panel:#161a21;--line:#2a303a;--fg:#e7eaef;--muted:#98a1ae;--accent:#6e8bff;--warn:#ffb347;color-scheme:dark;
+  --esp-tools-button-color:#6e8bff;--esp-tools-button-text-color:#0d0f13;--esp-tools-button-border-radius:999px}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--fg);font:16px/1.6 system-ui,-apple-system,"Segoe UI",sans-serif}
+.wrap{max-width:760px;margin:0 auto;padding:40px 16px 64px;display:flex;flex-direction:column;gap:28px}
+.hero{display:grid;grid-template-columns:auto 1fr;gap:22px;align-items:center}
+@media (max-width:560px){.hero{grid-template-columns:1fr}}
+.logo{width:120px;height:104px}
+h1{font-size:clamp(34px,7vw,48px);line-height:1;margin:0;letter-spacing:-.02em;font-weight:750}
+.lead{color:var(--muted);margin:8px 0 0;max-width:52ch}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:20px;display:flex;flex-direction:column;gap:14px}
+h2{font-size:15px;margin:0;color:var(--muted);font-weight:500;letter-spacing:.08em;text-transform:uppercase}
+.btn{font:600 17px/1 system-ui,sans-serif;background:var(--accent);color:#0d0f13;border:0;border-radius:999px;padding:16px 26px;cursor:pointer}
+.btn:focus-visible{outline:2px solid #fff;outline-offset:3px}
+.meta{font:13px ui-monospace,Menlo,monospace;color:var(--muted)}
+ol{margin:0;padding-left:22px;display:flex;flex-direction:column;gap:10px}
+li::marker{color:var(--accent);font-weight:600}
+.warn{border-color:var(--warn)}
+.warn p{margin:0}
+code{font:14px ui-monospace,Menlo,monospace;background:#0d0f13;border:1px solid var(--line);border-radius:6px;padding:1px 6px}
+a{color:var(--accent)}
+.chips{display:flex;flex-wrap:wrap;gap:8px}
+.chip{font:13px ui-monospace,Menlo,monospace;border:1px solid var(--line);border-radius:999px;padding:4px 10px;color:var(--muted)}
+details{border-top:1px solid var(--line);padding-top:12px}
+details+details{margin-top:-4px}
+summary{cursor:pointer;font-weight:500}
+details p{color:var(--muted);margin:8px 0 0}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="hero">
+    <svg class="logo" viewBox="0 0 120 104" aria-hidden="true">
+      <polygon points="4,100 60,4 116,100" fill="#16203d" stroke="#6e8bff" stroke-width="3" stroke-linejoin="round"/>
+      <polygon points="32,52 60,4 88,52" fill="#3d6dff" opacity=".85"/>
+      <polygon points="4,100 32,52 60,100" fill="#ff6b5c" opacity=".8"/>
+      <polygon points="60,100 88,52 116,100" fill="#3fd69a" opacity=".8"/>
+    </svg>
+    <div>
+      <h1>Trilumag</h1>
+      <p class="lead">Dreieckige Lichtpanels mit Magnetkontakten. Hier spielst du die Firmware für das Hauptpanel direkt aus dem Browser auf einen ESP32 und richtest gleich das WLAN ein.</p>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>Installieren</h2>
+    <esp-web-install-button manifest="manifest.json">
+      <button slot="activate" class="btn">Mit ESP32 verbinden und installieren</button>
+      <span slot="unsupported"><strong>Dieser Browser kann nicht auf USB zugreifen.</strong> Bitte Chrome, Edge oder Opera am Computer verwenden. Auf iPhone, iPad und in Firefox oder Safari geht es nicht.</span>
+      <span slot="not-allowed"><strong>Die Seite muss über https geöffnet werden.</strong></span>
+    </esp-web-install-button>
+    <div class="chips"><span class="chip">ESP32</span><span class="chip">ESP32-S3</span><span class="chip">ESP32-C3</span><span class="chip">Version __VERSION__</span></div>
+    <p class="meta">Der Installer erkennt selbst, welcher ESP32 angeschlossen ist, und wählt die passende Firmware.</p>
+  </div>
+
+  <div class="card">
+    <h2>So geht’s</h2>
+    <ol>
+      <li>ESP32 per USB-Kabel an den Computer anschließen. Beim <strong>ESP32-S3-DevKitC</strong> die Buchse mit der Aufschrift <code>COM</code> oder <code>UART</code> nehmen.</li>
+      <li>Oben auf <strong>Installieren</strong> tippen und im Fenster den Anschluss auswählen, meist heißt er <code>USB Serial</code>, <code>CP210x</code>, <code>CH340</code> oder <code>USB JTAG/serial</code>.</li>
+      <li><strong>Trilumag installieren</strong> wählen. Beim ersten Mal den Speicher löschen lassen. Das Aufspielen dauert etwa eine Minute.</li>
+      <li>Danach fragt der Installer nach deinem <strong>WLAN</strong>. Netz auswählen, Passwort eingeben, fertig.</li>
+      <li>Mit <strong>Gerät besuchen</strong> öffnet sich die Trilumag-App. Später erreichst du sie unter <code>http://trilumag.local</code>.</li>
+    </ol>
+  </div>
+
+  <div class="card warn">
+    <h2>Simulation</h2>
+    <p>Diese Version läuft im Simulationsmodus: Die Panels werden in der App angeklipst, ganz ohne echte Hardware. So lassen sich App, Erkennung und Home Assistant schon testen, bevor die Panels gebaut sind.</p>
+  </div>
+
+  <div class="card">
+    <h2>Wenn es nicht klappt</h2>
+    <details><summary>Der ESP32 taucht nicht in der Liste auf</summary>
+      <p>Anderes USB-Kabel probieren, viele Kabel laden nur und übertragen keine Daten. Unter Windows eventuell den Treiber für den USB-Chip installieren (CP210x oder CH340, steht meist auf dem Board).</p></details>
+    <details><summary>Die Verbindung bricht beim Aufspielen ab</summary>
+      <p>Taste <code>BOOT</code> gedrückt halten, kurz <code>RESET</code> drücken, <code>BOOT</code> loslassen und neu starten. Dann ist der ESP32 sicher im Programmiermodus.</p></details>
+    <details><summary>Das WLAN lässt sich im Installer nicht einrichten</summary>
+      <p>Kein Problem: Der ESP32 öffnet dann ein eigenes Netz <code>Trilumag-Setup</code> mit dem Passwort <code>trilumag</code>. Damit verbinden und <code>http://192.168.4.1</code> öffnen, dort das WLAN eintragen.</p></details>
+    <details><summary>Nur 2,4 GHz</summary>
+      <p>Der ESP32 kann kein 5-GHz-WLAN. Dein Router muss ein 2,4-GHz-Netz anbieten.</p></details>
+  </div>
+
+  <p class="meta">Quellcode und Bauplan: <a href="https://github.com/mariofritzer/Trilumag">github.com/mariofritzer/Trilumag</a></p>
+</div>
+</body>
+</html>
