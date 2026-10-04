@@ -42,6 +42,7 @@
 #include "pins.h"
 #include "ws.h"
 #include "ota.h"
+#include "panel_fw.h"   // aktuelle Panel-Firmware für Updates über den Bus (erzeugt beim Build)
 #include <Wire.h>
 #include "esp_ota_ops.h"
 #include "esp_timer.h"
@@ -103,7 +104,11 @@ struct Panel {
   uint32_t pings = 0, missed = 0;   // Abfragen und verpasste Antworten seit dem Anklipsen
   uint16_t rtt = 0, rttMax = 0;     // Antwortzeit in µs (zuletzt, höchste)
   uint8_t fw = 0;                   // Firmware-Version des Panels (aus PING)
-  uint16_t attaches = 0;            // wie oft seit dem Start angeklipst
+  uint16_t attaches = 0;            // wie oft seit dem Start erkannt
+  uint32_t clips = 0;               // wie oft insgesamt angeklipst (dauerhaft gespeichert)
+  uint8_t caps = 0;                 // vom Panel gemeldet: 1 = Touch-Sensor, 2 = Bootloader
+  uint8_t touchSeq = 0; bool touchKnown = false;
+  uint8_t upd = 0, updPct = 0, updFails = 0;   // Panel-Update: 0 nichts, 1 wartet, 2 läuft, 3 fehlgeschlagen
   bool edges = false;               // Kanten einzeln: Effekte bekommen drei Farben pro Panel
   uint8_t state = DARK;
   uint32_t since = 0;
@@ -125,6 +130,10 @@ struct Config {
   int8_t i2cSda = -1, i2cScl = -1;   // Stromsensor INA226 (optional)
   uint16_t shuntUo = 50;    // Shunt in 0,1 mΩ (50 = 5 mΩ)
   bool mqttOn = false;     // Häkchen "MQTT aktiv"; Zugangsdaten bleiben auch ausgeschaltet gespeichert
+  bool touchOn = true;      // Antippen der Panels (Beschleunigungssensor)
+  uint8_t touchSens = 5;    // Empfindlichkeit 1 bis 10
+  uint8_t tapA1 = 1, tapA2 = 2;   // Aktion für einmal und doppelt antippen (TapAction)
+  bool panelAuto = true;    // Panels mit älterer Firmware automatisch aktualisieren
   String mqttHost;
   uint16_t mqttPort = 1883;
   String mqttUser, mqttPass;
@@ -284,7 +293,10 @@ void orderBytes(const String& o, uint8_t* out) {
 namespace bus {
 const uint8_t SYNC = 0xA5, ALL = 0x00, BYID = 0x7F, REPLY = 0x80;
 enum { C_PING = 0x01, C_COLOR = 0x02, C_EDGES = 0x03, C_FRAME = 0x04, C_PULSE = 0x05, C_ORDER = 0x06, C_FRAME3 = 0x07,
-       C_BEACON = 0x10, C_DISCOVER = 0x11, C_PROBE = 0x12, C_ASSIGN = 0x14, C_RESET = 0x15 };
+       C_TOUCH = 0x08,
+       C_BEACON = 0x10, C_DISCOVER = 0x11, C_PROBE = 0x12, C_ASSIGN = 0x14, C_RESET = 0x15,
+       C_BOOT = 0x20, BL_INFO = 0x21, BL_WRITE = 0x22, BL_DONE = 0x23, BL_SCAN = 0x24, BL_RUN = 0x25 };
+enum { CAP_TOUCH = 1, CAP_BOOT = 2 };
 
 HardwareSerial& port = Serial1;
 
@@ -370,6 +382,10 @@ void sendOrder(uint8_t addr) {
   send(addr, C_ORDER, o, 4);
 }
 
+// Empfindlichkeit 1..10 als Schwelle des Sensors (16 mg je Schritt), 0 = aus
+uint8_t touchThreshold() { return cfg.touchOn ? 66 - 6 * constrain((int)cfg.touchSens, 1, 10) : 0; }
+void sendTouch(uint8_t addr) { uint8_t t = touchThreshold(); send(addr, C_TOUCH, &t, 1); }
+
 void begin() {
   port.begin(250000, SERIAL_8N1, cfg.pins.rx, cfg.pins.tx);
   port.setPins(cfg.pins.rx, cfg.pins.tx, -1, cfg.pins.de);
@@ -378,6 +394,7 @@ void begin() {
   send(ALL, C_RESET);
   delay(5);
   sendOrder(ALL);
+  sendTouch(ALL);
   beacons(true);
   logf("[BUS] gestartet: RX %d, TX %d, DE %d, SNS rechts %d, SNS links %d\n",
        cfg.pins.rx, cfg.pins.tx, cfg.pins.de, cfg.pins.snsR, cfg.pins.snsL);
@@ -390,15 +407,28 @@ extern bool outForce, testMode;
 void transition();
 bool placePanel(int i, int parent, uint8_t edge, uint8_t own);
 
+// ---------- Anklips-Zähler (dauerhaft im NVS, je Chip-ID) ----------
+String clipKey(uint32_t chip) { return "n" + hex(chip); }
+void clipsLoad(int i) { P[i].clips = prefs.getUInt(clipKey(P[i].chip).c_str(), 0); }
+void clipCount(int i) { P[i].clips++; prefs.putUInt(clipKey(P[i].chip).c_str(), P[i].clips); }
+// Beim Einschalten der ganzen Wand melden sich alle Panels als frisch versorgt. Das ist kein Anklipsen:
+// Bis 5 s nach dem letzten gefundenen Panel (mindestens 15 s nach dem Start) wird nicht gezählt.
+uint32_t busQuietUntil = 15000;
+
+namespace pupd { bool busy(uint32_t chip); void loop(); }
+void touchEvent(int i, uint8_t kind);
+void wsKick();
+
 // Neues Panel gefunden: Nachbarn orten, Adresse vergeben, Farbe oder Pulsieren
 void busHandleNew(uint32_t chip, uint8_t mask) {
+  if (pupd::busy(chip)) return;                // startet gerade nach einem Update neu, bekommt seine alte Adresse
   int i = findChip(chip);
   if (i >= 0 && P[i].attached) { P[i].attached = false; P[i].addr = 0; }   // Panel wurde neu gestartet
   if (i < 0) {
     for (int k = 1; k < SLOTS; k++) if (!P[k].used) { i = k; break; }
     if (i < 0) { logf("[BUS] kein Platz mehr für %s\n", hex(chip).c_str()); return; }
     P[i] = Panel(); P[i].used = true; P[i].chip = chip;
-    loadColor(i);
+    loadColor(i); clipsLoad(i);
   }
   if (countAttached() >= MAX_ATTACHED) { logf("[BUS] Höchstzahl erreicht, %s wird ignoriert\n", hex(chip).c_str()); return; }
 
@@ -438,9 +468,13 @@ void busHandleNew(uint32_t chip, uint8_t mask) {
     diag("Panel %s hat die Adresse nicht bestätigt", hex(chip).substring(4).c_str());
     P[i].attached = false; reconcile(); return;
   }
-  P[i].addr = addr; P[i].miss = 0;
+  bool fresh = r.len >= 1 ? r.data[0] : true;   // Panel-Firmware ab 3: 1 = gerade erst Strom bekommen
+  P[i].addr = addr; P[i].miss = 0; P[i].touchKnown = false;
   P[i].joinAt = (millis() + FX_JOIN_MS) | 1;
   bus::sendOrder(addr);
+  bus::sendTouch(addr);
+  if ((int32_t)(millis() - busQuietUntil) < 0) busQuietUntil = millis() + 5000;
+  else if (fresh) clipCount(i);
   P[i].state = P[i].hasColor ? ACTIVE : PULSE;
   P[i].since = millis();
   transition();                       // weich einblenden, das nächste Bild enthält das neue Panel
@@ -457,7 +491,7 @@ void busLoop() {
     bool lost = false;
     for (int i = 1; i < SLOTS; i++) {
       Panel& p = P[i];
-      if (!p.used || !p.attached || !p.addr) continue;
+      if (!p.used || !p.attached || !p.addr || p.upd == 2) continue;   // während des Updates im Bootloader
       uint32_t t0 = micros();
       bus::send(p.addr, bus::C_PING);
       bus::Reply r;
@@ -466,9 +500,15 @@ void busLoop() {
         p.miss = 0;
         uint32_t us = micros() - t0; p.rtt = us > 65535 ? 65535 : us; if (p.rtt > p.rttMax) p.rttMax = p.rtt;
         if (r.len >= 3) p.fw = r.data[2];
+        if (r.len >= 5) {                       // ab Panel-Firmware 3: Antippen und Fähigkeiten
+          p.caps = r.data[4];
+          if (p.touchKnown && r.data[3] != p.touchSeq && (r.data[3] & 3)) touchEvent(i, r.data[3] & 3);
+          p.touchSeq = r.data[3]; p.touchKnown = true;
+        }
         if (r.len >= 1 && r.data[0] == DARK && p.state != DARK) outForce = true;   // Panel hat Zustand verloren: alles neu schicken   // Panel hat Zustand verloren
       } else if (p.missed++, busTimeouts++, ++p.miss >= 3) {
         diag("Panel %s antwortet nicht mehr, gilt als abgeklipst", hex(p.chip).substring(4).c_str());
+        bus::send(p.addr, bus::C_RESET);
         p.attached = false; p.addr = 0; p.state = DARK; publishAvail(i, false); lost = true;
       }
     }
@@ -493,7 +533,133 @@ void busLoop() {
     }
     for (uint8_t k = 0; k < n; k++) busHandleNew(found[k], masks[k]);
   }
+  pupd::loop();
 }
+
+// ---------- Panel-Updates über den Bus ----------
+// Das Hauptpanel trägt die aktuelle Panel-Firmware (panel_fw.h) in sich. Ein Panel mit älterer Version
+// springt auf BOOT in seinen Bootloader, bekommt die Firmware Seite für Seite (64 Bytes) und startet neu.
+// Danach bekommt es seine alte Adresse zurück, ohne Neuerkennung. Panels, die nach einem abgebrochenen Update
+// im Bootloader hängen, melden sich auf BL_SCAN und werden automatisch neu bespielt.
+namespace pupd {
+enum Step : uint8_t { IDLE, ENTER, INFO, WRITE, DONE, ASSIGN, SIM };
+struct Job { int8_t i = -1; uint32_t chip = 0; uint8_t addr = 0; Step step = IDLE; uint16_t page = 0; uint8_t tries = 0; uint32_t at = 0; bool rescue = false; };
+Job job;
+uint32_t lastScan = 0;
+uint8_t scanRound = 0;
+
+bool busy(uint32_t chip) { return job.step != IDLE && job.chip == chip; }
+bool canUpdate(const Panel& p) {
+  if (!p.used || !p.attached || !p.fw || p.fw >= PANEL_FW_VERSION) return false;
+  return cfg.bus ? (p.caps & bus::CAP_BOOT) && p.addr : true;
+}
+
+void sendBl(uint32_t chip, uint8_t cmd, const uint8_t* extra, uint8_t n) {
+  uint8_t d[4 + 65] = {(uint8_t)chip, (uint8_t)(chip >> 8), (uint8_t)(chip >> 16), (uint8_t)(chip >> 24)};
+  if (n) memcpy(d + 4, extra, n);
+  bus::send(bus::BYID, cmd, d, 4 + n);
+}
+
+void end(bool ok, const char* why) {
+  int i = job.i;
+  String name = hex(job.chip).substring(4);
+  if (i >= 0) {
+    P[i].upd = ok ? 0 : 3; P[i].updPct = ok ? 100 : 0; P[i].miss = 0;
+    if (!ok) P[i].updFails++;
+    if (ok && !cfg.bus) { P[i].fw = PANEL_FW_VERSION; prefs.putUChar(("f" + hex(P[i].chip)).c_str(), PANEL_FW_VERSION); }
+  }
+  if (ok) diag("Panel %s hat jetzt Firmware %u", name.c_str(), PANEL_FW_VERSION);
+  else diag("Update von Panel %s fehlgeschlagen: %s", name.c_str(), why);
+  job = Job();
+  wsKick();
+}
+
+void start(int i) {
+  job = Job(); job.i = i; job.chip = P[i].chip; job.addr = P[i].addr;
+  job.step = cfg.bus ? ENTER : SIM; job.at = millis();
+  P[i].upd = 2; P[i].updPct = 0;
+  diag("Panel %s: Update auf Firmware %u beginnt", hex(P[i].chip).substring(4).c_str(), PANEL_FW_VERSION);
+}
+
+// Ein Schritt pro Aufruf, damit App und Effekte weiterlaufen
+void step() {
+  if ((int32_t)(millis() - job.at) < 0) return;
+  bus::Reply r;
+  switch (job.step) {
+  case IDLE: return;
+  case SIM:                                          // Simulation: gleiche Dauer wie am Bus, etwa 15 ms pro Seite
+    job.at = millis() + 15;
+    if (++job.page >= PANEL_FW_PAGES) end(true, nullptr);
+    break;
+  case ENTER:
+    bus::send(job.addr, bus::C_BOOT);
+    if (bus::receive(r, 5) && r.cmd == bus::C_BOOT && r.len >= 1) {
+      if (!r.data[0]) { end(false, "kein Bootloader"); return; }
+      job.step = INFO; job.tries = 0; job.at = millis() + 30;
+    } else if (++job.tries > 5) end(false, "antwortet nicht");
+    return;
+  case INFO:
+    sendBl(job.chip, bus::BL_INFO, nullptr, 0);
+    if (bus::receive(r, 5) && r.cmd == bus::BL_INFO) { job.step = WRITE; job.page = 0; job.tries = 0; }
+    else if (++job.tries > 50) end(false, "Bootloader meldet sich nicht");
+    else job.at = millis() + 20;
+    return;
+  case WRITE: {
+    uint8_t d[65]; d[0] = job.page;
+    memcpy(d + 1, PANEL_FW + job.page * 64, 64);
+    sendBl(job.chip, bus::BL_WRITE, d, 65);
+    if (bus::receive(r, 30) && r.cmd == bus::BL_WRITE && r.len >= 1 && r.data[0]) { job.page++; job.tries = 0; }
+    else if (++job.tries > 5) { end(false, "Schreiben fehlgeschlagen"); return; }
+    if (job.page >= PANEL_FW_PAGES) { job.step = DONE; job.tries = 0; }
+    break;
+  }
+  case DONE: {
+    uint8_t d[4] = {(uint8_t)PANEL_FW_PAGES, (uint8_t)PANEL_FW_CRC, (uint8_t)(PANEL_FW_CRC >> 8), PANEL_FW_VERSION};
+    sendBl(job.chip, bus::BL_DONE, d, 4);
+    if (bus::receive(r, 60) && r.cmd == bus::BL_DONE && r.len >= 1 && r.data[0]) {
+      if (job.rescue) { end(true, nullptr); return; }  // ohne bekannte Adresse: die normale Erkennung übernimmt
+      job.step = ASSIGN; job.tries = 0; job.at = millis() + 30;
+    } else if (++job.tries > 3) end(false, "Prüfsumme passt nicht");
+    return;
+  }
+  case ASSIGN:                                       // neue Firmware läuft: alte Adresse zurück
+    bus::sendById(job.chip, bus::C_ASSIGN, job.addr);
+    if (bus::receive(r, 5) && r.cmd == bus::C_ASSIGN && r.addr == job.addr) {
+      bus::sendOrder(job.addr); bus::sendTouch(job.addr);
+      if (job.i >= 0) { P[job.i].touchKnown = false; P[job.i].fw = 0; }   // Version kommt mit dem nächsten PING
+      outForce = true;
+      end(true, nullptr);
+    } else if (++job.tries > 50) end(false, "startet nach dem Update nicht");
+    else job.at = millis() + 20;
+    return;
+  }
+  if (job.i >= 0 && job.step != IDLE) P[job.i].updPct = job.page * 100 / PANEL_FW_PAGES;
+}
+
+void loop() {
+  if (job.step != IDLE) { step(); return; }
+  for (int i = 1; i < SLOTS; i++) if (P[i].upd == 1) {
+    if (canUpdate(P[i])) { start(i); return; }
+    P[i].upd = 0;
+  }
+  if (cfg.panelAuto)
+    for (int i = 1; i < SLOTS; i++) if (P[i].upd == 0 && P[i].updFails < 2 && canUpdate(P[i])) { start(i); return; }
+  if (!cfg.bus || millis() - lastScan < 5000) return;
+  lastScan = millis();                               // hängt ein Panel nach abgebrochenem Update im Bootloader?
+  uint8_t d[2] = {++scanRound, 4};
+  bus::send(bus::ALL, bus::BL_SCAN, d, 2);
+  bus::Reply r;
+  if (bus::receive(r, 8) && r.cmd == bus::BL_SCAN && r.len >= 5) {
+    uint32_t chip = (uint32_t)r.data[0] | ((uint32_t)r.data[1] << 8) | ((uint32_t)r.data[2] << 16) | ((uint32_t)r.data[3] << 24);
+    job = Job(); job.chip = chip; job.i = findChip(chip); job.rescue = true; job.step = INFO; job.at = millis();
+    if (job.i >= 0) {
+      P[job.i].upd = 2; P[job.i].updPct = 0;
+      if (P[job.i].attached && P[job.i].addr) { job.addr = P[job.i].addr; job.rescue = false; }   // steht noch an der Wand: alte Adresse zurück
+    }
+    diag("Panel %s hängt im Bootloader, Firmware wird neu aufgespielt", hex(chip).substring(4).c_str());
+  }
+}
+}  // namespace pupd
 
 
 // ---------- Effekte ----------
@@ -1011,6 +1177,11 @@ void publishExtras() {
     t["icon"] = "mdi:palette";
     haDevice(t); haPublish("select", "palette", t); }
   publishPresetEntity();
+  { JsonDocument t;                                 // Antippen als Ereignis für Automationen
+    t["name"] = "Antippen"; t["unique_id"] = "trilumag_touch_" + hex(P[0].chip);
+    t["state_topic"] = "trilumag/touch"; t["icon"] = "mdi:gesture-tap";
+    JsonArray et = t["event_types"].to<JsonArray>(); et.add("einmal"); et.add("doppelt");
+    haDevice(t); haPublish("event", "touch", t); }
   // Strom und Leistung (gemessen mit INA226, sonst geschätzt)
   const char* keys[3] = {"strom", "leistung", "spannung"};
   const char* names[3] = {"Strom", "Leistung", "Spannung"};
@@ -1243,6 +1414,36 @@ void applyAll(JsonVariantConst cmd) {
   publishFx();
 }
 
+// ---------- Antippen (Beschleunigungssensor in den Panels) ----------
+enum TapAction : uint8_t { TA_NONE, TA_PANEL, TA_WALL, TA_PRESET, TA_EFFECT, TA_COUNT };
+const char* const TAP_NAMES[TA_COUNT] = {"nichts", "Panel ein/aus", "Wand ein/aus", "nächstes Preset", "nächster Effekt"};
+
+// kind: 1 = einmal, 2 = doppelt angetippt
+void touchEvent(int i, uint8_t kind) {
+  if (i < 0 || i >= SLOTS || !P[i].used || !P[i].attached || kind < 1 || kind > 2) return;
+  String id = hex(P[i].chip);
+  uint8_t a = kind == 2 ? cfg.tapA2 : cfg.tapA1;
+  diag("%s %s angetippt: %s", i ? ("Panel " + id.substring(4)).c_str() : "Hauptpanel", kind == 2 ? "doppelt" : "einmal", TAP_NAMES[a < TA_COUNT ? a : 0]);
+  JsonDocument c;
+  switch (a) {
+  case TA_PANEL: c["state"] = (P[i].on && masterOn) ? "OFF" : "ON"; applyCommand(i, c.as<JsonVariantConst>()); break;
+  case TA_WALL: c["state"] = masterOn ? "OFF" : "ON"; applyAll(c.as<JsonVariantConst>()); break;
+  case TA_PRESET:
+    for (int n = 1; n <= PRESET_MAX; n++) { int k = (curPreset + n + PRESET_MAX) % PRESET_MAX; if (presetNames[k].length()) { presetLoad(k); break; } }
+    break;
+  case TA_EFFECT:
+    if (!masterOn) { c["state"] = "ON"; applyAll(c.as<JsonVariantConst>()); }
+    fxStart((fx.id + 1) % FX_COUNT);
+    break;
+  }
+  if (mqtt.connected()) {                          // Ereignis für Home-Assistant-Automationen
+    String m = String("{\"event_type\":\"") + (kind == 2 ? "doppelt" : "einmal") + "\",\"panel\":\"" + id + "\"}";
+    mqtt.publish("trilumag/touch", m.c_str(), false);
+  }
+  ws::broadcast(String("{\"t\":\"touch\",\"d\":{\"id\":\"") + id + "\",\"k\":" + kind + "}}");
+  wsKick();
+}
+
 // ---------- Topologie ----------
 // Prüft von Hauptpanel aus, welche Panels noch verbunden sind. Nicht erreichbare gelten als abgeklipst.
 void reconcile() {
@@ -1263,6 +1464,8 @@ void reconcile() {
   }
   for (int i = 1; i < SLOTS; i++) {
     if (P[i].used && P[i].attached && !seen[i]) {
+      // Hat es doch noch Strom (etwa nach einem Aussetzer), vergisst es seine Adresse und wird neu gefunden
+      if (cfg.bus && P[i].addr) bus::send(P[i].addr, bus::C_RESET);
       P[i].attached = false; P[i].state = DARK; P[i].parent = -1; P[i].addr = 0;
       diag("Panel %s getrennt (hing an einem abgeklipsten Panel)", hex(P[i].chip).substring(4).c_str());
       publishAvail(i, false);
@@ -1292,7 +1495,7 @@ bool simAttach(int i, int parent, uint8_t edge) {
   if (!placePanel(i, parent, edge, esp_random() % 3)) return false;
   P[i].state = DARK;
   diag("Panel %s an Kante %u von %s angeklipst", hex(P[i].chip).substring(4).c_str(), edge + 1, parent == 0 ? "Haupt" : hex(P[parent].chip).substring(4).c_str());
-  P[i].attaches++;
+  P[i].attaches++; clipCount(i);
   publishDiscovery(i); publishAvail(i, true);
   simChanged();
   return true;
@@ -1311,6 +1514,7 @@ int simNewPanel() {
   for (int i = 1; i < SLOTS; i++) if (!P[i].used) {
     P[i] = Panel(); P[i].used = true;
     do { P[i].chip = esp_random(); } while (P[i].chip == 0 || findChip(P[i].chip) != i);
+    clipsLoad(i);
     simChanged();
     return i;
   }
@@ -1341,7 +1545,7 @@ bool simLoad() {
     P[i] = Panel(); P[i].used = true; P[i].chip = r[k].chip;
     P[i].x = r[k].x; P[i].y = r[k].y; P[i].rot = r[k].rot % 3; P[i].attached = r[k].attached;
     P[i].state = DARK; P[i].since = millis();                    // wie echte Panels: kurz dunkel, dann erkannt
-    loadColor(i);
+    loadColor(i); clipsLoad(i);
   }
   reconcile();                                                   // Nachbarn und Abstände neu berechnen
   logf("[SIM] gespeicherte Wand mit %d Panels geladen\n", countAttached() - 1);
@@ -1368,6 +1572,12 @@ void loadConfig() {
   int8_t dSda, dScl; i2cDefault(cfg.board.c_str(), dSda, dScl);           // ohne eigene Wahl: Vorgabe des Boards
   cfg.i2cSda = (int8_t)prefs.getChar("i2cSda", dSda); cfg.i2cScl = (int8_t)prefs.getChar("i2cScl", dScl);
   cfg.shuntUo = prefs.getUShort("shunt", 50);   // ältere Versionen: an, sobald eine Adresse da ist
+  cfg.touchOn = prefs.getBool("tOn", true);
+  cfg.touchSens = constrain((int)prefs.getUChar("tSens", 5), 1, 10);
+  cfg.tapA1 = prefs.getUChar("tA1", TA_PANEL); cfg.tapA2 = prefs.getUChar("tA2", TA_WALL);
+  if (cfg.tapA1 >= TA_COUNT) cfg.tapA1 = TA_PANEL;
+  if (cfg.tapA2 >= TA_COUNT) cfg.tapA2 = TA_WALL;
+  cfg.panelAuto = prefs.getBool("pAuto", true);
 }
 
 String configJson() {
@@ -1398,6 +1608,10 @@ String configJson() {
   for (const char* o : ORDERS) os.add(o);
   JsonObject m = d["mqtt"].to<JsonObject>();
   m["on"] = cfg.mqttOn; m["host"] = cfg.mqttHost; m["port"] = cfg.mqttPort; m["user"] = cfg.mqttUser; m["hasPass"] = cfg.mqttPass.length() > 0;
+  JsonObject t = d["touch"].to<JsonObject>();
+  t["on"] = cfg.touchOn; t["sens"] = cfg.touchSens; t["a1"] = cfg.tapA1; t["a2"] = cfg.tapA2;
+  JsonArray tn = t["actions"].to<JsonArray>();
+  for (const char* n : TAP_NAMES) tn.add(n);
   String out; serializeJson(d, out); return out;
 }
 
@@ -1423,6 +1637,7 @@ String stateJson(bool meta) {
   f["id"] = FX[fx.id].id; f["speed"] = fx.speed; f["inten"] = fx.inten; f["pal"] = PALS[fx.pal].id;
   f["r"] = fx.r; f["g"] = fx.g; f["b"] = fx.b; f["w"] = fx.w; f["usesColor"] = fxUsesColor();
   d["master"] = master; d["on"] = masterOn;
+  d["pfw"] = PANEL_FW_VERSION; d["pAuto"] = cfg.panelAuto;
   if (meta) {                                    // feste Listen nur beim ersten Mal
     JsonArray fl = d["effects"].to<JsonArray>();
     for (uint8_t k = 0; k < FX_COUNT; k++) { JsonObject e = fl.add<JsonObject>(); e["id"] = FX[k].id; e["name"] = FX[k].name; e["color"] = FX[k].color; }
@@ -1447,6 +1662,8 @@ String stateJson(bool meta) {
     o["x"] = p.x; o["y"] = p.y; o["up"] = isUp(p.x, p.y); o["rot"] = p.rot;
     o["parent"] = p.parent >= 0 ? hex(P[p.parent].chip) : String();
     o["state"] = p.state; o["on"] = p.on; o["edges"] = p.edges; o["fw"] = p.fw;
+    o["clips"] = p.clips; o["caps"] = p.caps;
+    if (p.upd) { o["upd"] = p.upd; o["pct"] = p.updPct; }
     o["r"] = p.r; o["g"] = p.g; o["b"] = p.b; o["w"] = p.w; o["bri"] = p.bri;
   }
   JsonArray gh = d["ghosts"].to<JsonArray>();
@@ -1624,6 +1841,7 @@ String diagJson() {
     JsonObject o = pa.add<JsonObject>();
     o["id"] = hex(p.chip); o["addr"] = p.addr; o["pings"] = p.pings; o["missed"] = p.missed;
     o["rtt"] = p.rtt; o["rttMax"] = p.rttMax; o["fw"] = p.fw; o["att"] = p.attaches; o["depth"] = p.depth;
+    o["clips"] = p.clips; o["caps"] = p.caps;
   }
   JsonArray lg = d["log"].to<JsonArray>();
   for (uint8_t k = 0; k < diagCount; k++) {                  // neueste zuerst
@@ -1646,6 +1864,11 @@ String backupJson() {
   m["on"] = cfg.mqttOn; m["host"] = cfg.mqttHost; m["port"] = cfg.mqttPort; m["user"] = cfg.mqttUser; m["pass"] = cfg.mqttPass;
   c["autoUpd"] = cfg.autoUpdate; c["trans"] = cfg.transMs; c["pwrMax"] = cfg.pwrMax; c["pwrCh"] = cfg.pwrCh;
   c["i2cSda"] = cfg.i2cSda; c["i2cScl"] = cfg.i2cScl; c["shunt"] = cfg.shuntUo;
+  JsonObject t = c["touch"].to<JsonObject>();
+  t["on"] = cfg.touchOn; t["sens"] = cfg.touchSens; t["a1"] = cfg.tapA1; t["a2"] = cfg.tapA2;
+  c["pAuto"] = cfg.panelAuto;
+  JsonObject cl = d["clips"].to<JsonObject>();
+  for (int i = 1; i < SLOTS; i++) if (P[i].used && P[i].clips) cl[hex(P[i].chip)] = P[i].clips;
   d["master"] = master; d["on"] = masterOn;
   JsonObject f = d["fx"].to<JsonObject>();
   f["id"] = fx.id; f["speed"] = fx.speed; f["pal"] = fx.pal; f["inten"] = fx.inten; f["r"] = fx.r; f["g"] = fx.g; f["b"] = fx.b; f["w"] = fx.w;
@@ -1690,7 +1913,14 @@ const char* restoreBackup(JsonDocument& d) {
     prefs.putBool("autoUpd", c["autoUpd"] | false);
     prefs.putUShort("trans", c["trans"] | 700); prefs.putUShort("pwrMax", c["pwrMax"] | 0); prefs.putUChar("pwrCh", c["pwrCh"] | 12);
     prefs.putChar("i2cSda", c["i2cSda"] | -1); prefs.putChar("i2cScl", c["i2cScl"] | -1); prefs.putUShort("shunt", c["shunt"] | 50);
+    JsonObject t = c["touch"];
+    if (!t.isNull()) {
+      prefs.putBool("tOn", t["on"] | true); prefs.putUChar("tSens", t["sens"] | 5);
+      prefs.putUChar("tA1", t["a1"] | (int)TA_PANEL); prefs.putUChar("tA2", t["a2"] | (int)TA_WALL);
+    }
+    prefs.putBool("pAuto", c["pAuto"] | true);
   }
+  for (JsonPair kv : d["clips"].as<JsonObject>()) prefs.putUInt(("n" + String(kv.key().c_str())).c_str(), kv.value().as<uint32_t>());
   FxCfg f;
   JsonObject fo = d["fx"];
   if (!fo.isNull()) {
@@ -1912,7 +2142,34 @@ const char* apiCall(const char* path, JsonDocument& d) {
     }
     return "Unbekannte Aktion";
   }
+  // Antippen: {"on":true,"sens":5,"a1":1,"a2":2}
+  if (!strcmp(path, "/api/touch")) {
+    if (d["on"].is<bool>()) { cfg.touchOn = d["on"]; prefs.putBool("tOn", cfg.touchOn); }
+    if (d["sens"].is<int>()) { cfg.touchSens = constrain(d["sens"].as<int>(), 1, 10); prefs.putUChar("tSens", cfg.touchSens); }
+    if (d["a1"].is<int>() && d["a1"].as<int>() >= 0 && d["a1"].as<int>() < TA_COUNT) { cfg.tapA1 = d["a1"]; prefs.putUChar("tA1", cfg.tapA1); }
+    if (d["a2"].is<int>() && d["a2"].as<int>() >= 0 && d["a2"].as<int>() < TA_COUNT) { cfg.tapA2 = d["a2"]; prefs.putUChar("tA2", cfg.tapA2); }
+    if (cfg.bus) bus::sendTouch(bus::ALL);
+    return nullptr;
+  }
+  // Panel-Firmware: {"action":"all"} / {"action":"one","id":"…"} / {"action":"auto","on":true}
+  if (!strcmp(path, "/api/panelfw")) {
+    const char* a = d["action"] | "";
+    if (!strcmp(a, "auto")) { cfg.panelAuto = d["on"] | true; prefs.putBool("pAuto", cfg.panelAuto); return nullptr; }
+    int n = 0;
+    for (int i = 1; i < SLOTS; i++) {
+      if (!strcmp(a, "one") && P[i].chip != parseHex(d["id"] | "0")) continue;
+      if (pupd::canUpdate(P[i]) && P[i].upd != 2) { P[i].upd = 1; P[i].updFails = 0; n++; }
+    }
+    if (strcmp(a, "all") && strcmp(a, "one")) return "Unbekannte Aktion";
+    return n ? nullptr : "Kein Panel braucht ein Update";
+  }
   if (!strncmp(path, "/api/sim/", 9) && cfg.bus) return "nur in der Simulation";
+  if (!strcmp(path, "/api/sim/tap")) {             // Antippen ausprobieren: {"id":"…","double":false}
+    int i = findChip(parseHex(d["id"] | "0"));
+    if (i < 0 || !P[i].attached) return "Panel unbekannt";
+    touchEvent(i, (d["double"] | false) ? 2 : 1);
+    return nullptr;
+  }
   if (!strcmp(path, "/api/sim/new")) return simNewPanel() < 0 ? "Ablage voll" : nullptr;
   if (!strcmp(path, "/api/sim/attach")) {
     int i = findChip(parseHex(d["id"] | "0")), par = findChip(parseHex(d["parent"] | "0"));
@@ -1970,7 +2227,8 @@ void setupWeb() {
   });
   server.on("/api/state", HTTP_GET, replyState);
   // Befehle laufen über apiCall(), damit HTTP und WebSocket dasselbe tun
-  const char* cmds[] = {"/api/set", "/api/presets", "/api/effect", "/api/test", "/api/ota", "/api/light", "/api/diag", "/api/sim/new", "/api/sim/attach", "/api/sim/detach"};
+  const char* cmds[] = {"/api/set", "/api/presets", "/api/effect", "/api/test", "/api/ota", "/api/light", "/api/diag", "/api/touch", "/api/panelfw",
+                        "/api/sim/new", "/api/sim/attach", "/api/sim/detach", "/api/sim/tap"};
   for (const char* path : cmds) {
     server.on(path, HTTP_POST, [path] {
       JsonDocument d;
@@ -2349,10 +2607,13 @@ void loop() {
       if (p.used && p.attached && p.state == DARK && millis() - p.since > DETECT_MS) {
         p.state = p.hasColor ? ACTIVE : PULSE;
         p.joinAt = (millis() + FX_JOIN_MS) | 1;
+        p.caps = bus::CAP_TOUCH | bus::CAP_BOOT;     // simulierte Panels: mit Sensor und Bootloader
+        p.fw = prefs.getUChar(("f" + hex(p.chip)).c_str(), PANEL_FW_VERSION - 1);   // einmal Update zum Ausprobieren
         logf("[SIM] %s eingegliedert: %s\n", hex(p.chip).c_str(), p.hasColor ? "alte Farbe" : "pulsiert blau");
         sendToPanel(i); publishState(i);
       }
     }
+    pupd::loop();
   }
   outLoop();
   otaLoop();

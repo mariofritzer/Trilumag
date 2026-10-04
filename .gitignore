@@ -7,3 +7,8 @@ firmware/panel/generated*.ld
 ch32fun/
 build/
 site/
+firmware/panel/bootloader/*.elf
+firmware/panel/bootloader/*.bin
+firmware/panel/bootloader/*.hex
+firmware/panel/bootloader/*.lst
+firmware/panel/bootloader/*.map
