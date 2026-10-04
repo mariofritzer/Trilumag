@@ -2,6 +2,38 @@
 
 Die Versionsnummer im Webinstaller und in der App setzt sich aus der Version in der Firmware und der Nummer des automatischen Builds zusammen, zum Beispiel **0.5.11** = Version 0.5, Build 11. Bis Build 9 hat der Build die Nummer immer als 0.2.x ausgegeben, die tatsächlichen Stände stehen deshalb unten mit beiden Nummern.
 
+## 0.7.23 · 4. Oktober 2026
+
+**Antippen**
+- Panels mit Bewegungssensor (LIS2DH12) reagieren auf Antippen.
+- Unter Optionen gibt es das Kästchen „Antippen“. Dort stellst du ein, was einmal und was doppelt Antippen tut: Panel ein/aus, Wand ein/aus, nächstes Preset oder nächster Effekt. Auch die Empfindlichkeit (1 bis 10) lässt sich dort einstellen.
+- Das angetippte Panel leuchtet in der App kurz auf.
+- In Home Assistant gibt es das Ereignis „Antippen“ für eigene Automationen, mit der Art (einmal oder doppelt) und dem Panel.
+- In der Simulation probierst du es unter Wand aus: Panel antippen, dann „einmal“ oder „doppelt“.
+
+**Panel-Updates über den Bus**
+- Die Panels haben jetzt einen eigenen Bootloader. Das Hauptpanel bringt die passende Panel-Firmware mit und spielt sie über den Bus auf. Pro Panel dauert das etwa eine Sekunde, die Wand leuchtet dabei weiter.
+- Unter Optionen gibt es dafür das Kästchen „Panel-Firmware“. Es zeigt veraltete Panels mit Fortschritt an. Du kannst einzelne oder alle Panels aktualisieren oder das automatisch erledigen lassen (Standard).
+- Bricht ein Update ab, etwa weil der Strom ausfällt, bleibt das Panel im Bootloader. Das Hauptpanel findet es dort von selbst und spielt die Firmware fertig auf.
+- Ein neues Panel wird einmal mit dem WCH-LinkE programmiert (`make flashall`). Danach kommen alle Updates über den Bus.
+- Panel-Firmware und Bootloader liegen bei jedem Release als Dateien bei.
+
+**Anklips-Zähler**
+- Jedes Panel zählt, wie oft es angeklipst wurde. Der Zähler bleibt dauerhaft gespeichert.
+- Er steht unter Wand beim Panel und als Spalte in der Bus-Diagnose.
+- Neustarts, das Einschalten der ganzen Wand und Updates zählen nicht mit.
+
+**Kanten einzeln**
+- Unter Wand gibt es eine Liste aller Panels zum An- und Abhaken, dazu „Alle an“ und „Alle aus“.
+
+**Panel-Hardware (Schaltplan aktualisiert)**
+- Die Steuerung im Panel läuft jetzt mit 3,3 V. Neu sind ein Spannungsregler, ein Bus-Baustein für 3,3 V (MAX3485) und ein Pegelwandler für die LED-Daten.
+- Kante 2 liegt jetzt auf PC4, Kante 3 auf PC0. PC1 und PC2 sind der I²C-Bus für den Sensor.
+
+**Fehlerbehebung**
+- Beim Umschalten von „Kanten einzeln“ blieb die Vorschau der Wand manchmal hängen, wenn ein Effekt lief.
+- Ein Panel, das kurz keinen Kontakt hatte, aber noch Strom hat, wird jetzt zuverlässig neu erkannt. Das gilt auch für die Panels dahinter.
+
 ## 0.7.21 · 4. Oktober 2026
 
 **Fehlerbehebung: weiße Seite**
