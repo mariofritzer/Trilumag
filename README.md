@@ -6,7 +6,7 @@ Dreieckige RGBW-Lichtpanels zum Selberbauen, ähnlich wie Nanoleaf: Die Panels w
 
 ## Stand
 
-Aktuell: **Version 0.5**. Was sich wann geändert hat, steht im [Versionsverlauf](CHANGELOG.md).
+Aktuell: **Version 0.6**. Was sich wann geändert hat, steht im [Versionsverlauf](CHANGELOG.md).
 
 Ab Version 0.2 gibt es zwei Betriebsarten, umschaltbar in der App: **Simulation** (Panels werden in der App per Ziehen angeklipst) und **Bus** (echte Panels über RS-485). Das Protokoll steht in [docs/protokoll.md](docs/protokoll.md).
 

@@ -2,7 +2,7 @@
 
 Die Versionsnummer im Webinstaller und in der App setzt sich aus der Version in der Firmware und der Nummer des automatischen Builds zusammen, zum Beispiel **0.5.11** = Version 0.5, Build 11. Bis Build 9 hat der Build die Nummer immer als 0.2.x ausgegeben, die tatsächlichen Stände stehen deshalb unten mit beiden Nummern.
 
-## Nächster Build
+## 0.6.13 · 4. Oktober 2026
 
 **Online-Updates**
 - Die App zeigt unter Optionen → Updates alle verfügbaren Versionen an, auch ältere für Downgrades, und installiert sie auf Knopfdruck.
