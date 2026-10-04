@@ -36,6 +36,7 @@
 #include "webapp.h"
 #include "improv.h"
 #include "pins.h"
+#include "ws.h"
 
 // ================= Voreinstellungen =================
 // Alles hier lässt sich später in der App ändern. Diese Werte gelten nur, solange nichts gespeichert ist.
@@ -47,7 +48,7 @@ const uint32_t FX_JOIN_MS   = 5 * 1600; // bei laufendem Effekt pulsieren neue P
 // ====================================================
 
 const char* FW_NAME    = "Trilumag";
-const char* FW_VERSION = "0.4.0";
+const char* FW_VERSION = "0.5.0";
 const char* HOSTNAME   = "trilumag";
 const char* SETUP_SSID = "Trilumag-Setup";
 const char* SETUP_PASS = "trilumag";
@@ -103,6 +104,7 @@ struct Config {
   String board;
   PinSet pins;
   String order = "RGBW";
+  bool mqttOn = false;     // Häkchen "MQTT aktiv"; Zugangsdaten bleiben auch ausgeschaltet gespeichert
   String mqttHost;
   uint16_t mqttPort = 1883;
   String mqttUser, mqttPass;
@@ -142,6 +144,14 @@ improv::Parser improvMain;
 #if HAS_UART_CONSOLE
 improv::Parser improvUart;
 #endif
+// WLAN-Verbindung im Hintergrund (siehe wifiLoop)
+enum WifiPhase : uint8_t { W_IDLE, W_CONNECTING };
+WifiPhase wPhase = W_IDLE;
+uint32_t wDeadline = 0;
+String wSsid, wPass;
+bool wImprov = false;          // Verbindungsversuch kam aus dem Webinstaller
+bool wSaveLate = false;        // verbindet es sich doch noch, die Zugangsdaten trotzdem speichern
+Stream* wImprovStream = nullptr;
 uint32_t lastMqttTry = 0, lastPoll = 0, lastDiscover = 0, colorsDirtyAt = 0;
 bool wlanOk = false, apMode = false, colorsDirty = false;
 uint8_t discoverRound = 0;
@@ -1093,6 +1103,7 @@ void loadConfig() {
   cfg.mqttPort = prefs.getUShort("mqttPort", 1883);
   cfg.mqttUser = prefs.getString("mqttUser", "");
   cfg.mqttPass = prefs.getString("mqttPass", "");
+  cfg.mqttOn = prefs.getBool("mqttOn", cfg.mqttHost.length() > 0);   // ältere Versionen: an, sobald eine Adresse da ist
 }
 
 String configJson() {
@@ -1118,17 +1129,17 @@ String configJson() {
   JsonArray os = d["orders"].to<JsonArray>();
   for (const char* o : ORDERS) os.add(o);
   JsonObject m = d["mqtt"].to<JsonObject>();
-  m["host"] = cfg.mqttHost; m["port"] = cfg.mqttPort; m["user"] = cfg.mqttUser; m["hasPass"] = cfg.mqttPass.length() > 0;
+  m["on"] = cfg.mqttOn; m["host"] = cfg.mqttHost; m["port"] = cfg.mqttPort; m["user"] = cfg.mqttUser; m["hasPass"] = cfg.mqttPass.length() > 0;
   String out; serializeJson(d, out); return out;
 }
 
 // ---------- JSON für die App ----------
-String stateJson() {
+String stateJson(bool meta) {
   JsonDocument d;
   d["sim"] = !cfg.bus;
   d["max"] = MAX_ATTACHED;
   d["mqtt"] = mqtt.connected();
-  d["mqttSet"] = cfg.mqttHost.length() > 0;
+  d["mqttSet"] = cfg.mqttOn && cfg.mqttHost.length() > 0;
   d["ap"] = apMode;
   d["ssid"] = wlanOk ? WiFi.SSID() : String();
   d["ver"] = FW_VERSION;
@@ -1137,13 +1148,15 @@ String stateJson() {
   f["id"] = FX[fx.id].id; f["speed"] = fx.speed; f["inten"] = fx.inten; f["pal"] = PALS[fx.pal].id;
   f["r"] = fx.r; f["g"] = fx.g; f["b"] = fx.b; f["w"] = fx.w; f["usesColor"] = fxUsesColor();
   d["master"] = master; d["on"] = masterOn;
-  JsonArray fl = d["effects"].to<JsonArray>();
-  for (uint8_t k = 0; k < FX_COUNT; k++) { JsonObject e = fl.add<JsonObject>(); e["id"] = FX[k].id; e["name"] = FX[k].name; e["color"] = FX[k].color; }
-  JsonArray pl = d["palettes"].to<JsonArray>();
-  for (uint8_t k = 0; k < PAL_COUNT; k++) {
-    JsonObject e = pl.add<JsonObject>(); e["id"] = PALS[k].id; e["name"] = PALS[k].name;
-    JsonArray cs = e["c"].to<JsonArray>();
-    for (uint8_t j = 0; j < PALS[k].n; j++) { char b[8]; snprintf(b, sizeof b, "#%06X", (unsigned)PALS[k].c[j]); cs.add(b); }
+  if (meta) {                                    // feste Listen nur beim ersten Mal
+    JsonArray fl = d["effects"].to<JsonArray>();
+    for (uint8_t k = 0; k < FX_COUNT; k++) { JsonObject e = fl.add<JsonObject>(); e["id"] = FX[k].id; e["name"] = FX[k].name; e["color"] = FX[k].color; }
+    JsonArray pl = d["palettes"].to<JsonArray>();
+    for (uint8_t k = 0; k < PAL_COUNT; k++) {
+      JsonObject e = pl.add<JsonObject>(); e["id"] = PALS[k].id; e["name"] = PALS[k].name;
+      JsonArray cs = e["c"].to<JsonArray>();
+      for (uint8_t j = 0; j < PALS[k].n; j++) { char b[8]; snprintf(b, sizeof b, "#%06X", (unsigned)PALS[k].c[j]); cs.add(b); }
+    }
   }
   JsonArray pr = d["presets"].to<JsonArray>();
   for (uint8_t k = 0; k < PRESET_MAX; k++) if (presetNames[k].length()) { JsonObject e = pr.add<JsonObject>(); e["id"] = k; e["name"] = presetNames[k]; }
@@ -1185,91 +1198,143 @@ bool readBody(JsonDocument& d) {
   if (!server.hasArg("plain")) return false;
   return !deserializeJson(d, server.arg("plain"));
 }
-void replyState() { server.send(200, "application/json", stateJson()); }
+void wsKick();
+void replyState() { server.send(200, "application/json", stateJson(!server.hasArg("slim"))); wsKick(); }
 void replyError(const char* m) { server.send(400, "application/json", String("{\"error\":\"") + m + "\"}"); }
 
-void setupWeb() {
-  server.on("/", HTTP_GET, [] { server.send(200, "text/html; charset=utf-8", INDEX_HTML); });
-  server.on("/api/state", HTTP_GET, replyState);
-  server.on("/api/set", HTTP_POST, [] {
-    JsonDocument d; if (!readBody(d)) return replyError("JSON fehlt");
+// ---------- WebSocket: Zustand und Effektbild an die App schieben ----------
+String wsLast;                   // zuletzt geschickter Zustand
+bool wsForce = false;
+uint32_t wsLastState = 0, wsLastLive = 0;
+const char* apiCall(const char* path, JsonDocument& d);
+String liveJson();
+void wsKick() { wsForce = true; }
+
+void wsOpen(uint8_t id) {
+  ws::send(id, "{\"t\":\"state\",\"d\":" + stateJson(true) + "}");
+  wsLast = stateJson(false);
+}
+// Nachricht der App: {"p":"/api/set","b":{...}}
+void wsText(uint8_t id, char* msg, size_t len) {
+  JsonDocument m;
+  if (deserializeJson(m, msg, len)) return;
+  const char* p = m["p"] | "";
+  JsonDocument b; b.set(m["b"]);
+  if (const char* err = apiCall(p, b)) {
+    String e = "{\"t\":\"err\",\"m\":\""; e += err; e += "\"}";
+    ws::send(id, e);
+  }
+  wsForce = true;                // Änderung sofort an alle Apps
+}
+void wsLoop() {
+  ws::loop();
+  if (!ws::count()) { wsLast = ""; return; }
+  uint32_t now = millis();
+  if (wsForce || now - wsLastState > 250) {
+    wsLastState = now;
+    String s = stateJson(false);
+    if (wsForce || s != wsLast) { ws::broadcast("{\"t\":\"state\",\"d\":" + s + "}"); wsLast = s; }
+    wsForce = false;
+  }
+  if (fx.id && now - wsLastLive >= 66) {        // Effektbild etwa 15-mal pro Sekunde
+    wsLastLive = now;
+    ws::broadcast("{\"t\":\"live\",\"d\":" + liveJson() + "}");
+  }
+}
+
+// Ein Befehl der App, egal ob über HTTP oder WebSocket. Liefert eine Fehlermeldung oder nullptr.
+const char* apiCall(const char* path, JsonDocument& d) {
+  if (!strcmp(path, "/api/set")) {
     const char* id = d["id"] | "";
     if (d["ids"].is<JsonArrayConst>()) {                 // mehrere ausgewählte Panels
       for (JsonVariantConst v : d["ids"].as<JsonArrayConst>()) { int i = findChip(parseHex(v | "0")); if (i >= 0) applyCommand(i, d.as<JsonVariantConst>()); }
     } else if (!strcmp(id, "alle")) applyAll(d.as<JsonVariantConst>());
-    else { int i = findChip(parseHex(id)); if (i < 0) return replyError("Panel unbekannt"); applyCommand(i, d.as<JsonVariantConst>()); }
-    replyState();
-  });
+    else { int i = findChip(parseHex(id)); if (i < 0) return "Panel unbekannt"; applyCommand(i, d.as<JsonVariantConst>()); }
+    return nullptr;
+  }
   // Presets: {"action":"save","name":"Abend"} / {"action":"load","id":2} / {"action":"delete","id":2}
-  server.on("/api/presets", HTTP_POST, [] {
-    JsonDocument d; if (!readBody(d)) return replyError("JSON fehlt");
+  if (!strcmp(path, "/api/presets")) {
     const char* a = d["action"] | "";
     int id = d["id"] | -1;
     if (!strcmp(a, "save")) {
       String name = d["name"] | "";
       name.trim();
-      if (!name.length()) return replyError("Name fehlt");
+      if (!name.length()) return "Name fehlt";
       if (name.length() > 24) name = name.substring(0, 24);
-      if (presetSave(id, name.c_str()) < 0) return replyError("Alle 16 Plätze belegt");
+      if (presetSave(id, name.c_str()) < 0) return "Alle 16 Plätze belegt";
     } else if (!strcmp(a, "load")) {
-      if (!presetLoad(id)) return replyError("Preset unbekannt");
+      if (!presetLoad(id)) return "Preset unbekannt";
     } else if (!strcmp(a, "delete")) presetDelete(id);
-    else return replyError("Unbekannte Aktion");
-    replyState();
-  });
-  server.on("/api/effect", HTTP_POST, [] {
-    JsonDocument d; if (!readBody(d)) return replyError("JSON fehlt");
-    if (d["effect"].is<const char*>() && fxFind(d["effect"].as<const char*>()) < 0) return replyError("Effekt unbekannt");
+    else return "Unbekannte Aktion";
+    return nullptr;
+  }
+  if (!strcmp(path, "/api/effect")) {
+    if (d["effect"].is<const char*>() && fxFind(d["effect"].as<const char*>()) < 0) return "Effekt unbekannt";
     applyAll(d.as<JsonVariantConst>());
-    replyState();
-  });
-  // aktuelles Effektbild, damit die App mitleuchtet
-  server.on("/api/live", HTTP_GET, [] {
-    String out = "{\"fx\":\""; out += FX[fx.id].id; out += "\",\"c\":{";
-    bool first = true;
-    for (int i = 0; i < SLOTS; i++) {
-      if (!P[i].used || !P[i].attached) continue;
-      char b[32]; snprintf(b, sizeof b, "%s\"%08X\":\"%02X%02X%02X%02X\"", first ? "" : ",", (unsigned)P[i].chip, OUT[i][0], OUT[i][1], OUT[i][2], OUT[i][3]);
-      out += b; first = false;
-    }
-    out += "},\"j\":[";
-    first = true;
-    for (int i = 0; i < SLOTS; i++) {
-      if (!P[i].used || !P[i].attached || !P[i].joinAt || (int32_t)(millis() - P[i].joinAt) >= 0) continue;
-      char b[16]; snprintf(b, sizeof b, "%s\"%08X\"", first ? "" : ",", (unsigned)P[i].chip);
-      out += b; first = false;
-    }
-    out += "]}";
-    server.send(200, "application/json", out);
-  });
-  server.on("/api/test", HTTP_POST, [] {
-    JsonDocument d; if (!readBody(d)) return replyError("JSON fehlt");
+    return nullptr;
+  }
+  if (!strcmp(path, "/api/test")) {
     int ch = d["ch"] | -1;
     uint8_t c[4] = {0, 0, 0, 0};
     if (ch >= 0 && ch < 4) c[ch] = 70;
     if (cfg.bus) bus::send(bus::ALL, bus::C_COLOR, c, 4);
     if (cfg.pins.led >= 0) { for (int k = 0; k < 3; k++) strip.setPixelColor(k, strip.Color(c[0], c[1], c[2], c[3])); strip.show(); }
     if (ch < 0) for (int i = 0; i < SLOTS; i++) if (P[i].used && P[i].attached) sendToPanel(i);   // Test beenden
-    server.send(200, "application/json", "{\"ok\":true}");
-  });
-  server.on("/api/sim/new", HTTP_POST, [] {
-    if (cfg.bus) return replyError("nur in der Simulation");
-    if (simNewPanel() < 0) return replyError("Ablage voll");
-    replyState();
-  });
-  server.on("/api/sim/attach", HTTP_POST, [] {
-    if (cfg.bus) return replyError("nur in der Simulation");
-    JsonDocument d; if (!readBody(d)) return replyError("JSON fehlt");
+    return nullptr;
+  }
+  if (!strncmp(path, "/api/sim/", 9) && cfg.bus) return "nur in der Simulation";
+  if (!strcmp(path, "/api/sim/new")) return simNewPanel() < 0 ? "Ablage voll" : nullptr;
+  if (!strcmp(path, "/api/sim/attach")) {
     int i = findChip(parseHex(d["id"] | "0")), par = findChip(parseHex(d["parent"] | "0"));
-    if (!simAttach(i, par, d["edge"] | 9)) return replyError("Anklipsen nicht möglich");
-    replyState();
-  });
-  server.on("/api/sim/detach", HTTP_POST, [] {
-    if (cfg.bus) return replyError("nur in der Simulation");
-    JsonDocument d; if (!readBody(d)) return replyError("JSON fehlt");
-    simDetach(findChip(parseHex(d["id"] | "0")));
-    replyState();
-  });
+    return simAttach(i, par, d["edge"] | 9) ? nullptr : "Anklipsen nicht möglich";
+  }
+  if (!strcmp(path, "/api/sim/detach")) { simDetach(findChip(parseHex(d["id"] | "0"))); return nullptr; }
+  return "Unbekannter Befehl";
+}
+
+// aktuelles Effektbild, damit die App mitleuchtet
+String liveJson() {
+  String out = "{\"fx\":\""; out += FX[fx.id].id; out += "\",\"c\":{";
+  bool first = true;
+  for (int i = 0; i < SLOTS; i++) {
+    if (!P[i].used || !P[i].attached) continue;
+    char b[32]; snprintf(b, sizeof b, "%s\"%08X\":\"%02X%02X%02X%02X\"", first ? "" : ",", (unsigned)P[i].chip, OUT[i][0], OUT[i][1], OUT[i][2], OUT[i][3]);
+    out += b; first = false;
+  }
+  out += "},\"j\":[";
+  first = true;
+  for (int i = 0; i < SLOTS; i++) {
+    if (!P[i].used || !P[i].attached || !P[i].joinAt || (int32_t)(millis() - P[i].joinAt) >= 0) continue;
+    char b[16]; snprintf(b, sizeof b, "%s\"%08X\"", first ? "" : ",", (unsigned)P[i].chip);
+    out += b; first = false;
+  }
+  out += "]}";
+  return out;
+}
+
+// WLAN-Suche, die nicht leer zurückkommt, nur weil das Panel gerade selbst verbinden will
+int scanWifi() {
+  int n = WiFi.scanNetworks(false, false);
+  if (n < 0) { WiFi.scanDelete(); delay(100); n = WiFi.scanNetworks(false, false); }
+  if (n < 0 && wPhase == W_CONNECTING) { WiFi.disconnect(false); delay(50); n = WiFi.scanNetworks(false, false); WiFi.begin(wSsid.c_str(), wPass.c_str()); }
+  return n < 0 ? 0 : n;
+}
+
+void setupWeb() {
+  server.on("/", HTTP_GET, [] { server.send(200, "text/html; charset=utf-8", INDEX_HTML); });
+  server.on("/api/state", HTTP_GET, replyState);
+  // Befehle laufen über apiCall(), damit HTTP und WebSocket dasselbe tun
+  const char* cmds[] = {"/api/set", "/api/presets", "/api/effect", "/api/test", "/api/sim/new", "/api/sim/attach", "/api/sim/detach"};
+  for (const char* path : cmds) {
+    server.on(path, HTTP_POST, [path] {
+      JsonDocument d;
+      if (server.hasArg("plain") && server.arg("plain").length()) deserializeJson(d, server.arg("plain"));
+      if (const char* err = apiCall(path, d)) return replyError(err);
+      if (!strcmp(path, "/api/test")) server.send(200, "application/json", "{\"ok\":true}");
+      else replyState();
+    });
+  }
+  server.on("/api/live", HTTP_GET, [] { server.send(200, "application/json", liveJson()); });
   server.on("/api/config", HTTP_GET, [] { server.send(200, "application/json", configJson()); });
   server.on("/api/config", HTTP_POST, [] {
     JsonDocument d; if (!readBody(d)) return replyError("JSON fehlt");
@@ -1289,6 +1354,7 @@ void setupWeb() {
     prefs.putString("order", order);
     JsonObject m = d["mqtt"];
     if (!m.isNull()) {
+      if (!m["on"].isNull()) prefs.putBool("mqttOn", m["on"].as<bool>());
       prefs.putString("mqttHost", (const char*)(m["host"] | ""));
       prefs.putUShort("mqttPort", m["port"] | 1883);
       prefs.putString("mqttUser", (const char*)(m["user"] | ""));
@@ -1301,13 +1367,16 @@ void setupWeb() {
     ESP.restart();
   });
   server.on("/api/wifi/scan", HTTP_GET, [] {
-    int n = WiFi.scanNetworks();
+    int n = scanWifi();
     JsonDocument d; JsonArray a = d["networks"].to<JsonArray>();
-    for (int k = 0; k < n && k < 20; k++) {
+    JsonArray l = d["list"].to<JsonArray>();
+    for (int k = 0; k < n && k < 30; k++) {          // die Liste kommt nach Signalstärke sortiert
       String ss = WiFi.SSID(k);
       if (!ss.length()) continue;
       bool dup = false; for (JsonVariant v : a) if (v.as<String>() == ss) dup = true;
-      if (!dup) a.add(ss);
+      if (dup) continue;
+      a.add(ss);
+      JsonObject o = l.add<JsonObject>(); o["ssid"] = ss; o["rssi"] = WiFi.RSSI(k); o["lock"] = WiFi.encryptionType(k) != WIFI_AUTH_OPEN;
     }
     WiFi.scanDelete();
     String out; serializeJson(d, out); server.send(200, "application/json", out);
@@ -1321,6 +1390,8 @@ void setupWeb() {
     delay(800);
     ESP.restart();
   });
+  ws::onOpen = wsOpen; ws::onText = wsText;
+  ws::begin();
   server.onNotFound([] { server.send(404, "text/plain", "Nicht gefunden"); });
   server.begin();
 }
@@ -1341,7 +1412,7 @@ void onMqtt(char* topic, byte* payload, unsigned int len) {
 }
 
 void mqttLoop() {
-  if (!cfg.mqttHost.length() || !wlanOk) return;
+  if (!cfg.mqttOn || !cfg.mqttHost.length() || !wlanOk) return;
   if (mqtt.connected()) { mqtt.loop(); return; }
   if (millis() - lastMqttTry < 5000) return;
   lastMqttTry = millis();
@@ -1372,13 +1443,6 @@ void saveWifi(const String& ss, const String& pw) {
 
 // Die Verbindung läuft im Hintergrund. So bleibt das Hauptpanel währenddessen für App und
 // Webinstaller ansprechbar (der Webinstaller gibt nach 1,5 bis 10 s auf).
-enum WifiPhase : uint8_t { W_IDLE, W_CONNECTING };
-WifiPhase wPhase = W_IDLE;
-uint32_t wDeadline = 0;
-String wSsid, wPass;
-bool wImprov = false;          // Verbindungsversuch kam aus dem Webinstaller
-bool wSaveLate = false;        // verbindet es sich doch noch, die Zugangsdaten trotzdem speichern
-Stream* wImprovStream = nullptr;
 
 void improvSendUrl(Stream& s, uint8_t cmd);
 
@@ -1462,7 +1526,7 @@ void improvRpc(Stream& s, const improv::Parser& p) {
       break;
     }
     case improv::GET_WIFI_NETWORKS: {
-      int n = WiFi.scanNetworks();
+      int n = scanWifi();
       for (int k = 0; k < n && k < 20; k++) {
         String ss = WiFi.SSID(k), rssi = String(WiFi.RSSI(k));
         if (!ss.length()) continue;
@@ -1538,6 +1602,8 @@ void setup() {
   MDNS.begin(HOSTNAME);
   MDNS.addService("http", "tcp", 80);
 
+  netClient.setTimeout(800);       // ist der Broker nicht erreichbar, nicht 3 s lang hängen
+  mqtt.setSocketTimeout(2);
   mqtt.setServer(cfg.mqttHost.c_str(), cfg.mqttPort);
   mqtt.setBufferSize(1024);
   mqtt.setCallback(onMqtt);
@@ -1549,6 +1615,7 @@ void setup() {
 
 void loop() {
   server.handleClient();
+  wsLoop();
   improvLoop();
   wifiLoop();
   mqttLoop();

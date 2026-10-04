@@ -22,6 +22,7 @@ button{font:inherit;color:inherit}
 .pwr.on svg{stroke:var(--acc)}
 .bri{flex:1;display:flex;align-items:center;gap:10px}
 .bri svg{width:20px;height:20px;flex:none;fill:var(--muted)}
+.pct{flex:none;width:46px;text-align:right;font:13px ui-monospace,Menlo,monospace;color:var(--fg)}
 .status{max-width:720px;margin:4px auto 0;font:11.5px ui-monospace,Menlo,monospace;color:var(--muted);display:flex;justify-content:space-between;gap:8px}
 .status b{color:var(--fg);font-weight:600;font-family:system-ui,sans-serif;letter-spacing:.02em}
 /* Regler */
@@ -95,6 +96,20 @@ input[type=text],input[type=password],input:not([type]),select{width:100%;height
 .item svg{width:56px;height:52px;display:block}
 label.f{display:flex;flex-direction:column;gap:6px;font-size:13px;color:var(--muted)}
 .pins{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px}
+.tog{display:flex;align-items:center;gap:12px;font-size:15px;cursor:pointer;user-select:none}
+.tog input{position:absolute;opacity:0;width:0;height:0}
+.tog .sw{width:46px;height:28px;border-radius:14px;background:#3a3a3a;position:relative;flex:none;transition:background .15s}
+.tog .sw::after{content:"";position:absolute;left:3px;top:3px;width:22px;height:22px;border-radius:50%;background:#eee;transition:transform .15s}
+.tog input:checked+.sw{background:var(--acc)}
+.tog input:checked+.sw::after{transform:translateX(18px)}
+.tog input:focus-visible+.sw{outline:2px solid var(--acc);outline-offset:2px}
+.pins.off{opacity:.45}
+.nets{display:flex;flex-direction:column;border-radius:12px;overflow:hidden;background:var(--card2)}
+.nets:empty{display:none}
+.nets .row{gap:10px}
+.bars{display:flex;align-items:flex-end;gap:2px;height:14px;flex:none}
+.bars i{width:4px;background:#555;border-radius:1px}
+.bars i.on{background:var(--fg)}
 .kv{display:grid;grid-template-columns:auto 1fr;gap:4px 14px;font-size:14px}
 .kv span:nth-child(odd){color:var(--muted)}
 /* Tabs unten */
@@ -109,7 +124,7 @@ nav.tabs button.on{color:var(--acc)}
   <div class="toprow">
     <button class="pwr" id="pwr" aria-label="Wand ein/aus"><svg viewBox="0 0 24 24"><path d="M12 3v8"/><path d="M6.3 6.8a8 8 0 1 0 11.4 0"/></svg></button>
     <div class="bri"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="4.2"/><g stroke="#999" stroke-width="2" stroke-linecap="round"><path d="M12 2.5v2M12 19.5v2M2.5 12h2M19.5 12h2M5.3 5.3l1.4 1.4M17.3 17.3l1.4 1.4M5.3 18.7l1.4-1.4M17.3 6.7l1.4-1.4"/></g></svg>
-      <input type="range" id="master" min="1" max="255" value="255" aria-label="Gesamthelligkeit"></div>
+      <input type="range" id="master" min="1" max="100" value="100" aria-label="Gesamthelligkeit in Prozent"><output id="mastero" class="pct">100 %</output></div>
   </div>
   <div class="status"><b>Trilumag</b><span id="status">verbinde …</span></div>
 </header>
@@ -124,7 +139,7 @@ nav.tabs button.on{color:var(--acc)}
       <div class="chips"><button class="chip" id="tgtAll">Ganze Wand</button><button class="chip" id="tgtSel">Auswahl</button></div>
       <p class="note" id="colNote"></p>
       <div class="wheelbox"><div class="wheel" id="wheel"><canvas id="wcv"></canvas><div class="knob" id="knob"></div></div></div>
-      <div class="sl">Helligkeit<input type="range" id="cv" min="0" max="100" value="100"><output id="cvo">100</output></div>
+      <div class="sl">Helligkeit<input type="range" id="cv" min="0" max="100" value="100"><output id="cvo">100 %</output></div>
       <div class="sl">Weißanteil<input type="range" id="cw" min="0" max="255" value="0"><output id="cwo">0</output></div>
       <div class="quick" id="quick"></div>
       <div class="hexrow"><input id="hex" maxlength="7" value="#FF7800" aria-label="Farbe als Hex"><button class="btn" id="rnd">Zufall</button></div>
@@ -155,7 +170,7 @@ nav.tabs button.on{color:var(--acc)}
     <div class="card" id="panelCard">
       <h3 id="pTitle">Panel</h3>
       <div class="kv" id="pInfo"></div>
-      <div class="sl">Helligkeit<input type="range" id="pbri" min="1" max="255" value="180"><output id="pbrio">180</output></div>
+      <div class="sl">Helligkeit<input type="range" id="pbri" min="1" max="100" value="71"><output id="pbrio">71 %</output></div>
       <div class="btnrow"><button class="btn" id="pOn">Ein / Aus</button><button class="btn pri" id="pCol">Farbe wählen</button></div>
     </div>
     <div class="card" id="trayCard">
@@ -184,7 +199,8 @@ nav.tabs button.on{color:var(--acc)}
     <div class="card" id="wifiCard">
       <h3>WLAN</h3>
       <p class="note" id="wifiInfo"></p>
-      <label class="f">WLAN<input id="ssid" list="nets" autocomplete="off" placeholder="Name deines WLANs"><datalist id="nets"></datalist></label>
+      <div class="nets" id="netList"></div>
+      <label class="f">WLAN<input id="ssid" autocomplete="off" placeholder="Name deines WLANs"></label>
       <label class="f">Passwort<input id="pass" type="password" autocomplete="off"></label>
       <div class="btnrow"><button class="btn" id="scanBtn">Netze suchen</button><button class="btn pri" id="wifiBtn">Speichern und verbinden</button></div>
     </div>
@@ -206,7 +222,8 @@ nav.tabs button.on{color:var(--acc)}
     </div>
     <div class="card">
       <h3>Home Assistant (MQTT)</h3>
-      <div class="pins">
+      <label class="tog"><input type="checkbox" id="m_on"><span class="sw"></span>MQTT aktiv</label>
+      <div class="pins" id="mqttFields">
         <label class="f">Broker-Adresse<input id="m_host" placeholder="z. B. 192.168.1.10"></label>
         <label class="f">Port<input id="m_port" inputmode="numeric" value="1883"></label>
         <label class="f">Benutzer<input id="m_user" autocomplete="off"></label>
@@ -243,20 +260,39 @@ function rgb2hsv(r,g,b){r/=255;g/=255;b/=255;const M=Math.max(r,g,b),m=Math.min(
   if(d){h=M===r?((g-b)/d)%6:M===g?(b-r)/d+2:(r-g)/d+4;h/=6;if(h<0)h+=1;}return[h,M?d/M:0,M];}
 function setFill(r){r.style.setProperty('--p',((r.value-r.min)/(r.max-r.min)*100)+'%');}
 document.querySelectorAll('input[type=range]').forEach(r=>{setFill(r);r.addEventListener('input',()=>setFill(r));});
-function setRange(id,v){const r=$(id);if(document.activeElement===r)return;r.value=v;setFill(r);const o=$(id+'o');if(o)o.textContent=v;}
+function setRange(id,v,unit){const r=$(id);if(document.activeElement===r)return;r.value=v;setFill(r);const o=$(id+'o');if(o)o.textContent=v+(unit||'');}
 // Akzentfarbe folgt der aktuellen Farbe, wie bei WLED
 function accent(r,g,b){if(r+g+b<60){r=110;g=139;b=255;}const root=document.documentElement.style;root.setProperty('--acc',`rgb(${r|0},${g|0},${b|0})`);
   root.setProperty('--accfg',(0.3*r+0.59*g+0.11*b)>150?'#111':'#fff');}
 
+// Neuer Zustand vom ESP32; die festen Listen (Effekte, Paletten) kommen nur beim ersten Mal mit
+function takeState(j){if(st&&!j.effects){j.effects=st.effects;j.palettes=st.palettes;}st=j;}
+
+// ----- Feste Verbindung (WebSocket, wie bei WLED) -----
+// Das Hauptpanel schickt Zustand und Effektbild von selbst, Befehle gehen über dieselbe Verbindung.
+// Ist sie weg, fragt die App wie früher per HTTP nach, bis sie wieder steht.
+let sock=null,wsOk=false;
+function wsConnect(){
+  try{sock=new WebSocket(`ws://${location.hostname}:81/`);}catch(e){setTimeout(wsConnect,3000);return;}
+  sock.onopen=()=>{wsOk=true;render();};
+  sock.onmessage=e=>{let m;try{m=JSON.parse(e.data);}catch(x){return;}
+    if(m.t==='state'){takeState(m.d);if(!drag)render();}
+    else if(m.t==='live'){if(m.d.fx!=='aus'){live=m.d.c;joining=m.d.j||[];if(!drag)paintLive();}}
+    else if(m.t==='err')toast(m.m);};
+  sock.onclose=()=>{wsOk=false;sock=null;render();setTimeout(wsConnect,2000);};
+  sock.onerror=()=>{try{sock.close();}catch(x){}};
+}
+
 async function api(path,body){
+  if(body&&wsOk){sock.send(JSON.stringify({p:path,b:body}));return st;}   // Antwort kommt als neuer Zustand
   const r=await fetch(path,body?{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)}:{});
-  const j=await r.json();if(!r.ok){toast(j.error||'Fehler');return null;}if(j.panels)st=j;return j;}
-// Der ESP32 beantwortet eine Anfrage nach der anderen: Abfragen nie gleichzeitig, Klicks gehen vor.
-async function poll(){if(drag||inflight)return;if(fxOn()&&Date.now()-lastState<2000)return;
+  const j=await r.json();if(!r.ok){toast(j.error||'Fehler');return null;}if(j.panels)takeState(j);return j;}
+// Ohne WebSocket: Abfragen nie gleichzeitig, Klicks gehen vor
+async function poll(){if(wsOk||drag||inflight)return;if(fxOn()&&Date.now()-lastState<2000)return;
   inflight=true;try{await api('/api/state');lastState=Date.now();render();}catch(e){$('status').textContent='keine Verbindung zum ESP32';}inflight=false;}
 function fxOn(){return st&&st.fx&&st.fx.id!=='aus';}
 async function pollLive(){
-  if(!fxOn()||drag||document.hidden||inflight)return;inflight=true;
+  if(wsOk||!fxOn()||drag||document.hidden||inflight)return;inflight=true;
   try{const j=await (await fetch('/api/live')).json();if(j.fx!=='aus'){live=j.c;joining=j.j||[];paintLive();}}catch(e){}
   inflight=false;}
 const tSend={};function later(k,fn,ms){clearTimeout(tSend[k]);tSend[k]=setTimeout(()=>{tSend[k]=null;fn();},ms||110);}
@@ -355,8 +391,9 @@ $('big').addEventListener('pointerdown',e=>{const id=e.target.dataset&&e.target.
 // ---------- Darstellung ----------
 function render(){
   if(!st)return;
-  $('status').textContent=`${st.panels.length}/${st.max} Panels · ${st.sim?'Simulation':'Bus'} · MQTT ${st.mqtt?'an':'aus'}`;
-  $('pwr').classList.toggle('on',st.on);setRange('master',st.master);
+  $('status').textContent=`${st.panels.length}/${st.max} Panels · ${st.sim?'Simulation':'Bus'} · MQTT ${st.mqttSet?(st.mqtt?'verbunden':'getrennt'):'aus'} · ${wsOk?'live':'HTTP'}`;
+  $('pwr').classList.toggle('on',st.on);
+  if(document.activeElement!==$('master')){const p=pct(st.master);setRange('master',p);$('mastero').textContent=p+' %';}
   $('apBanner').hidden=!st.ap||tab==='opt';
   [...sel].forEach(id=>{if(!st.panels.some(p=>p.id===id))sel.delete(id);});     // abgeklipste Panels aus der Auswahl nehmen
   if(tab!=='wall'&&tab!=='opt'){drawWall($('mini'),false);
@@ -387,7 +424,7 @@ function syncColUi(){
   const w=$('wheel').clientWidth,r=w/2,a=hsv[0]*2*Math.PI;
   $('knob').style.left=(r+Math.cos(a)*hsv[1]*r)+'px';$('knob').style.top=(r+Math.sin(a)*hsv[1]*r)+'px';
   $('knob').style.background=rgbHex(...hsv2rgb(hsv[0],hsv[1],1));
-  setRange('cv',Math.round(hsv[2]*100));setRange('cw',cw);
+  setRange('cv',Math.round(hsv[2]*100),' %');setRange('cw',cw);
   if(document.activeElement!==$('hex'))$('hex').value=rgbHex(...hsv2rgb(...hsv));
 }
 function drawWheel(){
@@ -411,7 +448,7 @@ function wheelPick(e){const b=$('wheel').getBoundingClientRect(),r=b.width/2;con
 $('wheel').addEventListener('pointerdown',e=>{wheelBusy=true;$('wheel').setPointerCapture(e.pointerId);wheelPick(e);});
 $('wheel').addEventListener('pointermove',e=>{if(wheelBusy)wheelPick(e);});
 $('wheel').addEventListener('pointerup',()=>{wheelBusy=false;});
-$('cv').addEventListener('input',()=>{hsv[2]=$('cv').value/100;$('cvo').textContent=$('cv').value;sendColor();});
+$('cv').addEventListener('input',()=>{hsv[2]=$('cv').value/100;$('cvo').textContent=$('cv').value+' %';sendColor();});
 $('cw').addEventListener('input',()=>{cw=+$('cw').value;$('cwo').textContent=cw;sendColor();});
 $('hex').addEventListener('change',()=>{const m=$('hex').value.trim().replace('#','');if(!/^[0-9a-f]{6}$/i.test(m)){toast('Bitte als #RRGGBB eingeben');return;}
   hsv=rgb2hsv(parseInt(m.slice(0,2),16),parseInt(m.slice(2,4),16),parseInt(m.slice(4,6),16));syncColUi();sendColor();});
@@ -456,7 +493,11 @@ $('finten').addEventListener('input',()=>{$('finteno').textContent=$('finten').v
 
 // ---------- Kopfzeile ----------
 $('pwr').addEventListener('click',async()=>{if(!st)return;st.on=!st.on;render();await api('/api/set',{id:'alle',state:st.on?'ON':'OFF'});render();});
-$('master').addEventListener('input',()=>{if(!st)return;st.master=+$('master').value;later('m',async()=>{await api('/api/set',{id:'alle',brightness:st.master});render();});});
+// Helligkeit in Prozent anzeigen, intern 1 bis 255
+function pct(v){return Math.max(1,Math.round(v*100/255));}
+function fromPct(p){return Math.max(1,Math.round(p*255/100));}
+$('master').addEventListener('input',()=>{if(!st)return;const p=+$('master').value;$('mastero').textContent=p+' %';st.master=fromPct(p);
+  later('m',async()=>{await api('/api/set',{id:'alle',brightness:st.master});render();},60);});
 
 // ---------- Tab Wand ----------
 function renderWall(){
@@ -477,12 +518,12 @@ function renderWall(){
     const par=st.panels.find(q=>q.id===p.parent);
     $('pInfo').innerHTML='';[['Chip-ID',p.id],['Zustand',stx],['Position',`${p.x} / ${p.y} · Spitze ${p.up?'oben':'unten'}`],['Hängt an',p.main?'–':par?(par.main?'Hauptpanel':'Panel '+par.id.slice(4)):'–'],['Farbe',rgbHex(p.r,p.g,p.b)+(p.w?' + Weiß '+p.w:'')]]
       .forEach(([k,v])=>{const a=document.createElement('span');a.textContent=k;const b=document.createElement('span');b.textContent=v;$('pInfo').append(a,b);});
-    setRange('pbri',p.bri);
+    if(document.activeElement!==$('pbri')){setRange('pbri',pct(p.bri));$('pbrio').textContent=pct(p.bri)+' %';}
     $('pOn').classList.toggle('pri',p.on);$('pOn').textContent=p.on?'Ein':'Aus';
   }
 }
 $('newBtn').addEventListener('click',async()=>{if(await api('/api/sim/new',{}))render();});
-$('pbri').addEventListener('input',()=>{$('pbrio').textContent=$('pbri').value;const id=focus;later('pb',async()=>{await api('/api/set',{id,brightness:+$('pbri').value});render();});});
+$('pbri').addEventListener('input',()=>{$('pbrio').textContent=$('pbri').value+' %';const id=focus;later('pb',async()=>{await api('/api/set',{id,brightness:fromPct(+$('pbri').value)});render();});});
 $('pOn').addEventListener('click',async()=>{const p=st.panels.find(q=>q.id===focus);if(!p)return;await api('/api/set',{id:p.id,state:p.on?'OFF':'ON'});render();});
 $('pCol').addEventListener('click',()=>{if(!focus)return;sel=new Set([focus]);showTab('col');});
 
@@ -508,13 +549,14 @@ let cfg=null;const PIN_KEYS=['rx','tx','de','led','snsR','snsL'];
 async function loadCfg(){
   $('wifiInfo').textContent=st&&st.ssid?`Verbunden mit „${st.ssid}“. Hier kannst du ein anderes WLAN eintragen.`:'Noch mit keinem WLAN verbunden. Danach startet das Hauptpanel neu und ist unter http://trilumag.local erreichbar.';
   try{cfg=await (await fetch('/api/config')).json();}catch(e){return;}
+  if(st&&(st.ap||!st.ssid)&&!$('netList').children.length)$('scanBtn').click();   // ohne WLAN gleich nach Netzen suchen
   $('mode').value=cfg.mode;
   const b=$('board');b.innerHTML='';cfg.boards.forEach(x=>{const o=document.createElement('option');o.value=x.id;o.textContent=x.name;b.append(o);});
   const c=document.createElement('option');c.value='custom';c.textContent='Eigene Belegung';b.append(c);
   b.value=cfg.boards.some(x=>x.id===cfg.board)?cfg.board:'custom';
   PIN_KEYS.forEach(k=>{const s=$('p_'+k);s.innerHTML='';cfg.validPins.forEach(p=>{const o=document.createElement('option');o.value=p;o.textContent='GPIO '+p;s.append(o);});s.value=cfg.pins[k];});
   $('order').innerHTML='';cfg.orders.forEach(o=>{const e=document.createElement('option');e.value=o;e.textContent=o;$('order').append(e);});$('order').value=cfg.order;
-  $('m_host').value=cfg.mqtt.host;$('m_port').value=cfg.mqtt.port;$('m_user').value=cfg.mqtt.user;
+  $('m_on').checked=!!cfg.mqtt.on;$('mqttFields').classList.toggle('off',!cfg.mqtt.on);$('m_host').value=cfg.mqtt.host;$('m_port').value=cfg.mqtt.port;$('m_user').value=cfg.mqtt.user;
   $('info').innerHTML='';[['Chip',cfg.chip],['Firmware',cfg.ver],['Betriebsart',cfg.mode==='bus'?'Bus':'Simulation'],['WLAN',st&&st.ssid||'–']]
     .forEach(([k,v])=>{const a=document.createElement('span');a.textContent=k;const x=document.createElement('span');x.textContent=v;$('info').append(a,x);});
 }
@@ -524,13 +566,27 @@ document.querySelectorAll('[data-t]').forEach(b=>b.addEventListener('click',()=>
 $('saveBtn').addEventListener('click',async()=>{
   const pins={};PIN_KEYS.forEach(k=>pins[k]=+$('p_'+k).value);
   if(new Set(Object.values(pins)).size<6){$('setErr').textContent='Ein Pin ist doppelt belegt.';return;}
-  const body={mode:$('mode').value,board:$('board').value,pins,order:$('order').value,mqtt:{host:$('m_host').value.trim(),port:+$('m_port').value||1883,user:$('m_user').value.trim()}};
+  const body={mode:$('mode').value,board:$('board').value,pins,order:$('order').value,mqtt:{on:$('m_on').checked,host:$('m_host').value.trim(),port:+$('m_port').value||1883,user:$('m_user').value.trim()}};
   if($('m_pass').value)body.mqtt.pass=$('m_pass').value;
   const r=await fetch('/api/config',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)}).catch(()=>null);
   if(r&&!r.ok){const j=await r.json();$('setErr').textContent=j.error||'Speichern fehlgeschlagen';return;}
   $('setErr').textContent='';toast('Gespeichert. Trilumag startet neu …');setTimeout(()=>location.reload(),7000);});
+$('m_on').addEventListener('change',()=>{$('mqttFields').classList.toggle('off',!$('m_on').checked);
+  if($('m_on').checked&&!$('m_host').value.trim())$('m_host').focus();});
+// Gefundene Netze als Liste zum Antippen, stärkstes zuerst
 $('scanBtn').addEventListener('click',async()=>{$('scanBtn').disabled=true;$('scanBtn').textContent='Suche …';
-  try{const r=await fetch('/api/wifi/scan');const j=await r.json();$('nets').innerHTML='';j.networks.forEach(n=>{const o=document.createElement('option');o.value=n;$('nets').append(o);});toast(j.networks.length+' Netze gefunden');}catch(e){toast('Suche fehlgeschlagen');}
+  try{const r=await fetch('/api/wifi/scan');const j=await r.json();const box=$('netList');box.innerHTML='';
+    const list=(j.list||j.networks.map(n=>({ssid:n,rssi:-70,lock:true}))).sort((a,b)=>b.rssi-a.rssi);
+    list.forEach(n=>{const b=document.createElement('button');b.className='row';
+      const lv=n.rssi>-55?4:n.rssi>-65?3:n.rssi>-75?2:1;
+      const bars=document.createElement('span');bars.className='bars';bars.setAttribute('aria-label','Signal '+lv+' von 4');
+      for(let k=1;k<=4;k++){const i=document.createElement('i');i.style.height=(k*3+2)+'px';if(k<=lv)i.className='on';bars.append(i);}
+      const t=document.createElement('span');t.textContent=n.ssid;
+      const sm=document.createElement('small');sm.textContent=n.lock?'gesichert':'offen';
+      b.append(bars,t,sm);
+      b.addEventListener('click',()=>{$('ssid').value=n.ssid;box.querySelectorAll('.row').forEach(x=>x.classList.toggle('on',x===b));$('pass').value='';$('pass').focus();});
+      box.append(b);});
+    toast(list.length?list.length+' Netze gefunden':'Keine Netze gefunden, bitte noch einmal suchen');}catch(e){toast('Suche fehlgeschlagen');}
   $('scanBtn').disabled=false;$('scanBtn').textContent='Netze suchen';});
 $('wifiBtn').addEventListener('click',async()=>{const ssid=$('ssid').value.trim();if(!ssid){toast('Bitte WLAN-Namen eingeben');return;}
   await fetch('/api/wifi',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({ssid,pass:$('pass').value})}).catch(()=>{});
@@ -539,5 +595,5 @@ $('wifiBtn').addEventListener('click',async()=>{const ssid=$('ssid').value.trim(
 // ---------- Start ----------
 window.addEventListener('resize',()=>{if(drag)return;vbFix=null;drawWheel();syncColUi();render();});
 drawWheel();syncColUi();
-poll();setInterval(poll,700);setInterval(pollLive,120);
+poll();wsConnect();setInterval(poll,700);setInterval(pollLive,120);
 </script></body></html>)HTML";

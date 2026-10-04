@@ -46,7 +46,11 @@ Die App ist aufgebaut wie bei WLED: oben Ein/Aus und Gesamthelligkeit der ganzen
 - **Effekte:** Tempo, Intensität, Effektliste mit Suche und Paletten.
 - **Wand:** Panels anordnen (in der Simulation per Ziehen), Details, Helligkeit und Ein/Aus pro Panel.
 - **Presets:** Szenen speichern, abrufen und löschen (bis zu 16).
-- **Optionen:** WLAN, Betriebsart, Board und Pins, Farbreihenfolge mit Farbtest, MQTT.
+- **Optionen:** WLAN (gefundene Netze zum Antippen), Betriebsart, Board und Pins, Farbreihenfolge mit Farbtest, MQTT mit Schalter „MQTT aktiv“.
+
+Die App hält wie WLED eine feste Verbindung (WebSocket auf Port 81). Das Hauptpanel schickt Änderungen und das Effektbild etwa 15-mal pro Sekunde von selbst. Ist die Verbindung weg, fragt die App per HTTP nach, bis sie wieder steht.
+
+Updates über den Webinstaller behalten WLAN, Einstellungen, Farben und Presets. Nur „Gerät löschen“ beim Installieren setzt alles zurück.
 
 ## Effekte und Paletten
 
@@ -62,7 +66,7 @@ Ein Preset merkt sich Ein/Aus, Gesamthelligkeit, den Effekt mit Tempo, Intensit�
 
 ## Home Assistant
 
-In der App unter Optionen die Adresse des MQTT-Brokers eintragen. Danach erscheinen automatisch:
+In der App unter Optionen „MQTT aktiv“ einschalten und die Adresse des Brokers eintragen. Danach erscheinen automatisch:
 
 - **Ein Licht pro Panel**
 - **„Alle Panels“:** Ein/Aus, Gesamthelligkeit, Farbe und die Effektliste.

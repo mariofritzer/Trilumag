@@ -67,6 +67,11 @@ jobs:
                 0xe000 "$BOOT_APP0" \
                 0x10000 "build/${NAME}/trilumag.ino.bin"
             fi
+            # Einzelteile für den Webinstaller: so bleibt der NVS-Bereich (WLAN, Einstellungen, Presets) bei Updates erhalten
+            cp "build/${NAME}/trilumag.ino.bootloader.bin" "site/firmware/${NAME}/bootloader.bin"
+            cp "build/${NAME}/trilumag.ino.partitions.bin" "site/firmware/${NAME}/partitions.bin"
+            cp "$BOOT_APP0" "site/firmware/${NAME}/boot_app0.bin"
+            cp "build/${NAME}/trilumag.ino.bin" "site/firmware/${NAME}/app.bin"
             ls -l "site/firmware/${NAME}"
             echo "::endgroup::"
           }
