@@ -45,7 +45,7 @@ const uint32_t FX_JOIN_MS   = 5 * 1600; // bei laufendem Effekt pulsieren neue P
 // ====================================================
 
 const char* FW_NAME    = "Trilumag";
-const char* FW_VERSION = "0.3.1";
+const char* FW_VERSION = "0.3.2";
 const char* HOSTNAME   = "trilumag";
 const char* SETUP_SSID = "Trilumag-Setup";
 const char* SETUP_PASS = "trilumag";
@@ -151,7 +151,7 @@ void logf(const char* fmt, ...) {
 }
 
 void saveWifi(const String& ss, const String& pw);
-bool connectWifi(const String& ss, const String& pw, uint32_t timeout);
+void wifiStart(const String& ss, const String& pw, uint32_t timeout, bool fromImprov);
 void startSetupAp();
 void publishDiscovery(int i);
 void publishAvail(int i, bool online);
@@ -883,6 +883,7 @@ String stateJson() {
   d["mqtt"] = mqtt.connected();
   d["mqttSet"] = cfg.mqttHost.length() > 0;
   d["ap"] = apMode;
+  d["ssid"] = wlanOk ? WiFi.SSID() : String();
   d["ver"] = FW_VERSION;
   d["chip"] = CHIP_FAMILY;
   JsonObject f = d["fx"].to<JsonObject>();
@@ -1095,27 +1096,69 @@ void saveWifi(const String& ss, const String& pw) {
   logf("[WLAN] Zugangsdaten für '%s' gespeichert\n", ss.c_str());
 }
 
-bool connectWifi(const String& ss, const String& pw, uint32_t timeout) {
+// Die Verbindung läuft im Hintergrund. So bleibt das Hauptpanel währenddessen für App und
+// Webinstaller ansprechbar (der Webinstaller gibt nach 1,5 bis 10 s auf).
+enum WifiPhase : uint8_t { W_IDLE, W_CONNECTING };
+WifiPhase wPhase = W_IDLE;
+uint32_t wDeadline = 0;
+String wSsid, wPass;
+bool wImprov = false;          // Verbindungsversuch kam aus dem Webinstaller
+bool wSaveLate = false;        // verbindet es sich doch noch, die Zugangsdaten trotzdem speichern
+Stream* wImprovStream = nullptr;
+
+void improvSendUrl(Stream& s, uint8_t cmd);
+
+void wifiStart(const String& ss, const String& pw, uint32_t timeout, bool fromImprov) {
   WiFi.mode(apMode ? WIFI_AP_STA : WIFI_STA);
   WiFi.setSleep(false);            // ohne Funk-Sparmodus antwortet die App sofort
+  if (WiFi.status() == WL_CONNECTED) WiFi.disconnect(false);
+  wlanOk = false;
   WiFi.begin(ss.c_str(), pw.c_str());
-  logf("[WLAN] verbinde mit '%s'", ss.c_str());
-  uint32_t t0 = millis();
-  while (WiFi.status() != WL_CONNECTED && millis() - t0 < timeout) {
-    delay(250);
-    if (apMode) server.handleClient();
-    logf(".");
+  wSsid = ss; wPass = pw; wImprov = fromImprov; wSaveLate = fromImprov;
+  wPhase = W_CONNECTING; wDeadline = millis() + timeout;
+  logf("[WLAN] verbinde mit '%s' …\n", ss.c_str());
+}
+
+void wifiConnected() {
+  wlanOk = true;
+  if (wSaveLate) { saveWifi(wSsid, wPass); wSaveLate = false; }
+  if (apMode) { WiFi.softAPdisconnect(true); WiFi.mode(WIFI_STA); apMode = false; }
+  MDNS.end(); MDNS.begin(HOSTNAME); MDNS.addService("http", "tcp", 80);
+  logf("[WLAN] verbunden. App: http://%s  oder  http://%s.local\n", WiFi.localIP().toString().c_str(), HOSTNAME);
+  // Webinstaller Bescheid geben, auch wenn die Verbindung erst nach seiner Wartezeit kam
+  Stream* outs[2] = {&Serial, nullptr};
+#if HAS_UART_CONSOLE
+  outs[1] = &Serial0;
+#endif
+  for (Stream* o : outs) {
+    if (!o) continue;
+    improv::sendState(*o, improv::PROVISIONED);
+    if (wImprov && o == wImprovStream) improvSendUrl(*o, improv::WIFI_SETTINGS);
   }
-  logf("\n");
-  wlanOk = WiFi.status() == WL_CONNECTED;
-  if (wlanOk && apMode) {
-    WiFi.softAPdisconnect(true);
-    WiFi.mode(WIFI_STA);
-    apMode = false;
-    MDNS.end(); MDNS.begin(HOSTNAME); MDNS.addService("http", "tcp", 80);
+  wImprov = false; wImprovStream = nullptr;
+}
+
+void wifiLoop() {
+  bool up = WiFi.status() == WL_CONNECTED;
+  if (wPhase == W_CONNECTING) {
+    if (up) { wPhase = W_IDLE; wifiConnected(); return; }
+    if ((int32_t)(millis() - wDeadline) < 0) return;
+    wPhase = W_IDLE;
+    logf("[WLAN] keine Verbindung zu '%s'\n", wSsid.c_str());
+    if (wImprov && wImprovStream) {
+      improv::sendError(*wImprovStream, improv::UNABLE_TO_CONNECT);
+      improv::sendState(*wImprovStream, improv::AUTHORIZED);
+      wImprov = false; wImprovStream = nullptr;
+      wSaveLate = false;
+      WiFi.disconnect(false);
+      String ss = prefs.getString("ssid", ""), pw = prefs.getString("pass", "");
+      if (ss.length() && ss != wSsid) { wifiStart(ss, pw, 15000, false); return; }   // zurück ins alte WLAN
+    }
+    if (!apMode) startSetupAp();     // das Panel versucht es im Hintergrund weiter
+    return;
   }
-  if (!wlanOk) logf("[WLAN] keine Verbindung\n");
-  return wlanOk;
+  if (up && !wlanOk) wifiConnected();                       // später doch verbunden oder wieder da
+  else if (!up && wlanOk) { wlanOk = false; logf("[WLAN] Verbindung verloren, verbinde neu …\n"); }
 }
 
 void startSetupAp() {
@@ -1136,7 +1179,7 @@ void improvSendUrl(Stream& s, uint8_t cmd) {
 void improvRpc(Stream& s, const improv::Parser& p) {
   switch (p.command()) {
     case improv::GET_CURRENT_STATE:
-      improv::sendState(s, wlanOk ? improv::PROVISIONED : improv::AUTHORIZED);
+      improv::sendState(s, wlanOk ? improv::PROVISIONED : (wPhase == W_CONNECTING && wImprov) ? improv::PROVISIONING : improv::AUTHORIZED);
       if (wlanOk) improvSendUrl(s, improv::GET_CURRENT_STATE);
       break;
     case improv::GET_DEVICE_INFO: {
@@ -1168,16 +1211,8 @@ void improvRpc(Stream& s, const improv::Parser& p) {
       memcpy(pb, d + 2 + sl, pn); pb[pn] = 0;
       String ss(sb), pw(pb);
       improv::sendState(s, improv::PROVISIONING);
-      if (connectWifi(ss, pw, 20000)) {
-        saveWifi(ss, pw);
-        improv::sendState(s, improv::PROVISIONED);
-        improvSendUrl(s, improv::WIFI_SETTINGS);
-        logf("Verbunden. App: http://%s  oder  http://%s.local\n", WiFi.localIP().toString().c_str(), HOSTNAME);
-      } else {
-        improv::sendError(s, improv::UNABLE_TO_CONNECT);
-        improv::sendState(s, improv::AUTHORIZED);
-        if (!apMode) startSetupAp();
-      }
+      wImprovStream = &s;
+      wifiStart(ss, pw, 30000, true);     // Antwort kommt aus wifiLoop, sobald klar ist, ob es klappt
       break;
     }
     default:
@@ -1201,7 +1236,7 @@ void setup() {
 #if HAS_UART_CONSOLE
   Serial0.begin(115200);
 #endif
-  delay(300);
+  delay(50);
   logf("\n%s %s auf %s\n", FW_NAME, FW_VERSION, CHIP_FAMILY);
 
   prefs.begin("trilumag", false);
@@ -1223,11 +1258,8 @@ void setup() {
 
   String ss = prefs.getString("ssid", WLAN_SSID), pw = prefs.getString("pass", WLAN_PASS);
   WiFi.setHostname(HOSTNAME);
-  if (ss.length() && connectWifi(ss, pw, 15000)) {
-    logf("Verbunden. App: http://%s  oder  http://%s.local\n", WiFi.localIP().toString().c_str(), HOSTNAME);
-  } else {
-    startSetupAp();
-  }
+  if (ss.length()) wifiStart(ss, pw, 15000, false);   // nicht warten, Improv muss sofort antworten können
+  else startSetupAp();
   MDNS.begin(HOSTNAME);
   MDNS.addService("http", "tcp", 80);
 
@@ -1243,6 +1275,7 @@ void setup() {
 void loop() {
   server.handleClient();
   improvLoop();
+  wifiLoop();
   mqttLoop();
   if (cfg.bus) busLoop();
   else {
