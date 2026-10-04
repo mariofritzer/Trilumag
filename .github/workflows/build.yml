@@ -43,6 +43,25 @@ jobs:
       - name: Zertifikate für Online-Updates prüfen
         run: python3 .github/scripts/check_certs.py
 
+      - name: Panel-Firmware (CH32V003) und Bootloader bauen
+        run: |
+          set -euo pipefail
+          sudo apt-get update -q
+          sudo apt-get install -y -q gcc-riscv64-unknown-elf picolibc-riscv64-unknown-elf
+          git clone -q https://github.com/cnlohr/ch32fun.git ch32fun
+          git -C ch32fun checkout -q 6b247c7      # fester Stand, damit Größe und Verhalten gleich bleiben
+          NEWLIB=/usr/lib/picolibc/riscv64-unknown-elf/include
+          make -C firmware/panel build CH32FUN="$PWD/ch32fun/ch32fun" NEWLIB=$NEWLIB
+          make -C firmware/panel/bootloader build CH32FUN="$PWD/ch32fun/ch32fun" NEWLIB=$NEWLIB
+          BL=$(stat -c %s firmware/panel/bootloader/bootloader.bin)
+          [ "$BL" -le 1920 ] || { echo "::error::Bootloader zu groß: $BL Bytes (höchstens 1920)"; exit 1; }
+          # Das Hauptpanel trägt die Panel-Firmware für Updates über den Bus in sich
+          python3 .github/scripts/panel_fw_header.py firmware/panel/panel.bin firmware/panel/panel.c firmware/trilumag/panel_fw.h
+          mkdir -p site/firmware/panel
+          cp firmware/panel/panel.bin firmware/panel/panel.hex site/firmware/panel/
+          cp firmware/panel/bootloader/bootloader.bin site/firmware/panel/
+          ls -l site/firmware/panel
+
       - name: Firmware kompilieren
         run: |
           set -euo pipefail
@@ -98,6 +117,9 @@ jobs:
           set -euo pipefail
           mkdir -p release
           for n in esp32 esp32s3 esp32c3 esp32c6; do cp "site/firmware/$n/app.bin" "release/trilumag-$n.bin"; done
+          # Panel-Firmware und Bootloader zum ersten Programmieren mit dem WCH-LinkE
+          cp site/firmware/panel/panel.bin release/trilumag-panel.bin
+          cp site/firmware/panel/bootloader.bin release/trilumag-panel-bootloader.bin
           # Text zur Version aus dem Versionsverlauf (Abschnitt "## <Version>"), sonst ein kurzer Standardtext
           awk -v v="## ${VERSION}" 'index($0,v)==1{f=1;next} /^## /{if(f)exit} f' CHANGELOG.md > notes.md || true
           [ -s notes.md ] || echo "Automatischer Build ${VERSION}. Details im Versionsverlauf (CHANGELOG.md)." > notes.md
@@ -130,17 +152,6 @@ jobs:
             if cur: out[cur].append(l)
           json.dump({k:'\n'.join(v).strip() for k,v in out.items()},open('site/changelog.json','w'),ensure_ascii=False)
           PY
-
-      - name: Panel-Firmware (CH32V003) bauen
-        run: |
-          set -euo pipefail
-          sudo apt-get update -q
-          sudo apt-get install -y -q gcc-riscv64-unknown-elf picolibc-riscv64-unknown-elf
-          git clone -q --depth 1 https://github.com/cnlohr/ch32fun.git ch32fun
-          make -C firmware/panel build CH32FUN="$PWD/ch32fun/ch32fun" NEWLIB=/usr/lib/picolibc/riscv64-unknown-elf/include
-          mkdir -p site/firmware/panel
-          cp firmware/panel/panel.bin firmware/panel/panel.hex site/firmware/panel/
-          ls -l site/firmware/panel
 
       - uses: actions/upload-pages-artifact@v3
         if: github.ref == 'refs/heads/main'
