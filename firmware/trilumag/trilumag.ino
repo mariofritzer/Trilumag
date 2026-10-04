@@ -51,7 +51,7 @@ const uint32_t FX_JOIN_MS   = 5 * 1600; // bei laufendem Effekt pulsieren neue P
 // ====================================================
 
 const char* FW_NAME    = "Trilumag";
-const char* FW_VERSION = "0.6.0";
+const char* FW_VERSION = "0.6.0";   // die dritte Stelle setzt der Build
 const char* HOSTNAME   = "trilumag";
 const char* SETUP_SSID = "Trilumag-Setup";
 const char* SETUP_PASS = "trilumag";
@@ -351,6 +351,7 @@ void begin() {
 }  // namespace bus
 
 void reconcile();
+void simChanged();
 bool placePanel(int i, int parent, uint8_t edge, uint8_t own);
 
 // Neues Panel gefunden: Nachbarn orten, Adresse vergeben, Farbe oder Pulsieren
@@ -1075,6 +1076,7 @@ bool simAttach(int i, int parent, uint8_t edge) {
   P[i].state = DARK;
   logf("[SIM] %s an Kante %u von %s angeklipst\n", hex(P[i].chip).c_str(), edge + 1, hex(P[parent].chip).c_str());
   publishDiscovery(i); publishAvail(i, true);
+  simChanged();
   return true;
 }
 
@@ -1084,15 +1086,48 @@ void simDetach(int i) {
   publishAvail(i, false);
   logf("[SIM] %s abgeklipst\n", hex(P[i].chip).c_str());
   reconcile();
+  simChanged();
 }
 
 int simNewPanel() {
   for (int i = 1; i < SLOTS; i++) if (!P[i].used) {
     P[i] = Panel(); P[i].used = true;
     do { P[i].chip = esp_random(); } while (P[i].chip == 0 || findChip(P[i].chip) != i);
+    simChanged();
     return i;
   }
   return -1;
+}
+
+// Die simulierte Wand übersteht Neustarts und Updates: Panels, Positionen und Ablage im NVS
+struct SimRec { uint32_t chip; int8_t x, y; uint8_t rot, attached; };
+bool simDirty = false;
+uint32_t simDirtyAt = 0;
+void simChanged() { simDirty = true; simDirtyAt = millis(); }
+
+void simSave() {
+  SimRec r[SLOTS]; uint8_t n = 0;
+  for (int i = 1; i < SLOTS; i++) if (P[i].used) r[n++] = {P[i].chip, P[i].x, P[i].y, P[i].rot, (uint8_t)P[i].attached};
+  if (n) prefs.putBytes("simw", r, n * sizeof(SimRec)); else prefs.remove("simw");
+  simDirty = false;
+}
+
+// true, wenn eine gespeicherte Wand geladen wurde
+bool simLoad() {
+  SimRec r[SLOTS];
+  size_t len = prefs.getBytes("simw", r, sizeof r);
+  if (!len || len % sizeof(SimRec)) return false;
+  uint8_t n = len / sizeof(SimRec);
+  for (uint8_t k = 0; k < n && k + 1 < SLOTS; k++) {
+    int i = k + 1;
+    P[i] = Panel(); P[i].used = true; P[i].chip = r[k].chip;
+    P[i].x = r[k].x; P[i].y = r[k].y; P[i].rot = r[k].rot % 3; P[i].attached = r[k].attached;
+    P[i].state = DARK; P[i].since = millis();                    // wie echte Panels: kurz dunkel, dann erkannt
+    loadColor(i);
+  }
+  reconcile();                                                   // Nachbarn und Abstände neu berechnen
+  logf("[SIM] gespeicherte Wand mit %d Panels geladen\n", countAttached() - 1);
+  return true;
 }
 
 // ---------- Einstellungen ----------
@@ -1288,7 +1323,7 @@ void otaLoop() {
   if (otaInstallVer.length()) {
     String v = otaInstallVer; otaInstallVer = "";
     logf("[OTA] installiere %s …\n", v.c_str());
-    saveColors(); fxSave();                                    // nichts verlieren
+    saveColors(); fxSave(); if (simDirty) simSave();           // nichts verlieren
     bool ok = ota::install(v);
     otaPush();
     if (ok) {
@@ -1427,7 +1462,7 @@ void setupWeb() {
     HTTPUpload& u = server.upload();
     if (u.status == UPLOAD_FILE_START) {
       logf("[OTA] Datei-Upload %s\n", u.filename.c_str());
-      saveColors(); fxSave();
+      saveColors(); fxSave(); if (simDirty) simSave();
       Update.begin(UPDATE_SIZE_UNKNOWN);
     } else if (u.status == UPLOAD_FILE_WRITE) {
       Update.write(u.buf, u.currentSize);
@@ -1462,7 +1497,7 @@ void setupWeb() {
       prefs.putString("mqttUser", (const char*)(m["user"] | ""));
       if (m["pass"].is<const char*>()) prefs.putString("mqttPass", (const char*)m["pass"]);
     }
-    saveColors(); fxSave();
+    saveColors(); fxSave(); if (simDirty) simSave();
     server.send(200, "application/json", "{\"ok\":true,\"restart\":true}");
     logf("Einstellungen gespeichert, starte neu\n");
     delay(600);
@@ -1714,7 +1749,7 @@ void setup() {
   mqtt.setCallback(onMqtt);
 
   if (cfg.bus) bus::begin();
-  else for (int k = 0; k < 3; k++) simNewPanel();   // drei Panels liegen in der Ablage bereit
+  else if (!simLoad()) { for (int k = 0; k < 3; k++) simNewPanel(); simSave(); }   // sonst liegen drei Panels in der Ablage bereit
   setupWeb();
 }
 
@@ -1740,5 +1775,6 @@ void loop() {
   fxLoop();
   otaLoop();
   if (colorsDirty && millis() - colorsDirtyAt > 5000) saveColors();
+  if (simDirty && millis() - simDirtyAt > 1500) simSave();
   if (fxDirty && millis() - fxDirtyAt > 5000) fxSave();
 }
