@@ -23,6 +23,7 @@
    - Boardverwalter: "esp32" von Espressif
    - Bibliotheken: ArduinoJson (ab 7), PubSubClient, Adafruit NeoPixel
    - ESP32-S3/C3/C6: "USB CDC On Boot" auf "Enabled" stellen
+   - Partition Scheme: "Minimal SPIFFS (1.9MB APP with OTA)", sonst passen Online-Updates nicht
 */
 
 #include <WiFi.h>

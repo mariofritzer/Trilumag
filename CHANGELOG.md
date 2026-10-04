@@ -2,6 +2,12 @@
 
 Die Versionsnummer im Webinstaller und in der App setzt sich aus der Version in der Firmware und der Nummer des automatischen Builds zusammen, zum Beispiel **0.5.11** = Version 0.5, Build 11. Bis Build 9 hat der Build die Nummer immer als 0.2.x ausgegeben, die tatsächlichen Stände stehen deshalb unten mit beiden Nummern.
 
+## 0.6.14 · 4. Oktober 2026
+
+**Wichtig: bitte einmal über den Webinstaller installieren**
+- Die Speicheraufteilung bietet jetzt 1,9 MB pro Programm statt 1,25 MB. Mit 0.6.13 war die Firmware für ESP32-C3 und C6 dafür zu groß, beim ESP32 und S3 war es knapp. Ein Online-Update hätte dort nicht geklappt. Die neue Aufteilung kommt nur über den Webinstaller aufs Gerät, danach gehen Online-Updates.
+- WLAN, Einstellungen, Farben und Presets bleiben erhalten, ihr Speicherbereich liegt an derselben Stelle.
+
 ## 0.6.13 · 4. Oktober 2026
 
 **Online-Updates**
