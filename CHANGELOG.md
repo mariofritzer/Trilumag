@@ -2,6 +2,16 @@
 
 Die Versionsnummer im Webinstaller und in der App setzt sich aus der Version in der Firmware und der Nummer des automatischen Builds zusammen, zum Beispiel **0.5.11** = Version 0.5, Build 11. Bis Build 9 hat der Build die Nummer immer als 0.2.x ausgegeben, die tatsächlichen Stände stehen deshalb unten mit beiden Nummern.
 
+## 0.7.21 · 4. Oktober 2026
+
+**Fehlerbehebung: weiße Seite**
+- Nach 0.7.20 blieb die App bei manchen Geräten weiß. Die rund 70 KB große Seite wurde vor dem Senden komplett in den Arbeitsspeicher kopiert, und dafür war nicht immer genug Platz frei.
+- Jetzt wird sie direkt aus dem Flash gesendet, ohne Kopie.
+
+**Notfall-Seite `/update`**
+- Unter `http://trilumag.local/update` gibt es eine kleine Seite, die auch dann lädt, wenn die App selbst nicht geht.
+- Ein Knopf installiert die neueste Version von GitHub, alternativ lässt sich eine Firmware-Datei hochladen.
+
 ## 0.7.20 · 4. Oktober 2026
 
 **Stromlimit**

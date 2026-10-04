@@ -1766,6 +1766,7 @@ void otaVerifyLoop() {
 
 // ---------- Online-Updates ----------
 bool otaCheckNow = false;
+bool otaLatestAfterCheck = false;     // Notfall-Seite: nach der Abfrage die neueste Version installieren
 String otaInstallVer;
 uint32_t otaNext = 0;
 const uint32_t OTA_EVERY = 6UL * 3600 * 1000;    // alle 6 Stunden nachsehen
@@ -1798,6 +1799,8 @@ void otaLoop() {
     logf("[OTA] %s\n", ok ? ("neueste Version " + ota::latest()).c_str() : ota::error.c_str());
     otaPush(); wsForce = true;
     if (ok && cfg.autoUpdate && ota::cmp(ota::latest(), FW_VERSION) > 0 && ota::latest() != prefs.getString("otaBad", "")) otaInstallVer = ota::latest();
+    if (ok && otaLatestAfterCheck && ota::latest() != FW_VERSION) otaInstallVer = ota::latest();
+    otaLatestAfterCheck = false;
   }
   if (otaInstallVer.length()) {
     String v = otaInstallVer; otaInstallVer = "";
@@ -1890,6 +1893,7 @@ const char* apiCall(const char* path, JsonDocument& d) {
   if (!strcmp(path, "/api/ota")) {
     const char* a = d["action"] | "";
     if (!strcmp(a, "check")) { if (!wlanOk) return "Kein WLAN"; otaCheckNow = true; return nullptr; }
+    if (!strcmp(a, "latest")) { if (!wlanOk) return "Kein WLAN"; otaCheckNow = true; otaLatestAfterCheck = true; return nullptr; }
     if (!strcmp(a, "install")) {
       if (!wlanOk) return "Kein WLAN";
       String v = d["version"] | "";
@@ -1951,7 +1955,19 @@ int scanWifi() {
 }
 
 void setupWeb() {
-  server.on("/", HTTP_GET, [] { server.send(200, "text/html; charset=utf-8", INDEX_HTML); });
+  // Die App direkt aus dem Flash schicken, ohne sie erst in den Arbeitsspeicher zu kopieren (sie ist rund 70 KB groß)
+  server.on("/", HTTP_GET, [] { server.send_P(200, "text/html; charset=utf-8", INDEX_HTML, sizeof(INDEX_HTML) - 1); });
+  // Notfall-Seite für Updates: klein, funktioniert auch, wenn die App selbst nicht lädt
+  server.on("/update", HTTP_GET, [] {
+    String h = String("<!doctype html><meta charset=utf-8><meta name=viewport content='width=device-width,initial-scale=1'><title>Trilumag Update</title>"
+      "<style>body{font:16px system-ui;background:#111;color:#eee;max-width:520px;margin:24px auto;padding:0 16px}button,input{font:inherit;margin:6px 0;padding:10px 14px;border-radius:10px}"
+      "button{background:#6e8bff;border:0;color:#111;font-weight:600}p{color:#aaa}</style><h1>Trilumag Update</h1>");
+    h += "<p>Installierte Version: <b>" + String(FW_VERSION) + "</b> auf " + CHIP_FAMILY + "</p>";
+    h += String("<button onclick=\"fetch('/api/ota',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action:'latest'})}).then(()=>{document.getElementById('m').textContent='Suche und installiere die neueste Version. Trilumag startet danach neu, die Seite in etwa einer Minute neu laden.'})\">Neueste Version installieren</button>"
+      "<p id=m></p><h2>Datei hochladen</h2><form method=post action=/update enctype=multipart/form-data><input type=file name=f accept=.bin><br><button>Hochladen und installieren</button></form>"
+      "<p><a href=/ style=color:#6e8bff>zur App</a></p>");
+    server.send(200, "text/html; charset=utf-8", h);
+  });
   server.on("/api/state", HTTP_GET, replyState);
   // Befehle laufen über apiCall(), damit HTTP und WebSocket dasselbe tun
   const char* cmds[] = {"/api/set", "/api/presets", "/api/effect", "/api/test", "/api/ota", "/api/light", "/api/diag", "/api/sim/new", "/api/sim/attach", "/api/sim/detach"};
