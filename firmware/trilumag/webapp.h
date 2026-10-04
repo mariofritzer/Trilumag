@@ -6,6 +6,7 @@ const char INDEX_HTML[] = R"HTML(<!doctype html>
 <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#111">
 <title>Trilumag</title>
+<link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 120 104'%3E%3Cpolygon points='4,100 60,4 116,100' fill='%2316203d' stroke='%236e8bff' stroke-width='6' stroke-linejoin='round'/%3E%3Cpolygon points='32,52 60,4 88,52' fill='%233d6dff' opacity='.85'/%3E%3Cpolygon points='4,100 32,52 60,100' fill='%23ff6b5c' opacity='.8'/%3E%3Cpolygon points='60,100 88,52 116,100' fill='%233fd69a' opacity='.8'/%3E%3C/svg%3E">
 <style>
 :root{--bg:#111;--card:#1c1c1c;--card2:#252525;--line:#333;--fg:#eee;--muted:#999;--acc:#6e8bff;--accfg:#111;color-scheme:dark}
 *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}

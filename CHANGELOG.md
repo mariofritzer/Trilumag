@@ -2,6 +2,10 @@
 
 Die Versionsnummer im Webinstaller und in der App setzt sich aus der Version in der Firmware und der Nummer des automatischen Builds zusammen, zum Beispiel **0.5.11** = Version 0.5, Build 11. Bis Build 9 hat der Build die Nummer immer als 0.2.x ausgegeben, die tatsächlichen Stände stehen deshalb unten mit beiden Nummern.
 
+## Nächster Build
+
+- Die App im Browser zeigt das Trilumag-Logo als Symbol im Tab und in den Lesezeichen.
+
 ## 0.5.11 · 4. Oktober 2026
 
 **Verbindung**
