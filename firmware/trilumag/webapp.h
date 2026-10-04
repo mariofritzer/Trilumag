@@ -99,6 +99,7 @@ input[type=text],input[type=password],input:not([type]),select{width:100%;height
 .preset.on{border-color:var(--acc);box-shadow:inset 0 0 0 1px var(--acc)}
 .preset .del{position:absolute;top:6px;right:6px;min-width:30px;height:30px;border-radius:999px;border:0;background:transparent;color:var(--muted);font-size:17px;cursor:pointer}
 .preset .del.ask{padding:0 10px;background:#5a1d1d;color:#ffb4b4;font-size:12px}
+a.btn{text-decoration:none;color:var(--fg);display:inline-block}
 .btn{border:1px solid var(--line);background:var(--card2);border-radius:999px;padding:10px 16px;cursor:pointer;font-size:14px;white-space:nowrap}
 .btn.pri{background:var(--acc);border-color:var(--acc);color:var(--accfg);font-weight:600}
 .btn:disabled{opacity:.4;cursor:default}
@@ -240,6 +241,17 @@ nav.tabs button.on{color:var(--acc)}
       <label class="f">Passwort<input id="pass" type="password" autocomplete="off"></label>
       <div class="btnrow"><button class="btn" id="scanBtn">Netze suchen</button><button class="btn pri" id="wifiBtn">Speichern und verbinden</button></div>
     </div>
+    <div class="card" id="lightCard">
+      <h3>Licht</h3>
+      <div class="sl">Übergänge<input type="range" id="ltrans" min="0" max="50" value="7"><output id="ltranso">0,7 s</output></div>
+      <p class="note">So lange blenden Farb-, Preset-, Effekt- und Ein/Aus-Wechsel weich über. 0 = sofort.</p>
+      <label class="tog"><input type="checkbox" id="lpwrOn"><span class="sw"></span>Stromlimit</label>
+      <div class="pins" id="lpwrBox">
+        <label class="f">Netzteil liefert höchstens (A)<input id="lpwrMax" inputmode="decimal" placeholder="z. B. 6"></label>
+        <label class="f">mA pro Farbkanal und Segment<input id="lpwrCh" inputmode="numeric" placeholder="12"></label>
+      </div>
+      <div class="wstat" id="pwrStat"><div class="ic" id="pwrIc">A</div><div><b id="pwrT">–</b><span id="pwrS"></span></div></div>
+    </div>
     <div class="card">
       <h3>Hardware</h3>
       <label class="f">Betriebsart<select id="mode"><option value="sim">Simulation: Panels in der App anklipsen</option><option value="bus">Bus: echte Panels über RS-485</option></select></label>
@@ -253,6 +265,12 @@ nav.tabs button.on{color:var(--acc)}
         <label class="f">SNS links (Kante 3)<select id="p_snsL"></select></label>
       </div>
       <label class="f">Farbreihenfolge der LEDs<select id="order"></select></label>
+      <div class="pins">
+        <label class="f">Stromsensor INA226 SDA<select id="p_sda"></select></label>
+        <label class="f">Stromsensor INA226 SCL<select id="p_scl"></select></label>
+        <label class="f">Shunt (mΩ)<input id="p_shunt" inputmode="decimal" placeholder="5"></label>
+      </div>
+      <p class="note" id="sensInfo">Optional. Ohne Sensor schätzt Trilumag den Strom aus den Farben.</p>
       <div class="btnrow"><span class="note">Farbtest:</span><button class="btn" data-t="0">Rot</button><button class="btn" data-t="1">Grün</button><button class="btn" data-t="2">Blau</button><button class="btn" data-t="3">Weiß</button><button class="btn" data-t="-1">Ende</button></div>
       <p class="note">Leuchtet bei „Rot“ etwas anderes als Rot, stimmt die Reihenfolge nicht. Dann eine andere wählen und speichern.</p>
     </div>
@@ -280,6 +298,12 @@ nav.tabs button.on{color:var(--acc)}
       </div>
       <div class="btnrow"><button class="btn pri" id="saveBtn">Speichern und neu starten</button></div>
       <p class="note" id="setErr"></p>
+    </div>
+    <div class="card" id="backupCard">
+      <h3>Sicherung</h3>
+      <p class="note">Einstellungen, Presets, Farben und die simulierte Wand als Datei. Die WLAN-Zugangsdaten sind nicht dabei. Nach dem Einspielen startet Trilumag neu.</p>
+      <div class="btnrow"><a class="btn" id="bkDown" href="/api/backup" download>Sicherung herunterladen</a></div>
+      <div class="btnrow"><input type="file" id="bkFile" accept=".json,application/json"><button class="btn" id="bkUp">Einspielen</button></div>
     </div>
     <div class="card"><h3>Info</h3><div class="kv" id="info"></div></div>
   </section>
@@ -449,7 +473,7 @@ function render(){
   if(document.activeElement!==$('master')){const p=pct(st.master);setRange('master',p);$('mastero').textContent=p+' %';}
   $('apBanner').hidden=!st.ap||tab==='opt';
   $('updBadge').hidden=!st.upd;
-  if(tab==='opt')renderWifi();
+  if(tab==='opt'){renderWifi();renderPower();}
   [...sel].forEach(id=>{if(!st.panels.some(p=>p.id===id))sel.delete(id);});     // abgeklipste Panels aus der Auswahl nehmen
   if(tab!=='wall'&&tab!=='opt'){drawWall($('mini'),false);
     $('miniHint').textContent=tab==='col'?(sel.size?`${sel.size} Panel${sel.size>1?'s':''} ausgewählt`:'Panels antippen, um nur diese einzufärben'):'';}
@@ -611,6 +635,12 @@ async function loadCfg(){
   b.value=cfg.boards.some(x=>x.id===cfg.board)?cfg.board:'custom';
   PIN_KEYS.forEach(k=>{const s=$('p_'+k);s.innerHTML='';cfg.validPins.forEach(p=>{const o=document.createElement('option');o.value=p;o.textContent='GPIO '+p;s.append(o);});s.value=cfg.pins[k];});
   $('order').innerHTML='';cfg.orders.forEach(o=>{const e=document.createElement('option');e.value=o;e.textContent=o;$('order').append(e);});$('order').value=cfg.order;
+  const L=cfg.light||{};
+  $('lpwrOn').checked=L.pwrMax>0;$('lpwrBox').classList.toggle('off',!(L.pwrMax>0));
+  $('lpwrMax').value=L.pwrMax?(L.pwrMax/1000).toLocaleString('de-AT'):'';$('lpwrCh').value=L.pwrCh||12;
+  ['sda','scl'].forEach(k=>{const s=$('p_'+k);s.innerHTML='<option value="-1">aus</option>';cfg.validPins.forEach(p=>{const o=document.createElement('option');o.value=p;o.textContent='GPIO '+p;s.append(o);});s.value=L[k]??-1;});
+  $('p_shunt').value=((L.shunt||50)/10).toLocaleString('de-AT');
+  $('sensInfo').textContent=L.sda>=0?(L.sensor?'Stromsensor gefunden, Trilumag misst den echten Strom.':'Stromsensor nicht gefunden. Verkabelung und Pins prüfen.'):'Optional. Ohne Sensor schätzt Trilumag den Strom aus den Farben.';
   $('m_on').checked=!!cfg.mqtt.on;$('mqttFields').classList.toggle('off',!cfg.mqtt.on);$('m_host').value=cfg.mqtt.host;$('m_port').value=cfg.mqtt.port;$('m_user').value=cfg.mqtt.user;
   $('info').innerHTML='';[['Chip',cfg.chip],['Firmware',cfg.ver],['Betriebsart',cfg.mode==='bus'?'Bus':'Simulation'],['WLAN',st&&st.ssid||'–']]
     .forEach(([k,v])=>{const a=document.createElement('span');a.textContent=k;const x=document.createElement('span');x.textContent=v;$('info').append(a,x);});
@@ -621,7 +651,10 @@ document.querySelectorAll('[data-t]').forEach(b=>b.addEventListener('click',()=>
 $('saveBtn').addEventListener('click',async()=>{
   const pins={};PIN_KEYS.forEach(k=>pins[k]=+$('p_'+k).value);
   if(new Set(Object.values(pins)).size<6){$('setErr').textContent='Ein Pin ist doppelt belegt.';return;}
-  const body={mode:$('mode').value,board:$('board').value,pins,order:$('order').value,mqtt:{on:$('m_on').checked,host:$('m_host').value.trim(),port:+$('m_port').value||1883,user:$('m_user').value.trim()}};
+  const sda=+$('p_sda').value,scl=+$('p_scl').value;
+  if((sda<0)!==(scl<0)){$('setErr').textContent='Für den Stromsensor beide Pins wählen oder keinen.';return;}
+  if(sda>=0&&(Object.values(pins).includes(sda)||Object.values(pins).includes(scl)||sda===scl)){$('setErr').textContent='Ein Pin des Stromsensors ist schon belegt.';return;}
+  const body={light:{sda,scl,shunt:Math.round(parseFloat(($('p_shunt').value||'5').replace(',','.'))*10)},mode:$('mode').value,board:$('board').value,pins,order:$('order').value,mqtt:{on:$('m_on').checked,host:$('m_host').value.trim(),port:+$('m_port').value||1883,user:$('m_user').value.trim()}};
   if($('m_pass').value)body.mqtt.pass=$('m_pass').value;
   const r=await fetch('/api/config',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)}).catch(()=>null);
   if(r&&!r.ok){const j=await r.json();$('setErr').textContent=j.error||'Speichern fehlgeschlagen';return;}
@@ -649,6 +682,32 @@ $('wifiBtn').addEventListener('click',async()=>{const ssid=$('ssid').value.trim(
   $('wifiStat').classList.add('bad');$('wifiIc').textContent='…';$('wifiT').textContent=`Verbinde mit „${ssid}“ …`;
   $('wifiS').textContent='Trilumag startet neu. Lade diese Seite in etwa 20 Sekunden neu, im neuen WLAN unter http://trilumag.local.';});
 
+// ---------- Licht: Übergänge und Stromlimit ----------
+function fmtA(ma){return (ma/1000).toLocaleString('de-AT',{minimumFractionDigits:1,maximumFractionDigits:1})+' A';}
+function renderPower(){
+  if(!st||!st.pwr)return;const p=st.pwr,meas=p.ma!=null;
+  const ma=meas?p.ma:p.est,v=meas?p.v:24;
+  $('pwrT').textContent=`${fmtA(ma)} · ${Math.round(ma/1000*v)} W ${meas?'gemessen':'geschätzt'}`;
+  $('pwrS').textContent=(meas?`${String(p.v).replace('.',',')} V · `:'')+(p.lim?(p.scale<100?`Stromlimit greift: gedimmt auf ${p.scale} %`:`unter dem Limit von ${fmtA(p.lim)}`):'kein Stromlimit');
+  $('pwrStat').classList.toggle('bad',!!p.lim&&p.scale<100);
+  if(document.activeElement!==$('ltrans')){const t=Math.round(st.trans/100);setRange('ltrans',t);$('ltranso').textContent=(t/10).toLocaleString('de-AT')+' s';}
+}
+$('ltrans').addEventListener('input',()=>{const t=+$('ltrans').value;$('ltranso').textContent=(t/10).toLocaleString('de-AT')+' s';later('lt',()=>api('/api/light',{trans:t*100}));});
+function sendPwr(){const on=$('lpwrOn').checked;$('lpwrBox').classList.toggle('off',!on);
+  const a=parseFloat(($('lpwrMax').value||'').replace(',','.'));const ch=parseInt($('lpwrCh').value);
+  const body={pwrMax:on&&a>0?Math.round(a*1000):0};if(ch>0)body.pwrCh=ch;
+  if(on&&!(a>0)){$('lpwrMax').focus();return;}
+  api('/api/light',body);}
+$('lpwrOn').addEventListener('change',sendPwr);
+$('lpwrMax').addEventListener('change',sendPwr);$('lpwrCh').addEventListener('change',sendPwr);
+
+// ---------- Sicherung ----------
+$('bkUp').addEventListener('click',async()=>{const f=$('bkFile').files[0];if(!f){toast('Bitte zuerst eine Sicherungsdatei wählen');return;}
+  const txt=await f.text();
+  const r=await fetch('/api/restore',{method:'POST',headers:{'Content-Type':'application/json'},body:txt}).catch(()=>null);
+  if(r&&r.ok){toast('Sicherung eingespielt, Trilumag startet neu …');setTimeout(()=>location.reload(),9000);}
+  else{let m='Einspielen fehlgeschlagen';try{m=(await r.json()).error||m;}catch(e){}toast(m);}});
+
 // ---------- WLAN-Anzeige ----------
 function quality(r){return r>=-55?'sehr gut':r>=-65?'gut':r>=-75?'mittel':'schwach';}
 function renderWifi(){
@@ -668,8 +727,10 @@ function renderOta(){
   const installing=o.busy&&o.p>=0;
   $('otaProg').hidden=!installing;$('otaBar').style.width=(installing?o.p:0)+'%';
   const bad=!!o.err&&!installing;$('otaStat').classList.toggle('bad',bad);
-  if(installing){$('otaIc').textContent='↓';$('otaT').textContent=`Installiere … ${o.p} %`;$('otaS').textContent='Nicht ausschalten. Danach startet Trilumag neu.';}
+  if(!installing&&o.verifying){$('otaStat').classList.remove('bad');$('otaIc').textContent='…';$('otaT').textContent=`Version ${o.cur} bewährt sich noch`;$('otaS').textContent='In den ersten 45 Sekunden springt Trilumag bei einem Absturz automatisch auf die vorige Version zurück.';}
+  else if(installing){$('otaIc').textContent='↓';$('otaT').textContent=`Installiere … ${o.p} %`;$('otaS').textContent='Nicht ausschalten. Danach startet Trilumag neu.';}
   else if(bad){$('otaIc').textContent='!';$('otaT').textContent=`Version ${o.cur}`;$('otaS').textContent=o.err;}
+  else if(o.notice&&o.notice.includes('nicht richtig')){$('otaStat').classList.add('bad');$('otaIc').textContent='↺';$('otaT').textContent='Zurück auf die vorige Version';$('otaS').textContent=o.notice;}
   else if(o.newer){$('otaIc').textContent='↑';$('otaT').textContent=`Version ${o.latest} ist verfügbar`;$('otaS').textContent=`Installiert ist ${o.cur}.`;}
   else{$('otaIc').textContent='✓';$('otaT').textContent=`Version ${o.cur}`;
     $('otaS').textContent=o.busy?'Suche nach Updates …':o.ago<0?'Noch nicht nach Updates gesucht.':`Aktuell · zuletzt geprüft vor ${o.ago<90?'1':Math.round(o.ago/60)} Min.`;}
@@ -690,7 +751,7 @@ function renderOta(){
       else if(logData)cl.textContent=v.notes||'Keine Beschreibung vorhanden.';
       else cl.textContent='Lade …';
       box.append(cl);}
-    const tag=document.createElement('span');tag.className='tag'+(c>0?' new':'');tag.textContent=c===0?'installiert':c>0?'neuer':'älter';
+    const tag=document.createElement('span');tag.className='tag'+(c>0?' new':'');tag.textContent=c===0?'installiert':v.v===o.bad?'startete nicht':c>0?'neuer':'älter';
     r.append(info,tag);
     if(c!==0){const btn=document.createElement('button');btn.className='ib'+(askVer===v.v?' ask':'');btn.disabled=!!o.busy;
       btn.textContent=askVer===v.v?(c>0?'Wirklich?':'Wirklich zurück?'):(c>0?'Installieren':'Zurück');

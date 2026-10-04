@@ -16,6 +16,8 @@
    - Gesamthelligkeit und Ein/Aus für die ganze Wand, Presets (gespeicherte Szenen)
    - Web-App im Stil von WLED
    - Online-Updates von GitHub, auf Wunsch automatisch, auch Downgrades; Datei-Upload
+   - Update-Absicherung: eine neue Version muss sich nach dem Start bewähren, sonst zurück zur alten
+   - weiche Übergänge, Stromlimit (geschätzt oder mit Stromsensor INA226), Sichern und Wiederherstellen
    - Farben bleiben pro Panel (Chip-ID) gespeichert, auch über einen Neustart
    - HTTP-API und Home Assistant über MQTT mit Auto-Discovery, Broker in der App einstellbar
 
@@ -40,6 +42,9 @@
 #include "pins.h"
 #include "ws.h"
 #include "ota.h"
+#include <Wire.h>
+#include "esp_ota_ops.h"
+#include "esp_timer.h"
 
 // ================= Voreinstellungen =================
 // Alles hier lässt sich später in der App ändern. Diese Werte gelten nur, solange nichts gespeichert ist.
@@ -108,6 +113,11 @@ struct Config {
   PinSet pins;
   String order = "RGBW";
   bool autoUpdate = false; // Häkchen "Automatisch aktualisieren"
+  uint16_t transMs = 700;   // Dauer weicher Übergänge
+  uint16_t pwrMax = 0;      // Stromlimit in mA (0 = aus)
+  uint8_t pwrCh = 12;       // mA pro Farbkanal und LED-Segment bei voller Helligkeit (WS2814 24V)
+  int8_t i2cSda = -1, i2cScl = -1;   // Stromsensor INA226 (optional)
+  uint16_t shuntUo = 50;    // Shunt in 0,1 mΩ (50 = 5 mΩ)
   bool mqttOn = false;     // Häkchen "MQTT aktiv"; Zugangsdaten bleiben auch ausgeschaltet gespeichert
   String mqttHost;
   uint16_t mqttPort = 1883;
@@ -352,6 +362,8 @@ void begin() {
 
 void reconcile();
 void simChanged();
+extern bool outForce, testMode;
+void transition();
 bool placePanel(int i, int parent, uint8_t edge, uint8_t own);
 
 // Neues Panel gefunden: Nachbarn orten, Adresse vergeben, Farbe oder Pulsieren
@@ -406,7 +418,8 @@ void busHandleNew(uint32_t chip, uint8_t mask) {
   P[i].joinAt = (millis() + FX_JOIN_MS) | 1;
   bus::sendOrder(addr);
   P[i].state = P[i].hasColor ? ACTIVE : PULSE;
-  bus::sendColor(i);
+  P[i].since = millis();
+  transition();                       // weich einblenden, das nächste Bild enthält das neue Panel
   logf("[BUS] %s an Kante %d von %s, eigene Kante %d, Adresse %u, %s\n", hex(chip).c_str(), parentEdge + 1,
        hex(P[parent].chip).c_str(), ownEdge + 1, addr, P[i].hasColor ? "alte Farbe" : "pulsiert blau");
   publishDiscovery(i); publishAvail(i, true); publishState(i);
@@ -424,7 +437,7 @@ void busLoop() {
       bus::Reply r;
       if (bus::receive(r, 4) && r.addr == p.addr) {
         p.miss = 0;
-        if (!fx.id && r.len >= 1 && r.data[0] == DARK && p.state != DARK) bus::sendColor(i);   // Panel hat Zustand verloren
+        if (r.len >= 1 && r.data[0] == DARK && p.state != DARK) outForce = true;   // Panel hat Zustand verloren: alles neu schicken   // Panel hat Zustand verloren
       } else if (++p.miss >= 3) {
         logf("[BUS] %s antwortet nicht mehr, gilt als abgeklipst\n", hex(p.chip).c_str());
         p.attached = false; p.addr = 0; p.state = DARK; publishAvail(i, false); lost = true;
@@ -452,17 +465,6 @@ void busLoop() {
   }
 }
 
-// ---------- LEDs des Hauptpanels ----------
-void showMain() {
-  if (cfg.pins.led < 0) return;
-  if (fx.id) return;               // Effekt läuft, fxSend kümmert sich um den Strip
-  const Panel& p = P[0];
-  uint32_t c = 0;
-  uint32_t k = (uint32_t)p.bri * masterK();
-  if (p.on) c = strip.Color(p.r * k / 65025, p.g * k / 65025, p.b * k / 65025, p.w * k / 65025);
-  for (int k = 0; k < 3; k++) strip.setPixelColor(k, c);
-  strip.show();
-}
 
 // ---------- Effekte ----------
 // Das Hauptpanel rechnet jeden Effekt selbst und schickt etwa 25 Bilder pro Sekunde
@@ -507,7 +509,8 @@ const uint32_t FX_FRAME_MS = 40;
 float fxPhase = 0, fxA[SLOTS], fxB[SLOTS], fxT[SLOTS];
 uint32_t fxLast = 0, fxDirtyAt = 0, fxLastFrame = 0;
 bool fxDirty = false;
-uint8_t OUT[SLOTS][4];          // aktuelles Effektbild pro Panel, Helligkeit schon eingerechnet
+uint8_t TGT[SLOTS][4];          // Ziel pro Panel (Effekt oder feste Farbe), Helligkeit schon eingerechnet
+uint8_t CUR[SLOTS][4];          // was die Panels gerade zeigen (nach Übergang und Stromlimit)
 
 int fxFind(const char* key) {
   for (uint8_t k = 0; k < FX_COUNT; k++) if (!strcasecmp(key, FX[k].id) || !strcasecmp(key, FX[k].name)) return k;
@@ -588,11 +591,11 @@ void fxCompute() {
   for (int i = 0; i < SLOTS; i++) {
     float c[4] = {0, 0, 0, 0};
     const Panel& p = P[i];
-    if (!p.used || !p.attached || p.state == DARK) { memset(OUT[i], 0, 4); continue; }
+    if (!p.used || !p.attached || p.state == DARK) { memset(TGT[i], 0, 4); continue; }
     if (p.joinAt && (int32_t)(now - p.joinAt) < 0) {      // gerade angeklipst: so pulsieren wie das Panel selbst
       uint32_t t = (now - (p.joinAt - FX_JOIN_MS)) % 1600;
       t = t < 800 ? t : 1600 - t;
-      OUT[i][0] = 0; OUT[i][1] = 0; OUT[i][2] = (uint8_t)(6 + (t * 26) / 800); OUT[i][3] = 0;
+      TGT[i][0] = 0; TGT[i][1] = 0; TGT[i][2] = (uint8_t)(6 + (t * 26) / 800); TGT[i][3] = 0;
       continue;
     }
     float u = (p.x * 0.5f - minX) / spanX;                 // 0 links … 1 rechts
@@ -639,20 +642,88 @@ void fxCompute() {
       }
     }
     float k = p.on ? masterK() / 255.0f : 0;
-    for (int ch = 0; ch < 4; ch++) OUT[i][ch] = (uint8_t)fminf(255, fmaxf(0, c[ch] * k));
+    for (int ch = 0; ch < 4; ch++) TGT[i][ch] = (uint8_t)fminf(255, fmaxf(0, c[ch] * k));
   }
 }
 
-void fxSend() {
-  if (cfg.pins.led >= 0) {
-    uint32_t c = strip.Color(OUT[0][0], OUT[0][1], OUT[0][2], OUT[0][3]);
+// ---------- Ausgabe ----------
+// Alles, was die Panels zeigen, läuft hier durch: Ziel berechnen (Effekt, feste Farbe oder Pulsieren),
+// Stromlimit anwenden, weich überblenden und als FRAME an alle Panels schicken (etwa 25-mal pro Sekunde,
+// aber nur, wenn sich etwas ändert, sonst einmal pro Sekunde zur Sicherheit).
+uint8_t FROM[SLOTS][4], SENT[SLOTS][4];
+bool isPulse[SLOTS];
+uint32_t transStart = 0, transDur = 0, lastKeep = 0;
+bool transOn = false;
+bool outForce = true, testMode = false;
+float powerScale = 1, measScale = 1;
+uint32_t estMa = 0;                       // geschätzter Strom aller LEDs und Panels in mA (bei 24 V)
+const uint8_t SEG_PER_PANEL = 3;          // LED-Segmente pro Panel (eins pro Kante)
+const uint16_t IDLE_PANEL_MA = 12, IDLE_MAIN_MA = 25;
+
+// ab jetzt vom aktuellen Bild weich zum neuen Ziel überblenden
+void transition() {
+  memcpy(FROM, CUR, sizeof CUR);
+  transDur = cfg.transMs;
+  transStart = millis();
+  transOn = transDur > 0;
+  outForce = true;
+  fxLastFrame = 0;
+}
+
+void computeTargets() {
+  uint32_t now = millis();
+  if (fx.id) fxCompute();
+  for (int i = 0; i < SLOTS; i++) {
+    const Panel& p = P[i];
+    isPulse[i] = false;
+    if (!p.used || !p.attached || p.state == DARK || !masterOn) { memset(TGT[i], 0, 4); continue; }
+    bool joining = fx.id && p.joinAt && (int32_t)(now - p.joinAt) < 0;
+    if (joining || (!fx.id && p.state == PULSE)) {               // blau pulsieren wie bisher die Panels selbst
+      uint32_t t = (now - (joining ? p.joinAt - FX_JOIN_MS : p.since)) % 1600;
+      t = t < 800 ? t : 1600 - t;
+      TGT[i][0] = 0; TGT[i][1] = 0; TGT[i][2] = (uint8_t)(6 + (t * 26) / 800); TGT[i][3] = 0;
+      isPulse[i] = true;
+      continue;
+    }
+    if (fx.id) continue;                                         // Effektbild steht schon in TGT
+    uint32_t k = p.on ? (uint32_t)p.bri * master : 0;
+    TGT[i][0] = p.r * k / 65025; TGT[i][1] = p.g * k / 65025; TGT[i][2] = p.b * k / 65025; TGT[i][3] = p.w * k / 65025;
+  }
+  // Stromlimit: Strom schätzen und bei Bedarf alles gleichmäßig dunkler machen (wie WLED)
+  uint32_t led = 0, idle = 0;
+  for (int i = 0; i < SLOTS; i++) {
+    if (!P[i].used || !P[i].attached) continue;
+    idle += i == 0 ? IDLE_MAIN_MA : IDLE_PANEL_MA;
+    led += (uint32_t)(TGT[i][0] + TGT[i][1] + TGT[i][2] + TGT[i][3]) * cfg.pwrCh * SEG_PER_PANEL / 255;
+  }
+  powerScale = 1;
+  if (cfg.pwrMax && led) {
+    float avail = (float)cfg.pwrMax - idle;
+    powerScale = avail <= 0 ? 0 : fminf(1, avail / led);
+  }
+  float sc = powerScale * measScale;
+  estMa = idle + (uint32_t)(led * sc);
+  if (sc < 0.999f) for (int i = 0; i < SLOTS; i++) if (!isPulse[i]) for (int c = 0; c < 4; c++) TGT[i][c] = (uint8_t)(TGT[i][c] * sc);
+}
+
+void sendOutput(bool force) {
+  bool mainChanged = force || memcmp(SENT[0], CUR[0], 4);
+  if (cfg.pins.led >= 0 && mainChanged) {
+    uint32_t c = strip.Color(CUR[0][0], CUR[0][1], CUR[0][2], CUR[0][3]);
     for (int k = 0; k < 3; k++) strip.setPixelColor(k, c);
     strip.show();
   }
-  if (!cfg.bus) return;
+  memcpy(SENT[0], CUR[0], 4);
+  if (!cfg.bus) { memcpy(SENT, CUR, sizeof CUR); return; }
+  bool changed = force;
   uint8_t lo = 0xFF, hi = 0;
-  for (int i = 1; i < SLOTS; i++) if (P[i].used && P[i].attached && P[i].addr) { if (P[i].addr < lo) lo = P[i].addr; if (P[i].addr > hi) hi = P[i].addr; }
-  if (lo > hi) return;
+  for (int i = 1; i < SLOTS; i++) {
+    const Panel& p = P[i];
+    if (!p.used || !p.attached || !p.addr) continue;
+    if (p.addr < lo) lo = p.addr; if (p.addr > hi) hi = p.addr;
+    if (memcmp(SENT[i], CUR[i], 4)) changed = true;
+  }
+  if (lo > hi || !changed) return;
   // höchstens 48 Panels pro Rahmen (Datenlänge bis 200 Byte)
   for (uint8_t first = lo; first <= hi; first += 48) {
     uint8_t n = (hi - first + 1) > 48 ? 48 : (hi - first + 1);
@@ -660,18 +731,66 @@ void fxSend() {
     for (int i = 1; i < SLOTS; i++) {
       const Panel& p = P[i];
       if (!p.used || !p.attached || p.addr < first || p.addr >= first + n) continue;
-      memcpy(d + 2 + 4 * (p.addr - first), OUT[i], 4);
+      memcpy(d + 2 + 4 * (p.addr - first), CUR[i], 4);
     }
     bus::send(bus::ALL, bus::C_FRAME, d, 2 + 4 * n);
   }
+  memcpy(SENT, CUR, sizeof CUR);
 }
 
-void fxLoop() {
-  if (!fx.id || millis() - fxLastFrame < FX_FRAME_MS) return;
-  fxLastFrame = millis();
-  fxCompute();
-  fxSend();
+void outLoop() {
+  uint32_t now = millis();
+  if (testMode || now - fxLastFrame < FX_FRAME_MS) return;
+  fxLastFrame = now;
+  computeTargets();
+  float e = 1;
+  if (transOn) {
+    e = (float)(uint32_t)(now - transStart) / transDur;
+    if (e >= 1) { e = 1; transOn = false; } else e = e * e * (3 - 2 * e);
+  }
+  for (int i = 0; i < SLOTS; i++) for (int c = 0; c < 4; c++)
+    CUR[i][c] = e >= 1 ? TGT[i][c] : (uint8_t)(FROM[i][c] + (TGT[i][c] - FROM[i][c]) * e + 0.5f);
+  bool keep = now - lastKeep > 1000;               // einmal pro Sekunde alles neu schicken, falls ein Panel neu gestartet ist
+  if (keep) lastKeep = now;
+  sendOutput(outForce || keep);
+  outForce = false;
 }
+
+// ---------- Stromsensor INA226 (optional, I²C) ----------
+namespace ina {
+const uint8_t ADDR = 0x40;
+bool ok = false;
+float volts = 0, amps = 0;
+uint32_t last = 0;
+bool wr(uint8_t reg, uint16_t v) { Wire.beginTransmission(ADDR); Wire.write(reg); Wire.write(v >> 8); Wire.write(v & 0xFF); return Wire.endTransmission() == 0; }
+bool rd(uint8_t reg, uint16_t& v) {
+  Wire.beginTransmission(ADDR); Wire.write(reg);
+  if (Wire.endTransmission(false) != 0) return false;
+  if (Wire.requestFrom((int)ADDR, 2) != 2) return false;
+  v = (uint16_t)(Wire.read() << 8); v |= Wire.read(); return true;
+}
+void begin() {
+  if (cfg.i2cSda < 0 || cfg.i2cScl < 0) return;
+  Wire.begin(cfg.i2cSda, cfg.i2cScl, 400000);
+  uint16_t id = 0;
+  ok = rd(0xFE, id) && id == 0x5449 && wr(0x00, 0x4527);    // Kennung "TI", 16-fach gemittelt, laufend messen
+  logf("[STROM] INA226 %s (SDA %d, SCL %d)\n", ok ? "gefunden" : "nicht gefunden", cfg.i2cSda, cfg.i2cScl);
+}
+void loop() {
+  if (!ok || millis() - last < 250) return;
+  last = millis();
+  uint16_t sv, bv;
+  if (!rd(0x01, sv) || !rd(0x02, bv)) return;
+  amps = (int16_t)sv * 2.5f / (cfg.shuntUo * 0.1f) / 1000.0f;   // µV / mΩ = mA
+  volts = bv * 1.25e-3f;
+  // Regelung nach Messung: liegt der echte Strom über dem Limit, dunkler; sonst langsam zurück
+  if (cfg.pwrMax) {
+    float lim = cfg.pwrMax / 1000.0f;
+    if (amps > lim * 1.03f) measScale = fmaxf(0.1f, measScale * 0.92f);
+    else if (amps < lim * 0.95f && measScale < 1) measScale = fminf(1, measScale * 1.03f);
+  } else measScale = 1;
+}
+}  // namespace ina
 
 void sendToPanel(int i);
 void fxStart(int id) {
@@ -681,7 +800,7 @@ void fxStart(int id) {
   fxDirty = true; fxDirtyAt = millis();
   if (id && id != was) { fxReset(); fxPhase = 0; }   // jeder Effekt beginnt von vorn, nicht mitten in einer dunklen Phase
   fxLastFrame = 0;                                      // nächstes Bild sofort, nicht erst nach 40 ms
-  if (!id && was) for (int i = 0; i < SLOTS; i++) if (P[i].used && P[i].attached) sendToPanel(i);   // zurück zu den festen Farben
+  transition();                                         // weich vom alten zum neuen Bild
   logf("[FX] %s\n", FX[fx.id].name);
   publishFx();
 }
@@ -718,12 +837,8 @@ void applyFx(JsonVariantConst cmd) {
 }
 
 // ---------- Ausgabe an ein Panel ----------
-void sendToPanel(int i) {
-  const Panel& p = P[i];
-  if (i == 0) { showMain(); return; }
-  if (cfg.bus) bus::sendColor(i);
-  else logf("[SIM] %s  Zustand=%u  an=%d  RGBW=%u,%u,%u,%u  Hell=%u\n", hex(p.chip).c_str(), p.state, p.on, p.r, p.g, p.b, p.w, p.bri);
-}
+// Panel i hat sich geändert: weich zum neuen Zustand überblenden (die Ausgabe schickt es mit dem nächsten Bild)
+void sendToPanel(int i) { (void)i; transition(); }
 
 // ---------- MQTT / Home Assistant ----------
 String tBase(int i) { return "trilumag/" + hex(P[i].chip); }
@@ -827,6 +942,30 @@ void publishExtras() {
     t["icon"] = "mdi:palette";
     haDevice(t); haPublish("select", "palette", t); }
   publishPresetEntity();
+  // Strom und Leistung (gemessen mit INA226, sonst geschätzt)
+  const char* keys[3] = {"strom", "leistung", "spannung"};
+  const char* names[3] = {"Strom", "Leistung", "Spannung"};
+  const char* cls[3] = {"current", "power", "voltage"};
+  const char* units[3] = {"A", "W", "V"};
+  const char* tpl[3] = {"{{ value_json.a }}", "{{ value_json.w }}", "{{ value_json.v }}"};
+  for (int k = 0; k < 3; k++) {
+    String topic = String("homeassistant/sensor/trilumag_") + keys[k] + "_" + hex(P[0].chip) + "/config";
+    if (k == 2 && !ina::ok) { mqtt.publish(topic.c_str(), "", true); continue; }   // Spannung nur mit Sensor
+    JsonDocument t;
+    t["name"] = String(names[k]) + (ina::ok ? "" : " (geschätzt)");
+    t["unique_id"] = String("trilumag_") + keys[k] + "_" + hex(P[0].chip);
+    t["state_topic"] = "trilumag/strom/state"; t["value_template"] = tpl[k];
+    t["device_class"] = cls[k]; t["unit_of_measurement"] = units[k]; t["state_class"] = "measurement";
+    haDevice(t); haPublish("sensor", keys[k], t);
+  }
+}
+
+void publishPower() {
+  if (!mqtt.connected()) return;
+  float a = ina::ok ? ina::amps : estMa / 1000.0f;
+  float v = ina::ok ? ina::volts : 24.0f;
+  char b[96]; snprintf(b, sizeof b, "{\"a\":%.2f,\"w\":%.1f,\"v\":%.2f}", a, a * v, v);
+  mqtt.publish("trilumag/strom/state", b, true);
 }
 
 // Zustand von "Alle Panels", Tempo, Intensität, Palette und Preset
@@ -961,8 +1100,8 @@ void presetDelete(int k) {
 
 // ---------- Farbe setzen (gemeinsam für App, API, MQTT) ----------
 void resendAll() {
-  for (int i = 0; i < SLOTS; i++) if (P[i].used && P[i].attached) { if (!fx.id) sendToPanel(i); publishState(i); }
-  fxLastFrame = 0;
+  transition();
+  for (int i = 0; i < SLOTS; i++) if (P[i].used && P[i].attached) publishState(i);
   fxDirty = true; fxDirtyAt = millis();
 }
 
@@ -1143,7 +1282,12 @@ void loadConfig() {
   cfg.mqttUser = prefs.getString("mqttUser", "");
   cfg.mqttPass = prefs.getString("mqttPass", "");
   cfg.mqttOn = prefs.getBool("mqttOn", cfg.mqttHost.length() > 0);
-  cfg.autoUpdate = prefs.getBool("autoUpd", false);   // ältere Versionen: an, sobald eine Adresse da ist
+  cfg.autoUpdate = prefs.getBool("autoUpd", false);
+  cfg.transMs = prefs.getUShort("trans", 700);
+  cfg.pwrMax = prefs.getUShort("pwrMax", 0);
+  cfg.pwrCh = prefs.getUChar("pwrCh", 12);
+  cfg.i2cSda = (int8_t)prefs.getChar("i2cSda", -1); cfg.i2cScl = (int8_t)prefs.getChar("i2cScl", -1);
+  cfg.shuntUo = prefs.getUShort("shunt", 50);   // ältere Versionen: an, sobald eine Adresse da ist
 }
 
 String configJson() {
@@ -1166,6 +1310,9 @@ String configJson() {
   JsonArray vp = d["validPins"].to<JsonArray>();
   for (size_t i = 0; i < VALID_COUNT; i++) vp.add(VALID_PINS[i]);
   d["order"] = cfg.order;
+  JsonObject li = d["light"].to<JsonObject>();
+  li["trans"] = cfg.transMs; li["pwrMax"] = cfg.pwrMax; li["pwrCh"] = cfg.pwrCh;
+  li["sda"] = cfg.i2cSda; li["scl"] = cfg.i2cScl; li["shunt"] = cfg.shuntUo; li["sensor"] = ina::ok;
   JsonArray os = d["orders"].to<JsonArray>();
   for (const char* o : ORDERS) os.add(o);
   JsonObject m = d["mqtt"].to<JsonObject>();
@@ -1183,6 +1330,10 @@ String stateJson(bool meta) {
   d["ap"] = apMode;
   d["ssid"] = wlanOk ? WiFi.SSID() : String();
   if (wlanOk) { d["rssi"] = WiFi.RSSI(); d["ip"] = WiFi.localIP().toString(); }
+  JsonObject pw = d["pwr"].to<JsonObject>();          // Strom: geschätzt, Limit, Dämpfung, Messung
+  pw["est"] = estMa; pw["lim"] = cfg.pwrMax; pw["scale"] = (int)(powerScale * measScale * 100 + 0.5f);
+  if (ina::ok) { pw["ma"] = (int)(ina::amps * 1000); pw["v"] = roundf(ina::volts * 100) / 100; }
+  d["trans"] = cfg.transMs;
   d["upd"] = ota::count && ota::cmp(ota::latest(), FW_VERSION) > 0 ? ota::latest() : String();   // neuere Version verfügbar
   d["ver"] = FW_VERSION;
   d["chip"] = CHIP_FAMILY;
@@ -1286,6 +1437,134 @@ void wsLoop() {
   }
 }
 
+// ---------- Sichern und Wiederherstellen ----------
+// Alles außer den WLAN-Zugangsdaten als eine JSON-Datei: Einstellungen, Effekt, Presets, Farben, simulierte Wand
+String backupJson() {
+  JsonDocument d;
+  d["trilumag"] = "backup"; d["ver"] = FW_VERSION; d["chip"] = CHIP_FAMILY;
+  JsonObject c = d["config"].to<JsonObject>();
+  c["bus"] = cfg.bus; c["board"] = cfg.board; c["order"] = cfg.order;
+  JsonObject p = c["pins"].to<JsonObject>();
+  p["rx"] = cfg.pins.rx; p["tx"] = cfg.pins.tx; p["de"] = cfg.pins.de; p["led"] = cfg.pins.led; p["snsR"] = cfg.pins.snsR; p["snsL"] = cfg.pins.snsL;
+  JsonObject m = c["mqtt"].to<JsonObject>();
+  m["on"] = cfg.mqttOn; m["host"] = cfg.mqttHost; m["port"] = cfg.mqttPort; m["user"] = cfg.mqttUser; m["pass"] = cfg.mqttPass;
+  c["autoUpd"] = cfg.autoUpdate; c["trans"] = cfg.transMs; c["pwrMax"] = cfg.pwrMax; c["pwrCh"] = cfg.pwrCh;
+  c["i2cSda"] = cfg.i2cSda; c["i2cScl"] = cfg.i2cScl; c["shunt"] = cfg.shuntUo;
+  d["master"] = master; d["on"] = masterOn;
+  JsonObject f = d["fx"].to<JsonObject>();
+  f["id"] = fx.id; f["speed"] = fx.speed; f["pal"] = fx.pal; f["inten"] = fx.inten; f["r"] = fx.r; f["g"] = fx.g; f["b"] = fx.b; f["w"] = fx.w;
+  JsonArray pr = d["presets"].to<JsonArray>();
+  for (uint8_t k = 0; k < PRESET_MAX; k++) {
+    if (!presetNames[k].length()) continue;
+    JsonObject o = pr.add<JsonObject>(); o["slot"] = k;
+    JsonDocument pd; deserializeJson(pd, prefs.getString(presetKey(k).c_str(), "{}"));
+    o["data"] = pd;
+  }
+  JsonObject col = d["colors"].to<JsonObject>();
+  JsonArray sim = d["sim"].to<JsonArray>();
+  for (int i = 0; i < SLOTS; i++) {
+    const Panel& q = P[i];
+    if (!q.used) continue;
+    if (q.hasColor) { JsonArray a = col[hex(q.chip)].to<JsonArray>(); a.add(q.r); a.add(q.g); a.add(q.b); a.add(q.w); a.add(q.bri); a.add((int)q.on); }
+    if (i > 0 && !cfg.bus) { JsonObject o = sim.add<JsonObject>(); o["chip"] = hex(q.chip); o["x"] = q.x; o["y"] = q.y; o["rot"] = q.rot; o["att"] = q.attached; }
+  }
+  String out; serializeJson(d, out); return out;
+}
+
+const char* restoreBackup(JsonDocument& d) {
+  if (strcmp(d["trilumag"] | "", "backup")) return "Das ist keine Trilumag-Sicherung";
+  JsonObject c = d["config"];
+  if (!c.isNull()) {
+    prefs.putBool("bus", c["bus"] | false);
+    prefs.putString("board", (const char*)(c["board"] | cfg.board.c_str()));
+    prefs.putString("order", (const char*)(c["order"] | "RGBW"));
+    JsonObject p = c["pins"];
+    if (!p.isNull()) {
+      PinSet ps = {(int8_t)(p["rx"] | -1), (int8_t)(p["tx"] | -1), (int8_t)(p["de"] | -1), (int8_t)(p["led"] | -1), (int8_t)(p["snsR"] | -1), (int8_t)(p["snsL"] | -1)};
+      if (!checkPins(ps)) prefs.putBytes("pins", &ps, sizeof ps);   // Pins eines anderen Chips werden übersprungen
+    }
+    JsonObject m = c["mqtt"];
+    if (!m.isNull()) {
+      prefs.putBool("mqttOn", m["on"] | false); prefs.putString("mqttHost", (const char*)(m["host"] | ""));
+      prefs.putUShort("mqttPort", m["port"] | 1883); prefs.putString("mqttUser", (const char*)(m["user"] | ""));
+      prefs.putString("mqttPass", (const char*)(m["pass"] | ""));
+    }
+    prefs.putBool("autoUpd", c["autoUpd"] | false);
+    prefs.putUShort("trans", c["trans"] | 700); prefs.putUShort("pwrMax", c["pwrMax"] | 0); prefs.putUChar("pwrCh", c["pwrCh"] | 12);
+    prefs.putChar("i2cSda", c["i2cSda"] | -1); prefs.putChar("i2cScl", c["i2cScl"] | -1); prefs.putUShort("shunt", c["shunt"] | 50);
+  }
+  FxCfg f;
+  JsonObject fo = d["fx"];
+  if (!fo.isNull()) {
+    f.id = fo["id"] | 0; f.speed = fo["speed"] | 50; f.pal = fo["pal"] | 0; f.inten = fo["inten"] | 128;
+    f.r = fo["r"] | 255; f.g = fo["g"] | 120; f.b = fo["b"] | 30; f.w = fo["w"] | 0;
+    if (f.id < FX_COUNT && f.pal < PAL_COUNT) prefs.putBytes("fx2", &f, sizeof f);
+  }
+  prefs.putUChar("master", d["master"] | 255); prefs.putBool("mOn", d["on"] | true);
+  for (uint8_t k = 0; k < PRESET_MAX; k++) prefs.remove(presetKey(k).c_str());
+  for (JsonObject o : d["presets"].as<JsonArray>()) {
+    int k = o["slot"] | -1;
+    if (k < 0 || k >= PRESET_MAX) continue;
+    String js; serializeJson(o["data"], js);
+    prefs.putString(presetKey(k).c_str(), js);
+  }
+  for (JsonPair kv : d["colors"].as<JsonObject>()) {
+    JsonArray a = kv.value();
+    if (a.size() < 6) continue;
+    uint8_t c6[6] = {a[0], a[1], a[2], a[3], a[4], a[5]};
+    prefs.putBytes(("c" + String(kv.key().c_str())).c_str(), c6, 6);
+  }
+  JsonArray sim = d["sim"];
+  if (sim.size()) {
+    SimRec r[SLOTS]; uint8_t n = 0;
+    for (JsonObject o : sim) { if (n >= SLOTS - 1) break; r[n++] = {parseHex(o["chip"] | "0"), (int8_t)(o["x"] | 0), (int8_t)(o["y"] | 0), (uint8_t)(o["rot"] | 0), (uint8_t)(o["att"] | false)}; }
+    prefs.putBytes("simw", r, n * sizeof(SimRec));
+  }
+  logf("[SICHERUNG] eingespielt, starte neu\n");
+  return nullptr;
+}
+
+
+// ---------- Update-Absicherung ----------
+// Eine neue Version muss sich nach dem Start bewähren: 45 Sekunden laufen, ohne abzustürzen oder
+// zu hängen. Erst dann gilt sie als gut. Startet das Gerät vorher neu (Absturz, Hänger, Stromausfall),
+// nimmt der Bootloader automatisch wieder die alte Version.
+extern "C" bool verifyRollbackLater() { return true; }   // nicht sofort als gültig markieren (Arduino-Core)
+bool otaVerifying = false;
+volatile uint32_t otaBeat = 0;
+esp_timer_handle_t otaWd = nullptr;
+String otaNotice;
+
+void otaBootCheck() {
+  esp_ota_img_states_t st;
+  const esp_partition_t* run = esp_ota_get_running_partition();
+  otaVerifying = run && esp_ota_get_state_partition(run, &st) == ESP_OK && st == ESP_OTA_IMG_PENDING_VERIFY;
+  String tried = prefs.getString("otaTry", "");
+  if (tried.length() && tried != FW_VERSION) {               // es läuft nicht die Version, die installiert wurde
+    otaNotice = "Version " + tried + " ist nicht richtig gestartet. Trilumag läuft wieder mit " + FW_VERSION + ".";
+    prefs.putString("otaBad", tried);
+    prefs.remove("otaTry");
+    logf("[OTA] %s\n", otaNotice.c_str());
+  }
+  if (otaVerifying) {
+    otaBeat = millis();
+    esp_timer_create_args_t a = {};
+    a.callback = [](void*) { if (millis() - otaBeat > 25000) esp_restart(); };   // hängt die Hauptschleife: neu starten = zurück
+    a.name = "otaWd";
+    if (esp_timer_create(&a, &otaWd) == ESP_OK) esp_timer_start_periodic(otaWd, 1000000);
+    logf("[OTA] neue Version %s muss sich 45 s bewähren\n", FW_VERSION);
+  }
+}
+void otaVerifyLoop() {
+  otaBeat = millis();
+  if (!otaVerifying || millis() < 45000) return;
+  esp_ota_mark_app_valid_cancel_rollback();
+  otaVerifying = false;
+  if (otaWd) { esp_timer_stop(otaWd); esp_timer_delete(otaWd); otaWd = nullptr; }
+  if (prefs.getString("otaTry", "") == FW_VERSION) { otaNotice = "Update auf " + String(FW_VERSION) + " erfolgreich."; prefs.remove("otaTry"); }
+  logf("[OTA] Version %s bewährt\n", FW_VERSION);
+}
+
 // ---------- Online-Updates ----------
 bool otaCheckNow = false;
 String otaInstallVer;
@@ -1300,6 +1579,7 @@ String otaJson() {
   d["ago"] = ota::lastCheck ? (long)((millis() - ota::lastCheck) / 1000) : -1;
   d["busy"] = otaCheckNow || otaInstallVer.length() > 0 || ota::progress >= 0;
   d["p"] = ota::progress; d["err"] = ota::error;
+  d["notice"] = otaNotice; d["bad"] = prefs.getString("otaBad", ""); d["verifying"] = otaVerifying;
   JsonArray a = d["versions"].to<JsonArray>();
   for (uint8_t k = 0; k < ota::count; k++) {
     JsonObject o = a.add<JsonObject>(); o["v"] = ota::list[k].v; o["date"] = ota::list[k].date; o["notes"] = ota::list[k].notes;
@@ -1318,13 +1598,15 @@ void otaLoop() {
     bool ok = ota::check();
     logf("[OTA] %s\n", ok ? ("neueste Version " + ota::latest()).c_str() : ota::error.c_str());
     otaPush(); wsForce = true;
-    if (ok && cfg.autoUpdate && ota::cmp(ota::latest(), FW_VERSION) > 0) otaInstallVer = ota::latest();
+    if (ok && cfg.autoUpdate && ota::cmp(ota::latest(), FW_VERSION) > 0 && ota::latest() != prefs.getString("otaBad", "")) otaInstallVer = ota::latest();
   }
   if (otaInstallVer.length()) {
     String v = otaInstallVer; otaInstallVer = "";
     logf("[OTA] installiere %s …\n", v.c_str());
     saveColors(); fxSave(); if (simDirty) simSave();           // nichts verlieren
+    prefs.putString("otaTry", v);                              // nach dem Neustart prüfen, ob sie wirklich läuft
     bool ok = ota::install(v);
+    if (!ok) prefs.remove("otaTry");
     otaPush();
     if (ok) {
       logf("[OTA] fertig, starte neu\n");
@@ -1371,9 +1653,18 @@ const char* apiCall(const char* path, JsonDocument& d) {
     int ch = d["ch"] | -1;
     uint8_t c[4] = {0, 0, 0, 0};
     if (ch >= 0 && ch < 4) c[ch] = 70;
+    testMode = ch >= 0 && ch < 4;                 // solange der Test läuft, schickt die Ausgabe nichts
     if (cfg.bus) bus::send(bus::ALL, bus::C_COLOR, c, 4);
     if (cfg.pins.led >= 0) { for (int k = 0; k < 3; k++) strip.setPixelColor(k, strip.Color(c[0], c[1], c[2], c[3])); strip.show(); }
-    if (ch < 0) for (int i = 0; i < SLOTS; i++) if (P[i].used && P[i].attached) sendToPanel(i);   // Test beenden
+    if (!testMode) outForce = true;               // Test beenden: wieder das normale Bild
+    return nullptr;
+  }
+  // Licht-Einstellungen ohne Neustart: {"trans":700,"pwrMax":5000,"pwrCh":12}
+  if (!strcmp(path, "/api/light")) {
+    if (d["trans"].is<int>()) { cfg.transMs = constrain(d["trans"].as<int>(), 0, 10000); prefs.putUShort("trans", cfg.transMs); }
+    if (d["pwrMax"].is<int>()) { cfg.pwrMax = constrain(d["pwrMax"].as<int>(), 0, 60000); prefs.putUShort("pwrMax", cfg.pwrMax); measScale = 1; }
+    if (d["pwrCh"].is<int>()) { cfg.pwrCh = constrain(d["pwrCh"].as<int>(), 1, 100); prefs.putUChar("pwrCh", cfg.pwrCh); }
+    outForce = true;
     return nullptr;
   }
   // Updates: {"action":"check"} / {"action":"install","version":"0.6.13"} / {"action":"auto","on":true}
@@ -1392,7 +1683,7 @@ const char* apiCall(const char* path, JsonDocument& d) {
     if (!strcmp(a, "auto")) {
       cfg.autoUpdate = d["on"] | false;
       prefs.putBool("autoUpd", cfg.autoUpdate);
-      if (cfg.autoUpdate && ota::count && ota::cmp(ota::latest(), FW_VERSION) > 0) otaInstallVer = ota::latest();
+      if (cfg.autoUpdate && ota::count && ota::cmp(ota::latest(), FW_VERSION) > 0 && ota::latest() != prefs.getString("otaBad", "")) otaInstallVer = ota::latest();
       otaPush();
       return nullptr;
     }
@@ -1414,7 +1705,7 @@ String liveJson() {
   bool first = true;
   for (int i = 0; i < SLOTS; i++) {
     if (!P[i].used || !P[i].attached) continue;
-    char b[32]; snprintf(b, sizeof b, "%s\"%08X\":\"%02X%02X%02X%02X\"", first ? "" : ",", (unsigned)P[i].chip, OUT[i][0], OUT[i][1], OUT[i][2], OUT[i][3]);
+    char b[32]; snprintf(b, sizeof b, "%s\"%08X\":\"%02X%02X%02X%02X\"", first ? "" : ",", (unsigned)P[i].chip, CUR[i][0], CUR[i][1], CUR[i][2], CUR[i][3]);
     out += b; first = false;
   }
   out += "},\"j\":[";
@@ -1440,7 +1731,7 @@ void setupWeb() {
   server.on("/", HTTP_GET, [] { server.send(200, "text/html; charset=utf-8", INDEX_HTML); });
   server.on("/api/state", HTTP_GET, replyState);
   // Befehle laufen über apiCall(), damit HTTP und WebSocket dasselbe tun
-  const char* cmds[] = {"/api/set", "/api/presets", "/api/effect", "/api/test", "/api/ota", "/api/sim/new", "/api/sim/attach", "/api/sim/detach"};
+  const char* cmds[] = {"/api/set", "/api/presets", "/api/effect", "/api/test", "/api/ota", "/api/light", "/api/sim/new", "/api/sim/attach", "/api/sim/detach"};
   for (const char* path : cmds) {
     server.on(path, HTTP_POST, [path] {
       JsonDocument d;
@@ -1453,6 +1744,17 @@ void setupWeb() {
   }
   server.on("/api/live", HTTP_GET, [] { server.send(200, "application/json", liveJson()); });
   server.on("/api/ota", HTTP_GET, [] { server.send(200, "application/json", otaJson()); });
+  server.on("/api/backup", HTTP_GET, [] {
+    server.sendHeader("Content-Disposition", String("attachment; filename=\"trilumag-sicherung-") + FW_VERSION + ".json\"");
+    server.send(200, "application/json", backupJson());
+  });
+  server.on("/api/restore", HTTP_POST, [] {
+    JsonDocument d; if (!readBody(d)) return replyError("Datei unlesbar");
+    if (const char* err = restoreBackup(d)) return replyError(err);
+    server.send(200, "application/json", "{\"ok\":true,\"restart\":true}");
+    delay(600);
+    ESP.restart();
+  });
   // Firmware-Datei hochladen (wie bei WLED unter /update)
   server.on("/update", HTTP_POST, [] {
     bool ok = !Update.hasError();
@@ -1482,6 +1784,18 @@ void setupWeb() {
       ps.led = p["led"] | ps.led; ps.snsR = p["snsR"] | ps.snsR; ps.snsL = p["snsL"] | ps.snsL;
     }
     if (const char* err = checkPins(ps)) return replyError(err);
+    JsonObject li = d["light"];
+    if (!li.isNull()) {                            // Stromsensor: beide Pins oder keiner, frei und gültig
+      int sda = li["sda"] | -1, scl = li["scl"] | -1;
+      if ((sda < 0) != (scl < 0)) return replyError("Für den Stromsensor beide Pins wählen oder keinen");
+      if (sda >= 0) {
+        const int8_t used[6] = {ps.rx, ps.tx, ps.de, ps.led, ps.snsR, ps.snsL};
+        if (!pinValid(sda) || !pinValid(scl) || sda == scl) return replyError("Pins für den Stromsensor ungültig");
+        for (int8_t u : used) if (u == sda || u == scl) return replyError("Pin des Stromsensors ist schon belegt");
+      }
+      prefs.putChar("i2cSda", sda); prefs.putChar("i2cScl", scl);
+      prefs.putUShort("shunt", constrain((int)(li["shunt"] | (int)cfg.shuntUo), 1, 10000));
+    }
     String order = d["order"] | cfg.order.c_str();
     bool okOrder = false; for (const char* o : ORDERS) if (order == o) okOrder = true;
     if (!okOrder) return replyError("Unbekannte Farbreihenfolge");
@@ -1529,6 +1843,7 @@ void setupWeb() {
   });
   ws::onOpen = wsOpen; ws::onText = wsText;
   ota::onProgress = [](int p) {                 // Fortschritt an die App; ws::loop läuft während des Downloads nicht
+    otaBeat = millis();
     if (p % 5 == 0) { ws::broadcast("{\"t\":\"otap\",\"p\":" + String(p) + "}"); logf("[OTA] %d %%\n", p); }
   };
   ws::begin();
@@ -1553,7 +1868,12 @@ void onMqtt(char* topic, byte* payload, unsigned int len) {
 
 void mqttLoop() {
   if (!cfg.mqttOn || !cfg.mqttHost.length() || !wlanOk) return;
-  if (mqtt.connected()) { mqtt.loop(); return; }
+  if (mqtt.connected()) {
+    mqtt.loop();
+    static uint32_t lastPwr = 0;
+    if (millis() - lastPwr > 10000) { lastPwr = millis(); publishPower(); }
+    return;
+  }
   if (millis() - lastMqttTry < 5000) return;
   lastMqttTry = millis();
   String cid = "trilumag-" + hex(P[0].chip);
@@ -1726,14 +2046,15 @@ void setup() {
   P[0].x = 0; P[0].y = 0; P[0].rot = 0;
   P[0].state = ACTIVE; P[0].hasColor = true; P[0].w = 200;
   loadColor(0);
+  otaBootCheck();
   fxLoad();
   presetsLoad();
+  ina::begin();
   if (fx.id) logf("[FX] Effekt %s läuft weiter\n", FX[fx.id].name);
 
   strip.updateType(neoType(cfg.order) + NEO_KHZ800);
   strip.setPin(cfg.pins.led);
   strip.begin();
-  showMain();
 
   String ss = prefs.getString("ssid", WLAN_SSID), pw = prefs.getString("pass", WLAN_PASS);
   WiFi.setHostname(HOSTNAME);
@@ -1754,6 +2075,8 @@ void setup() {
 }
 
 void loop() {
+  otaVerifyLoop();
+  ina::loop();
   server.handleClient();
   wsLoop();
   improvLoop();
@@ -1772,7 +2095,7 @@ void loop() {
       }
     }
   }
-  fxLoop();
+  outLoop();
   otaLoop();
   if (colorsDirty && millis() - colorsDirtyAt > 5000) saveColors();
   if (simDirty && millis() - simDirtyAt > 1500) simSave();

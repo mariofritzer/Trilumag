@@ -2,6 +2,26 @@
 
 Die Versionsnummer im Webinstaller und in der App setzt sich aus der Version in der Firmware und der Nummer des automatischen Builds zusammen, zum Beispiel **0.5.11** = Version 0.5, Build 11. Bis Build 9 hat der Build die Nummer immer als 0.2.x ausgegeben, die tatsächlichen Stände stehen deshalb unten mit beiden Nummern.
 
+## Nächster Build
+
+**Update-Absicherung**
+- Eine neue Version muss sich nach dem Start 45 Sekunden bewähren. Stürzt sie in dieser Zeit ab, hängt sie oder fällt der Strom aus, nimmt das Gerät beim nächsten Start automatisch wieder die vorige Version.
+- Die App meldet „Zurück auf die vorige Version“ und markiert die Version in der Liste mit „startete nicht“. Automatische Updates probieren sie nicht noch einmal.
+- Fällt der Strom während des Downloads aus, läuft ohnehin die alte Version weiter, weil das Update in den freien Programmplatz geschrieben wird.
+
+**Licht**
+- Weiche Übergänge: Farb-, Preset-, Effekt- und Ein/Aus-Wechsel blenden über eine einstellbare Zeit über (Standard 0,7 s).
+- Stromlimit wie bei WLED: Trilumag schätzt den Strom aller Panels und dimmt gleichmäßig, bevor das Netzteil überlastet wird.
+- Optionaler Stromsensor INA226 über I²C: misst Strom, Spannung und Leistung. Mit ihm regelt das Stromlimit nach Messung.
+- Home Assistant: neue Sensoren Strom, Leistung und (mit Sensor) Spannung.
+- Neue Panels pulsieren jetzt über das Hauptpanel. Alle Farben kommen über einen gemeinsamen Weg mit Überblendung und Stromlimit an die Panels.
+
+**Sichern und Wiederherstellen**
+- Unter Optionen → Sicherung lassen sich Einstellungen, Presets, Farben und die simulierte Wand als Datei herunterladen und wieder einspielen. Die WLAN-Zugangsdaten sind nicht dabei.
+
+**Behoben**
+- Der Farbtest unter Hardware wird nicht mehr sofort vom normalen Bild überschrieben.
+
 ## 0.6.16 · 4. Oktober 2026
 
 **Simulation**
