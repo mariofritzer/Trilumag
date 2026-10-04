@@ -23,6 +23,19 @@ const BoardPreset BOARDS[] = {
 };
 const size_t BOARD_COUNT = sizeof(BOARDS) / sizeof(BOARDS[0]);
 
+// Vorgabe für den Stromsensor INA226 (I²C) pro Board: freie Pins, die nicht mit Boot, Flash oder USB kollidieren
+struct I2cDefault { const char* id; int8_t sda, scl; };
+const I2cDefault I2C_DEFAULTS[] = {
+  {"s3-devkitc",   1,  2},
+  {"esp32-devkit", 21, 22},
+  {"c3-supermini", 5,  6},
+  {"c6-devkit",    6,  7},
+};
+inline void i2cDefault(const char* board, int8_t& sda, int8_t& scl) {
+  sda = scl = -1;
+  for (const I2cDefault& d : I2C_DEFAULTS) if (!strcmp(d.id, board)) { sda = d.sda; scl = d.scl; }
+}
+
 // Pins, die auf dem jeweiligen Chip frei nutzbar sind (ohne Boot-, Flash-, PSRAM- und USB-Pins)
 #if CONFIG_IDF_TARGET_ESP32S3
 const int8_t VALID_PINS[] = {1, 2, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 21, 38, 39, 40, 41, 42, 47, 48};

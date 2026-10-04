@@ -26,7 +26,7 @@
 #define DMALEDS 4
 #include "ws2812b_dma_spi_led_driver.h"
 
-#define FW_VERSION 1
+#define FW_VERSION 2   // 2: FRAME3 (drei Kanten pro Panel in einem Rahmen)
 #define NUM_SEGMENTS 3
 #define BAUD 250000
 
@@ -37,7 +37,7 @@
 #define REPLY_FLAG  0x80
 
 enum {
-	CMD_PING = 0x01, CMD_COLOR = 0x02, CMD_EDGES = 0x03, CMD_FRAME = 0x04, CMD_PULSE = 0x05, CMD_ORDER = 0x06,
+	CMD_PING = 0x01, CMD_COLOR = 0x02, CMD_EDGES = 0x03, CMD_FRAME = 0x04, CMD_PULSE = 0x05, CMD_ORDER = 0x06, CMD_FRAME3 = 0x07,
 	CMD_BEACON = 0x10, CMD_DISCOVER = 0x11, CMD_PROBE = 0x12, CMD_ASSIGN = 0x14, CMD_RESET = 0x15
 };
 enum { ST_DARK = 0, ST_PULSE = 1, ST_ACTIVE = 2 };
@@ -194,6 +194,12 @@ static void handleFrame(uint8_t addr, uint8_t cmd, const uint8_t* d, uint8_t len
 		if (len >= 2 && myAddr && myAddr >= d[0] && myAddr < d[0] + d[1]) {
 			uint16_t off = 2 + 4 * (myAddr - d[0]);
 			if (off + 4 <= len) setAll(d + off);
+		}
+		break;
+	case CMD_FRAME3:   // wie FRAME, aber drei Farben pro Panel (Kante 1 bis 3)
+		if (len >= 2 && myAddr && myAddr >= d[0] && myAddr < d[0] + d[1]) {
+			uint16_t off = 2 + 12 * (myAddr - d[0]);
+			if (off + 12 <= len) { memcpy(seg, d + off, 12); state = ST_ACTIVE; ledsDirty = 1; }
 		}
 		break;
 	case CMD_PULSE:

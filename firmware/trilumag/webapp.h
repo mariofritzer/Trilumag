@@ -123,6 +123,15 @@ label.f{display:flex;flex-direction:column;gap:6px;font-size:13px;color:var(--mu
 .bars{display:flex;align-items:flex-end;gap:2px;height:14px;flex:none}
 .bars i{width:4px;background:#555;border-radius:1px}
 .bars i.on{background:var(--fg)}
+.card h3.sub{font-size:11px;margin-top:6px}
+.dtab{overflow-x:auto}
+.dtab table{width:100%;border-collapse:collapse;font:13px ui-monospace,Menlo,monospace}
+.dtab th{text-align:left;color:var(--muted);font-weight:500;padding:4px 6px;border-bottom:1px solid var(--line)}
+.dtab td{padding:5px 6px;border-bottom:1px solid #222}
+.dtab td.warn{color:#f0b070}.dtab td.bad{color:#ff8a80}
+.dlog{display:flex;flex-direction:column;gap:2px;max-height:220px;overflow-y:auto;font-size:13px}
+.dlog div{display:grid;grid-template-columns:62px 1fr;gap:8px;padding:3px 0;border-bottom:1px solid #222}
+.dlog span{color:var(--muted);font:12px ui-monospace,Menlo,monospace}
 .prog{height:8px;border-radius:4px;background:#333;overflow:hidden}
 .prog i{display:block;height:100%;width:0;background:var(--acc);transition:width .3s}
 .row .tag{font-size:11px;padding:2px 8px;border-radius:999px;background:#333;color:var(--fg);flex:none}
@@ -245,12 +254,23 @@ nav.tabs button.on{color:var(--acc)}
       <h3>Licht</h3>
       <div class="sl">Übergänge<input type="range" id="ltrans" min="0" max="50" value="7"><output id="ltranso">0,7 s</output></div>
       <p class="note">So lange blenden Farb-, Preset-, Effekt- und Ein/Aus-Wechsel weich über. 0 = sofort.</p>
+    </div>
+    <div class="card" id="powerCard">
+      <h3>Stromlimit</h3>
+      <div class="wstat" id="pwrStat"><div class="ic" id="pwrIc">A</div><div><b id="pwrT">–</b><span id="pwrS"></span></div></div>
       <label class="tog"><input type="checkbox" id="lpwrOn"><span class="sw"></span>Stromlimit</label>
       <div class="pins" id="lpwrBox">
         <label class="f">Netzteil liefert höchstens (A)<input id="lpwrMax" inputmode="decimal" placeholder="z. B. 6"></label>
         <label class="f">mA pro Farbkanal und Segment<input id="lpwrCh" inputmode="numeric" placeholder="12"></label>
       </div>
-      <div class="wstat" id="pwrStat"><div class="ic" id="pwrIc">A</div><div><b id="pwrT">–</b><span id="pwrS"></span></div></div>
+      <p class="note">Wird es mehr, dimmt Trilumag alle Panels gleichmäßig. Ohne Sensor wird der Strom aus den Farben geschätzt.</p>
+      <h3 class="sub">Stromsensor INA226</h3>
+      <div class="pins">
+        <label class="f">SDA<select id="p_sda"></select></label>
+        <label class="f">SCL<select id="p_scl"></select></label>
+        <label class="f">Shunt (mΩ)<input id="p_shunt" inputmode="decimal" placeholder="5"></label>
+      </div>
+      <p class="note" id="sensInfo"></p>
     </div>
     <div class="card">
       <h3>Hardware</h3>
@@ -265,12 +285,7 @@ nav.tabs button.on{color:var(--acc)}
         <label class="f">SNS links (Kante 3)<select id="p_snsL"></select></label>
       </div>
       <label class="f">Farbreihenfolge der LEDs<select id="order"></select></label>
-      <div class="pins">
-        <label class="f">Stromsensor INA226 SDA<select id="p_sda"></select></label>
-        <label class="f">Stromsensor INA226 SCL<select id="p_scl"></select></label>
-        <label class="f">Shunt (mΩ)<input id="p_shunt" inputmode="decimal" placeholder="5"></label>
-      </div>
-      <p class="note" id="sensInfo">Optional. Ohne Sensor schätzt Trilumag den Strom aus den Farben.</p>
+
       <div class="btnrow"><span class="note">Farbtest:</span><button class="btn" data-t="0">Rot</button><button class="btn" data-t="1">Grün</button><button class="btn" data-t="2">Blau</button><button class="btn" data-t="3">Weiß</button><button class="btn" data-t="-1">Ende</button></div>
       <p class="note">Leuchtet bei „Rot“ etwas anderes als Rot, stimmt die Reihenfolge nicht. Dann eine andere wählen und speichern.</p>
     </div>
@@ -298,6 +313,14 @@ nav.tabs button.on{color:var(--acc)}
       </div>
       <div class="btnrow"><button class="btn pri" id="saveBtn">Speichern und neu starten</button></div>
       <p class="note" id="setErr"></p>
+    </div>
+    <div class="card" id="diagCard">
+      <h3>Bus-Diagnose</h3>
+      <p class="note" id="diagSum">–</p>
+      <div class="dtab"><table><thead><tr><th>Panel</th><th>Adr.</th><th>Antwort</th><th>verpasst</th><th>FW</th></tr></thead><tbody id="diagRows"></tbody></table></div>
+      <h3 class="sub">Ereignisse</h3>
+      <div class="dlog" id="diagLog"></div>
+      <div class="btnrow"><button class="btn" id="diagReset">Zähler zurücksetzen</button></div>
     </div>
     <div class="card" id="backupCard">
       <h3>Sicherung</h3>
@@ -595,7 +618,8 @@ function renderWall(){
     $('pTitle').textContent=p.main?'Hauptpanel':'Panel '+p.id.slice(4);
     const stx=['dunkel, wird erkannt','pulsiert blau, wartet auf erste Farbe','leuchtet'][p.state];
     const par=st.panels.find(q=>q.id===p.parent);
-    $('pInfo').innerHTML='';[['Chip-ID',p.id],['Zustand',stx],['Position',`${p.x} / ${p.y} · Spitze ${p.up?'oben':'unten'}`],['Hängt an',p.main?'–':par?(par.main?'Hauptpanel':'Panel '+par.id.slice(4)):'–'],['Farbe',rgbHex(p.r,p.g,p.b)+(p.w?' + Weiß '+p.w:'')]]
+    $('pInfo').innerHTML='';[['Chip-ID',p.id],['Zustand',stx],...(()=>{const q=diagData&&diagData.panels.find(x=>x.id===p.id);if(!q||!diagData.bus||p.main)return[];const pct=q.pings?Math.round(q.missed*1000/q.pings)/10:0;
+      return[['Bus',`Adresse ${q.addr} · Antwort ${(q.rtt/1000).toFixed(2)} ms · ${pct} % verpasst · Firmware ${q.fw}`]];})(),['Position',`${p.x} / ${p.y} · Spitze ${p.up?'oben':'unten'}`],['Hängt an',p.main?'–':par?(par.main?'Hauptpanel':'Panel '+par.id.slice(4)):'–'],['Farbe',rgbHex(p.r,p.g,p.b)+(p.w?' + Weiß '+p.w:'')]]
       .forEach(([k,v])=>{const a=document.createElement('span');a.textContent=k;const b=document.createElement('span');b.textContent=v;$('pInfo').append(a,b);});
     if(document.activeElement!==$('pbri')){setRange('pbri',pct(p.bri));$('pbrio').textContent=pct(p.bri)+' %';}
     $('pOn').classList.toggle('pri',p.on);$('pOn').textContent=p.on?'Ein':'Aus';
@@ -626,7 +650,7 @@ $('pname').addEventListener('keydown',e=>{if(e.key==='Enter')$('psave').click();
 // ---------- Tab Optionen ----------
 let cfg=null;const PIN_KEYS=['rx','tx','de','led','snsR','snsL'];
 async function loadCfg(){
-  renderWifi();loadOta();
+  renderWifi();loadOta();loadDiag();
   try{cfg=await (await fetch('/api/config')).json();}catch(e){return;}
   if(st&&(st.ap||!st.ssid)&&!$('netList').children.length)$('scanBtn').click();   // ohne WLAN gleich nach Netzen suchen
   $('mode').value=cfg.mode;
@@ -638,9 +662,10 @@ async function loadCfg(){
   const L=cfg.light||{};
   $('lpwrOn').checked=L.pwrMax>0;$('lpwrBox').classList.toggle('off',!(L.pwrMax>0));
   $('lpwrMax').value=L.pwrMax?(L.pwrMax/1000).toLocaleString('de-AT'):'';$('lpwrCh').value=L.pwrCh||12;
-  ['sda','scl'].forEach(k=>{const s=$('p_'+k);s.innerHTML='<option value="-1">aus</option>';cfg.validPins.forEach(p=>{const o=document.createElement('option');o.value=p;o.textContent='GPIO '+p;s.append(o);});s.value=L[k]??-1;});
+  ['sda','scl'].forEach(k=>{const s=$('p_'+k);s.innerHTML='<option value="-1">kein Sensor</option>';const def=k==='sda'?L.defSda:L.defScl;
+    cfg.validPins.forEach(p=>{const o=document.createElement('option');o.value=p;o.textContent='GPIO '+p+(p===def?' (Vorgabe)':'');s.append(o);});s.value=L[k]??-1;});
   $('p_shunt').value=((L.shunt||50)/10).toLocaleString('de-AT');
-  $('sensInfo').textContent=L.sda>=0?(L.sensor?'Stromsensor gefunden, Trilumag misst den echten Strom.':'Stromsensor nicht gefunden. Verkabelung und Pins prüfen.'):'Optional. Ohne Sensor schätzt Trilumag den Strom aus den Farben.';
+  renderSensor(L.sda,L.sensor);
   $('m_on').checked=!!cfg.mqtt.on;$('mqttFields').classList.toggle('off',!cfg.mqtt.on);$('m_host').value=cfg.mqtt.host;$('m_port').value=cfg.mqtt.port;$('m_user').value=cfg.mqtt.user;
   $('info').innerHTML='';[['Chip',cfg.chip],['Firmware',cfg.ver],['Betriebsart',cfg.mode==='bus'?'Bus':'Simulation'],['WLAN',st&&st.ssid||'–']]
     .forEach(([k,v])=>{const a=document.createElement('span');a.textContent=k;const x=document.createElement('span');x.textContent=v;$('info').append(a,x);});
@@ -651,10 +676,7 @@ document.querySelectorAll('[data-t]').forEach(b=>b.addEventListener('click',()=>
 $('saveBtn').addEventListener('click',async()=>{
   const pins={};PIN_KEYS.forEach(k=>pins[k]=+$('p_'+k).value);
   if(new Set(Object.values(pins)).size<6){$('setErr').textContent='Ein Pin ist doppelt belegt.';return;}
-  const sda=+$('p_sda').value,scl=+$('p_scl').value;
-  if((sda<0)!==(scl<0)){$('setErr').textContent='Für den Stromsensor beide Pins wählen oder keinen.';return;}
-  if(sda>=0&&(Object.values(pins).includes(sda)||Object.values(pins).includes(scl)||sda===scl)){$('setErr').textContent='Ein Pin des Stromsensors ist schon belegt.';return;}
-  const body={light:{sda,scl,shunt:Math.round(parseFloat(($('p_shunt').value||'5').replace(',','.'))*10)},mode:$('mode').value,board:$('board').value,pins,order:$('order').value,mqtt:{on:$('m_on').checked,host:$('m_host').value.trim(),port:+$('m_port').value||1883,user:$('m_user').value.trim()}};
+  const body={mode:$('mode').value,board:$('board').value,pins,order:$('order').value,mqtt:{on:$('m_on').checked,host:$('m_host').value.trim(),port:+$('m_port').value||1883,user:$('m_user').value.trim()}};
   if($('m_pass').value)body.mqtt.pass=$('m_pass').value;
   const r=await fetch('/api/config',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)}).catch(()=>null);
   if(r&&!r.ok){const j=await r.json();$('setErr').textContent=j.error||'Speichern fehlgeschlagen';return;}
@@ -700,6 +722,34 @@ function sendPwr(){const on=$('lpwrOn').checked;$('lpwrBox').classList.toggle('o
   api('/api/light',body);}
 $('lpwrOn').addEventListener('change',sendPwr);
 $('lpwrMax').addEventListener('change',sendPwr);$('lpwrCh').addEventListener('change',sendPwr);
+
+function renderSensor(sda,found){$('sensInfo').textContent=sda>=0?(found?'Sensor gefunden: Trilumag misst den echten Strom und regelt danach.':'Sensor nicht gefunden. Verkabelung prüfen (SDA, SCL, 3,3 V, GND), dann hier die Pins neu wählen.'):'Kein Sensor eingestellt. Der Strom wird aus den Farben geschätzt.';}
+async function sendSensor(){
+  const sda=+$('p_sda').value,scl=+$('p_scl').value;
+  if((sda<0)!==(scl<0)){$('sensInfo').textContent='Bitte beide Pins wählen oder bei beiden „kein Sensor“.';return;}
+  const shunt=Math.round(parseFloat(($('p_shunt').value||'5').replace(',','.'))*10);
+  const r=await api('/api/light',{sda,scl,shunt});
+  setTimeout(async()=>{try{const s2=await (await fetch('/api/state')).json();renderSensor(s2.pwr.sda,s2.pwr.sensor);}catch(e){}},600);}
+['p_sda','p_scl','p_shunt'].forEach(k=>$(k).addEventListener('change',sendSensor));
+
+// ---------- Bus-Diagnose ----------
+let diagData=null;
+function ago(s){return s<60?`vor ${s} s`:s<3600?`vor ${Math.round(s/60)} min`:`vor ${Math.round(s/3600)} h`;}
+async function loadDiag(){try{diagData=await (await fetch('/api/diag')).json();renderDiag();if(tab==='wall')renderWall();}catch(e){}}
+function renderDiag(){
+  const d=diagData;if(!d)return;
+  $('diagSum').textContent=d.bus?`Laufzeit ${Math.floor(d.up/3600)} h ${Math.floor(d.up%3600/60)} min · ${d.frames} Bilder gesendet · ${d.discovers} Erkennungsrunden · ${d.timeouts} verpasste Antworten · ${d.crc} gestörte Übertragungen`:
+    'Simulation: Antwortzeiten und Fehler gibt es erst im Busbetrieb. Das Ereignisprotokoll läuft trotzdem.';
+  const tb=$('diagRows');tb.innerHTML='';
+  d.panels.forEach(p=>{const tr=document.createElement('tr');const pct=p.pings?Math.round(p.missed*1000/p.pings)/10:0;
+    const cells=[p.id.slice(4),p.addr||'–',p.rtt?(p.rtt/1000).toFixed(2)+' ms':'–',p.pings?pct+' %':'–',p.fw||'–'];
+    cells.forEach((c,i)=>{const td=document.createElement('td');td.textContent=c;if(i===3&&pct>=5)td.className=pct>=20?'bad':'warn';tr.append(td);});tb.append(tr);});
+  const lg=$('diagLog');lg.innerHTML='';
+  if(!d.log.length){const x=document.createElement('p');x.className='note';x.textContent='Noch keine Ereignisse.';lg.append(x);}
+  d.log.forEach(e=>{const r=document.createElement('div');const t=document.createElement('span');t.textContent=ago(e.ago);const m=document.createElement('p');m.style.margin='0';m.textContent=e.m;r.append(t,m);lg.append(r);});
+}
+$('diagReset').addEventListener('click',async()=>{await api('/api/diag',{});loadDiag();});
+setInterval(()=>{if(document.hidden)return;if((tab==='opt'&&!$('diagCard').classList.contains('closed'))||(tab==='wall'&&focus))loadDiag();},3000);
 
 // ---------- Sicherung ----------
 $('bkUp').addEventListener('click',async()=>{const f=$('bkFile').files[0];if(!f){toast('Bitte zuerst eine Sicherungsdatei wählen');return;}

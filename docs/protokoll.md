@@ -31,12 +31,13 @@ Ein Panel antwortet frühestens 100 µs nach dem Ende der Anfrage. Der Master wa
 
 | Code | Name | Ziel | Daten | Antwort |
 | --- | --- | --- | --- | --- |
-| `0x01` | PING | Panel | – | `[Zustand, SNS-Maske, Firmware-Version]` |
+| `0x01` | PING | Panel | – | `[Zustand, SNS-Maske, Firmware-Version]` (Version 2 kennt FRAME3) |
 | `0x02` | COLOR | Panel oder alle | `[R, G, B, W]` | – |
 | `0x03` | EDGES | Panel | `[R,G,B,W] × 3` für Kante 1 bis 3 | – |
 | `0x04` | FRAME | alle | `[erste Adresse, Anzahl, (R,G,B,W) × Anzahl]` | – |
 | `0x05` | PULSE | Panel | – | – |
 | `0x06` | ORDER | Panel oder alle | 4 Bytes: welcher Farbkanal an Position 1–4 gesendet wird (0 = R, 1 = G, 2 = B, 3 = W) | – |
+| `0x07` | FRAME3 | alle | `[erste Adresse, Anzahl, (R,G,B,W) × 3 × Anzahl]`, drei Farben pro Panel für Kante 1 bis 3, ab Panel-Firmware 2 | – |
 | `0x10` | BEACON | alle | `[1 = an, 0 = aus]` | – |
 | `0x11` | DISCOVER | alle | `[Runde, Zeitschlitze]` | nur neue Panels mit Kontakt: `[Chip-ID ×4, SNS-Maske]` |
 | `0x12` | PROBE | `0x7F` | `[Chip-ID ×4, Kante oder 0xFF]` | `[]` |

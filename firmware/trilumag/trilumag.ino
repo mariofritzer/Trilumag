@@ -99,6 +99,12 @@ struct Panel {
   uint8_t depth = 0;      // Schritte bis zum Hauptpanel
   uint8_t addr = 0;       // Kurzadresse auf dem Bus (nur Busbetrieb)
   uint8_t miss = 0;       // verpasste Antworten in Folge
+  // Diagnose
+  uint32_t pings = 0, missed = 0;   // Abfragen und verpasste Antworten seit dem Anklipsen
+  uint16_t rtt = 0, rttMax = 0;     // Antwortzeit in µs (zuletzt, höchste)
+  uint8_t fw = 0;                   // Firmware-Version des Panels (aus PING)
+  uint16_t attaches = 0;            // wie oft seit dem Start angeklipst
+  bool edges = false;               // Kanten einzeln: Effekte bekommen drei Farben pro Panel
   uint8_t state = DARK;
   uint32_t since = 0;
   uint32_t joinAt = 0;    // bei laufendem Effekt: bis hierher noch blau pulsieren (0 = nicht)
@@ -178,6 +184,22 @@ void logf(const char* fmt, ...) {
 #if HAS_UART_CONSOLE
   Serial0.print(b);
 #endif
+}
+
+// ---------- Diagnose: Zähler und Ereignisprotokoll ----------
+struct DiagEvent { uint32_t t; char m[80]; };
+const uint8_t DIAG_N = 40;
+DiagEvent diagLogBuf[DIAG_N];
+uint8_t diagHead = 0, diagCount = 0;
+uint32_t busFramesSent = 0, busCrcErr = 0, busTimeouts = 0, busDiscovers = 0;
+// schreibt ins serielle Log und ins Ereignisprotokoll der App
+void diag(const char* fmt, ...) {
+  char b[80];
+  va_list a; va_start(a, fmt); vsnprintf(b, sizeof b, fmt, a); va_end(a);
+  logf("%s\n", b);
+  DiagEvent& e = diagLogBuf[diagHead];
+  e.t = millis(); strncpy(e.m, b, sizeof e.m - 1); e.m[sizeof e.m - 1] = 0;
+  diagHead = (diagHead + 1) % DIAG_N; if (diagCount < DIAG_N) diagCount++;
 }
 
 void saveWifi(const String& ss, const String& pw);
@@ -306,6 +328,7 @@ bool receive(Reply& r, uint32_t timeoutMs) {
           r.addr = f[1] & 0x7F; r.cmd = f[2]; r.len = f[3]; memcpy(r.data, f + 4, f[3]);
           return true;
         }
+        if (c != f[pos - 1]) busCrcErr++;          // gestörte Übertragung
         pos = 0;
       }
     }
@@ -401,17 +424,17 @@ void busHandleNew(uint32_t chip, uint8_t mask) {
   { bus::Reply r; bus::receive(r, 5); }
   bus::beacons(true);
 
-  if (parent < 0) { logf("[BUS] %s meldet Kontakt, Nachbar aber nicht gefunden\n", hex(chip).c_str()); return; }
+  if (parent < 0) { diag("Panel %s meldet Kontakt, Nachbar nicht gefunden (SNS prüfen)", hex(chip).substring(4).c_str()); return; }
 
   uint8_t addr = 0;
   for (uint8_t a = 1; a <= 0x3E; a++) if (findAddr(a) < 0) { addr = a; break; }
   if (!addr || !placePanel(i, parent, parentEdge, ownEdge)) {
-    logf("[BUS] %s lässt sich nicht einordnen\n", hex(chip).c_str()); return;
+    diag("Panel %s lässt sich nicht einordnen", hex(chip).substring(4).c_str()); return;
   }
   bus::sendById(chip, bus::C_ASSIGN, addr);
   bus::Reply r;
   if (!bus::receive(r, 5) || r.addr != addr) {
-    logf("[BUS] %s hat die Adresse nicht bestätigt\n", hex(chip).c_str());
+    diag("Panel %s hat die Adresse nicht bestätigt", hex(chip).substring(4).c_str());
     P[i].attached = false; reconcile(); return;
   }
   P[i].addr = addr; P[i].miss = 0;
@@ -420,8 +443,9 @@ void busHandleNew(uint32_t chip, uint8_t mask) {
   P[i].state = P[i].hasColor ? ACTIVE : PULSE;
   P[i].since = millis();
   transition();                       // weich einblenden, das nächste Bild enthält das neue Panel
-  logf("[BUS] %s an Kante %d von %s, eigene Kante %d, Adresse %u, %s\n", hex(chip).c_str(), parentEdge + 1,
-       hex(P[parent].chip).c_str(), ownEdge + 1, addr, P[i].hasColor ? "alte Farbe" : "pulsiert blau");
+  diag("Panel %s an Kante %d von %s (eigene Kante %d), Adresse %u", hex(chip).substring(4).c_str(), parentEdge + 1,
+       parent == 0 ? "Haupt" : hex(P[parent].chip).substring(4).c_str(), ownEdge + 1, addr);
+  P[i].pings = P[i].missed = 0; P[i].rttMax = 0; P[i].attaches++;
   publishDiscovery(i); publishAvail(i, true); publishState(i);
 }
 
@@ -433,13 +457,17 @@ void busLoop() {
     for (int i = 1; i < SLOTS; i++) {
       Panel& p = P[i];
       if (!p.used || !p.attached || !p.addr) continue;
+      uint32_t t0 = micros();
       bus::send(p.addr, bus::C_PING);
       bus::Reply r;
+      p.pings++;
       if (bus::receive(r, 4) && r.addr == p.addr) {
         p.miss = 0;
+        uint32_t us = micros() - t0; p.rtt = us > 65535 ? 65535 : us; if (p.rtt > p.rttMax) p.rttMax = p.rtt;
+        if (r.len >= 3) p.fw = r.data[2];
         if (r.len >= 1 && r.data[0] == DARK && p.state != DARK) outForce = true;   // Panel hat Zustand verloren: alles neu schicken   // Panel hat Zustand verloren
-      } else if (++p.miss >= 3) {
-        logf("[BUS] %s antwortet nicht mehr, gilt als abgeklipst\n", hex(p.chip).c_str());
+      } else if (p.missed++, busTimeouts++, ++p.miss >= 3) {
+        diag("Panel %s antwortet nicht mehr, gilt als abgeklipst", hex(p.chip).substring(4).c_str());
         p.attached = false; p.addr = 0; p.state = DARK; publishAvail(i, false); lost = true;
       }
     }
@@ -449,6 +477,7 @@ void busLoop() {
     lastDiscover = now;
     const uint8_t slots = 8;
     uint8_t d[2] = {++discoverRound, slots};
+    busDiscovers++;
     bus::send(bus::ALL, bus::C_DISCOVER, d, 2);
     uint32_t found[8]; uint8_t masks[8]; uint8_t n = 0;
     uint32_t t0 = millis();
@@ -506,11 +535,11 @@ int palFind(const char* key) {
 bool fxUsesColor() { return fx.id && (fx.pal == 2 || (fx.pal == 0 && FX[fx.id].color)); }
 const uint32_t FX_FRAME_MS = 40;
 
-float fxPhase = 0, fxA[SLOTS], fxB[SLOTS], fxT[SLOTS];
+float fxPhase = 0, fxA[SLOTS * 3], fxB[SLOTS * 3], fxT[SLOTS * 3];   // Zustand pro Punkt (Panel oder Kante)
 uint32_t fxLast = 0, fxDirtyAt = 0, fxLastFrame = 0;
 bool fxDirty = false;
-uint8_t TGT[SLOTS][4];          // Ziel pro Panel (Effekt oder feste Farbe), Helligkeit schon eingerechnet
-uint8_t CUR[SLOTS][4];          // was die Panels gerade zeigen (nach Übergang und Stromlimit)
+uint8_t TGT[SLOTS][3][4];       // Ziel pro Panel und Kante (Effekt oder feste Farbe), Helligkeit schon eingerechnet
+uint8_t CUR[SLOTS][3][4];       // was die Panels gerade zeigen (nach Übergang und Stromlimit)
 
 int fxFind(const char* key) {
   for (uint8_t k = 0; k < FX_COUNT; k++) if (!strcasecmp(key, FX[k].id) || !strcasecmp(key, FX[k].name)) return k;
@@ -571,7 +600,7 @@ void pcol(float t, float* c, uint8_t def) {   // def: PalDefault (als uint8_t, w
 void mul(float* c, float k) { for (int i = 0; i < 4; i++) c[i] *= k; }
 
 void fxReset() {
-  for (int i = 0; i < SLOTS; i++) { fxA[i] = frand(); fxB[i] = frand(); fxT[i] = frand(); }
+  for (int i = 0; i < SLOTS * 3; i++) { fxA[i] = frand(); fxB[i] = frand(); fxT[i] = frand(); }
   fxLast = millis();
 }
 
@@ -589,60 +618,70 @@ void fxCompute() {
   const float TAU = 6.2831853f;
 
   for (int i = 0; i < SLOTS; i++) {
-    float c[4] = {0, 0, 0, 0};
     const Panel& p = P[i];
-    if (!p.used || !p.attached || p.state == DARK) { memset(TGT[i], 0, 4); continue; }
-    if (p.joinAt && (int32_t)(now - p.joinAt) < 0) {      // gerade angeklipst: so pulsieren wie das Panel selbst
-      uint32_t t = (now - (p.joinAt - FX_JOIN_MS)) % 1600;
-      t = t < 800 ? t : 1600 - t;
-      TGT[i][0] = 0; TGT[i][1] = 0; TGT[i][2] = (uint8_t)(6 + (t * 26) / 800); TGT[i][3] = 0;
-      continue;
+    if (!p.used || !p.attached || p.state == DARK) { memset(TGT[i], 0, sizeof TGT[i]); continue; }
+    bool up = isUp(p.x, p.y);
+    int points = p.edges ? 3 : 1;
+    for (int e = 0; e < points; e++) {
+      // Position des Punkts: Mitte des Panels oder Mitte der Kante e (Seitenlänge 1)
+      float dx = 0, dy = 0, dd = 0;
+      if (p.edges) {
+        Dir w = worldDir(p, e);
+        if (w == BOTTOM) dy = 0.289f; else if (w == TOP) dy = -0.289f;
+        else { dx = w == RIGHT ? 0.25f : -0.25f; dy = up ? -0.144f : 0.144f; }
+        int nx, ny; neighbor(p.x, p.y, w, nx, ny);              // Kante zum Elternpanel liegt näher am Hauptpanel
+        dd = (p.parent >= 0 && P[p.parent].x == nx && P[p.parent].y == ny) ? -0.33f : 0.17f;
+      }
+      float c[4] = {0, 0, 0, 0};
+      int s = i * 3 + e;                                       // eigener Zufallszustand pro Punkt
+      float u = (p.x * 0.5f + dx - minX) / spanX;               // 0 links … 1 rechts
+      float v = p.y * 0.866f + dy;
+      float depth = p.depth + dd;
+      const float K = fx.inten / 255.0f;                       // Intensität 0..1
+      switch (fx.id) {
+        case 1: pcol(fxPhase * 0.1f + u * K * 0.6f, c, D_HUE); break;
+        case 2: pcol(fxPhase * 0.15f + u * (0.2f + 1.6f * K), c, D_HUE); break;
+        case 3: {
+          float lo = 0.02f + 0.45f * (1 - K);
+          pcol(fxPhase * 0.05f + u * 0.3f, c, D_COLOR);
+          mul(c, lo + (1 - lo) * (0.5f + 0.5f * cosf(fxPhase * TAU / 4 - (p.edges ? u * 0.6f : 0)))); break;
+        }
+        case 4: {
+          fxT[s] += dt * rate / 3.5f;
+          if (fxT[s] >= 1) { fxA[s] = fxB[s]; fxB[s] = fxA[s] + (frand() * 2 - 1) * (0.1f + 0.4f * K); fxT[s] = 0; }
+          float d = fxB[s] - fxA[s]; d -= floorf(d + 0.5f);
+          float t = fxT[s] * fxT[s] * (3 - 2 * fxT[s]);
+          pcol(fxA[s] + d * t, c, D_HUE); break;
+        }
+        case 5: {
+          fxA[s] = fmaxf(0, fxA[s] - dt * rate * 2.2f);
+          if (frand() < dt * rate * (0.05f + 0.9f * K) / points) fxA[s] = 1;
+          float a = fxA[s] * fxA[s];
+          pcol(u * 0.5f + fxPhase * 0.03f, c, D_COLOR);
+          mul(c, 0.18f + 0.5f * a); c[3] = fminf(255, c[3] + 255 * a); break;
+        }
+        case 6: {
+          float w = 0.5f + 0.5f * cosf(TAU * (fxPhase * 0.5f - depth * 0.17f));
+          pcol(fxPhase * 0.1f - depth * 0.08f, c, D_COLOR);
+          mul(c, 0.05f + 0.95f * powf(w, 1 + 7 * (1 - K))); break;
+        }
+        case 7: {
+          fxA[s] += (frand() - fxA[s]) * fminf(1, dt * rate * 9);
+          fxB[s] += (fxA[s] - fxB[s]) * fminf(1, dt * rate * 5);
+          float h = 1 - (0.2f + 0.8f * K) * (1 - fxB[s]);
+          if (fx.pal == 0) fireColor(h, c); else { pcol(h * 0.5f, c, D_FIRE); mul(c, h); }
+          break;
+        }
+        case 8: {
+          float sv = 0.5f + 0.5f * sinf(u * 5.0f + fxPhase * 0.9f + v * 0.7f) * sinf(u * 2.3f - fxPhase * 0.55f);
+          pcol(fxPhase * 0.04f + u * 0.48f, c, D_AURORA);
+          mul(c, 1 - (0.3f + 0.7f * K) * (1 - sv)); break;
+        }
+      }
+      float k = p.on ? masterK() / 255.0f : 0;
+      for (int ch = 0; ch < 4; ch++) TGT[i][e][ch] = (uint8_t)fminf(255, fmaxf(0, c[ch] * k));
     }
-    float u = (p.x * 0.5f - minX) / spanX;                 // 0 links … 1 rechts
-    float v = p.y * 0.866f;
-    const float K = fx.inten / 255.0f;                     // Intensität 0..1
-    switch (fx.id) {
-      case 1: pcol(fxPhase * 0.1f + u * K * 0.6f, c, D_HUE); break;           // ganze Wand im Farbverlauf, Intensität = Streuung
-      case 2: pcol(fxPhase * 0.15f + u * (0.2f + 1.6f * K), c, D_HUE); break; // Verlauf wandert von links nach rechts
-      case 3: {                                                               // Atmen, startet hell; Intensität = Tiefe
-        float lo = 0.02f + 0.45f * (1 - K);
-        pcol(fxPhase * 0.05f + u * 0.3f, c, D_COLOR);
-        mul(c, lo + (1 - lo) * (0.5f + 0.5f * cosf(fxPhase * TAU / 4))); break;
-      }
-      case 4: {                                                               // jedes Panel blendet zu eigener Zufallsfarbe
-        fxT[i] += dt * rate / 3.5f;
-        if (fxT[i] >= 1) { fxA[i] = fxB[i]; fxB[i] = fxA[i] + (frand() * 2 - 1) * (0.1f + 0.4f * K); fxT[i] = 0; }
-        float d = fxB[i] - fxA[i]; d -= floorf(d + 0.5f);
-        float t = fxT[i] * fxT[i] * (3 - 2 * fxT[i]);
-        pcol(fxA[i] + d * t, c, D_HUE); break;
-      }
-      case 5: {                                                               // Grundfarbe, einzelne Panels blitzen weiß auf
-        fxA[i] = fmaxf(0, fxA[i] - dt * rate * 2.2f);
-        if (frand() < dt * rate * (0.05f + 0.9f * K)) fxA[i] = 1;
-        float a = fxA[i] * fxA[i];
-        pcol(u * 0.5f + fxPhase * 0.03f, c, D_COLOR);
-        mul(c, 0.18f + 0.5f * a); c[3] = fminf(255, c[3] + 255 * a); break;
-      }
-      case 6: {                                                               // Wellen laufen vom Hauptpanel nach außen
-        float w = 0.5f + 0.5f * cosf(TAU * (fxPhase * 0.5f - p.depth * 0.17f));
-        pcol(fxPhase * 0.1f - p.depth * 0.08f, c, D_COLOR);
-        mul(c, 0.05f + 0.95f * powf(w, 1 + 7 * (1 - K))); break;
-      }
-      case 7: {                                                               // flackernde Glut; Intensität = Flackern
-        fxA[i] += (frand() - fxA[i]) * fminf(1, dt * rate * 9);
-        fxB[i] += (fxA[i] - fxB[i]) * fminf(1, dt * rate * 5);
-        float h = 1 - (0.2f + 0.8f * K) * (1 - fxB[i]);
-        if (fx.pal == 0) fireColor(h, c); else { pcol(h * 0.5f, c, D_FIRE); mul(c, h); }
-        break;
-      }
-      case 8: {                                                               // Polarlicht, langsam ziehend
-        float s = 0.5f + 0.5f * sinf(u * 5.0f + fxPhase * 0.9f + v * 0.7f) * sinf(u * 2.3f - fxPhase * 0.55f);
-        pcol(fxPhase * 0.04f + u * 0.48f, c, D_AURORA);
-        mul(c, 1 - (0.3f + 0.7f * K) * (1 - s)); break;
-      }
-    }
-    float k = p.on ? masterK() / 255.0f : 0;
-    for (int ch = 0; ch < 4; ch++) TGT[i][ch] = (uint8_t)fminf(255, fmaxf(0, c[ch] * k));
+    if (!p.edges) { memcpy(TGT[i][1], TGT[i][0], 4); memcpy(TGT[i][2], TGT[i][0], 4); }
   }
 }
 
@@ -734,6 +773,7 @@ void sendOutput(bool force) {
       memcpy(d + 2 + 4 * (p.addr - first), CUR[i], 4);
     }
     bus::send(bus::ALL, bus::C_FRAME, d, 2 + 4 * n);
+    busFramesSent++;
   }
   memcpy(SENT, CUR, sizeof CUR);
 }
@@ -769,9 +809,15 @@ bool rd(uint8_t reg, uint16_t& v) {
   if (Wire.requestFrom((int)ADDR, 2) != 2) return false;
   v = (uint16_t)(Wire.read() << 8); v |= Wire.read(); return true;
 }
+bool started = false;
 void begin() {
+  ok = false; amps = volts = 0;
+  if (started) { Wire.end(); started = false; }
   if (cfg.i2cSda < 0 || cfg.i2cScl < 0) return;
+  const int8_t used[6] = {cfg.pins.rx, cfg.pins.tx, cfg.pins.de, cfg.pins.led, cfg.pins.snsR, cfg.pins.snsL};
+  for (int8_t u : used) if (u == cfg.i2cSda || u == cfg.i2cScl) { logf("[STROM] Sensor-Pin %d ist schon belegt\n", u); return; }
   Wire.begin(cfg.i2cSda, cfg.i2cScl, 400000);
+  started = true;
   uint16_t id = 0;
   ok = rd(0xFE, id) && id == 0x5449 && wr(0x00, 0x4527);    // Kennung "TI", 16-fach gemittelt, laufend messen
   logf("[STROM] INA226 %s (SDA %d, SCL %d)\n", ok ? "gefunden" : "nicht gefunden", cfg.i2cSda, cfg.i2cScl);
@@ -995,6 +1041,7 @@ void publishFx() {
 // und die feste Farbe jedes bekannten Panels (über die Chip-ID).
 const uint8_t PRESET_MAX = 16;
 String presetNames[PRESET_MAX];
+uint32_t presetsVer = 1;             // ändert sich bei jedem Speichern/Löschen (für die WLED-Schnittstelle)
 
 String presetKey(uint8_t k) { return "ps" + String(k); }
 void presetsLoad() {
@@ -1049,6 +1096,7 @@ int presetSave(int slot, const char* name) {
   String out; serializeJson(d, out);
   prefs.putString(presetKey(slot).c_str(), out);
   presetNames[slot] = name;
+  presetsVer++;
   curPreset = slot;
   logf("[PRESET] '%s' in Platz %d gespeichert\n", name, slot + 1);
   publishPresetEntity(); publishPresetState();
@@ -1092,6 +1140,7 @@ bool presetLoad(int k) {
 
 void presetDelete(int k) {
   if (k < 0 || k >= PRESET_MAX) return;
+  presetsVer++;
   prefs.remove(presetKey(k).c_str());
   presetNames[k] = "";
   if (curPreset == k) curPreset = -1;
@@ -1186,7 +1235,7 @@ void reconcile() {
   for (int i = 1; i < SLOTS; i++) {
     if (P[i].used && P[i].attached && !seen[i]) {
       P[i].attached = false; P[i].state = DARK; P[i].parent = -1; P[i].addr = 0;
-      logf("[TOPO] %s getrennt\n", hex(P[i].chip).c_str());
+      diag("Panel %s getrennt (hing an einem abgeklipsten Panel)", hex(P[i].chip).substring(4).c_str());
       publishAvail(i, false);
     }
   }
@@ -1213,7 +1262,8 @@ bool placePanel(int i, int parent, uint8_t edge, uint8_t own) {
 bool simAttach(int i, int parent, uint8_t edge) {
   if (!placePanel(i, parent, edge, esp_random() % 3)) return false;
   P[i].state = DARK;
-  logf("[SIM] %s an Kante %u von %s angeklipst\n", hex(P[i].chip).c_str(), edge + 1, hex(P[parent].chip).c_str());
+  diag("Panel %s an Kante %u von %s angeklipst", hex(P[i].chip).substring(4).c_str(), edge + 1, parent == 0 ? "Haupt" : hex(P[parent].chip).substring(4).c_str());
+  P[i].attaches++;
   publishDiscovery(i); publishAvail(i, true);
   simChanged();
   return true;
@@ -1223,7 +1273,7 @@ void simDetach(int i) {
   if (i <= 0 || i >= SLOTS || !P[i].used || !P[i].attached) return;
   P[i].attached = false; P[i].state = DARK;
   publishAvail(i, false);
-  logf("[SIM] %s abgeklipst\n", hex(P[i].chip).c_str());
+  diag("Panel %s abgeklipst", hex(P[i].chip).substring(4).c_str());
   reconcile();
   simChanged();
 }
@@ -1286,7 +1336,8 @@ void loadConfig() {
   cfg.transMs = prefs.getUShort("trans", 700);
   cfg.pwrMax = prefs.getUShort("pwrMax", 0);
   cfg.pwrCh = prefs.getUChar("pwrCh", 12);
-  cfg.i2cSda = (int8_t)prefs.getChar("i2cSda", -1); cfg.i2cScl = (int8_t)prefs.getChar("i2cScl", -1);
+  int8_t dSda, dScl; i2cDefault(cfg.board.c_str(), dSda, dScl);           // ohne eigene Wahl: Vorgabe des Boards
+  cfg.i2cSda = (int8_t)prefs.getChar("i2cSda", dSda); cfg.i2cScl = (int8_t)prefs.getChar("i2cScl", dScl);
   cfg.shuntUo = prefs.getUShort("shunt", 50);   // ältere Versionen: an, sobald eine Adresse da ist
 }
 
@@ -1313,6 +1364,7 @@ String configJson() {
   JsonObject li = d["light"].to<JsonObject>();
   li["trans"] = cfg.transMs; li["pwrMax"] = cfg.pwrMax; li["pwrCh"] = cfg.pwrCh;
   li["sda"] = cfg.i2cSda; li["scl"] = cfg.i2cScl; li["shunt"] = cfg.shuntUo; li["sensor"] = ina::ok;
+  { int8_t a, b; i2cDefault(cfg.board.c_str(), a, b); li["defSda"] = a; li["defScl"] = b; }
   JsonArray os = d["orders"].to<JsonArray>();
   for (const char* o : ORDERS) os.add(o);
   JsonObject m = d["mqtt"].to<JsonObject>();
@@ -1333,6 +1385,7 @@ String stateJson(bool meta) {
   JsonObject pw = d["pwr"].to<JsonObject>();          // Strom: geschätzt, Limit, Dämpfung, Messung
   pw["est"] = estMa; pw["lim"] = cfg.pwrMax; pw["scale"] = (int)(powerScale * measScale * 100 + 0.5f);
   if (ina::ok) { pw["ma"] = (int)(ina::amps * 1000); pw["v"] = roundf(ina::volts * 100) / 100; }
+  pw["sensor"] = ina::ok; pw["sda"] = cfg.i2cSda; pw["scl"] = cfg.i2cScl; pw["shunt"] = cfg.shuntUo;
   d["trans"] = cfg.transMs;
   d["upd"] = ota::count && ota::cmp(ota::latest(), FW_VERSION) > 0 ? ota::latest() : String();   // neuere Version verfügbar
   d["ver"] = FW_VERSION;
@@ -1435,6 +1488,120 @@ void wsLoop() {
     wsLastLive = now;
     ws::broadcast("{\"t\":\"live\",\"d\":" + liveJson() + "}");
   }
+}
+
+// ---------- WLED-kompatible Schnittstelle ----------
+// Trilumag meldet sich zusätzlich wie ein WLED-Gerät mit einem Segment (der ganzen Wand).
+// Damit funktionieren die WLED-Integration von Home Assistant und andere WLED-Programme.
+String macPlain() { uint8_t m[6]; WiFi.macAddress(m); char b[13]; snprintf(b, sizeof b, "%02x%02x%02x%02x%02x%02x", m[0], m[1], m[2], m[3], m[4], m[5]); return b; }
+
+void mdnsStart() {
+  MDNS.end();
+  MDNS.begin(HOSTNAME);
+  MDNS.addService("http", "tcp", 80);
+  MDNS.addService("wled", "tcp", 80);
+  MDNS.addServiceTxt("wled", "tcp", "mac", macPlain().c_str());
+}
+
+int ledCount() { return countAttached() * SEG_PER_PANEL; }
+
+void wledInfo(JsonObject in) {
+  in["ver"] = "0.15.0"; in["vid"] = 2410000;
+  in["brand"] = "WLED"; in["product"] = "Trilumag"; in["name"] = "Trilumag";
+  in["release"] = String("Trilumag ") + FW_VERSION; in["repo"] = "mariofritzer/Trilumag";
+  in["arch"] = "esp32"; in["core"] = "3.0.7"; in["freeheap"] = ESP.getFreeHeap(); in["uptime"] = millis() / 1000;
+  in["mac"] = macPlain(); in["ip"] = WiFi.localIP().toString();
+  JsonObject l = in["leds"].to<JsonObject>();
+  l["count"] = ledCount(); l["rgbw"] = true; l["wv"] = true; l["cct"] = false; l["fps"] = 25; l["maxseg"] = 1;
+  l["pwr"] = cfg.pwrMax ? estMa : 0; l["maxpwr"] = cfg.pwrMax; l["lc"] = 3;
+  l["seglc"].to<JsonArray>().add(3);
+  in["ws"] = -1;                                     // keine WLED-WebSocket-Verbindung: Programme fragen per HTTP
+  in["fxcount"] = FX_COUNT; in["palcount"] = PAL_COUNT;
+  JsonObject fs = in["fs"].to<JsonObject>(); fs["u"] = 4; fs["t"] = 1024; fs["pmt"] = presetsVer;
+  in["live"] = false; in["lm"] = ""; in["lip"] = ""; in["udpport"] = 21324; in["str"] = false;
+  JsonObject w = in["wifi"].to<JsonObject>();
+  int rssi = wlanOk ? WiFi.RSSI() : 0;
+  w["bssid"] = WiFi.BSSIDstr(); w["rssi"] = rssi; w["signal"] = rssi ? constrain(2 * (rssi + 100), 0, 100) : 0; w["channel"] = WiFi.channel();
+}
+
+void wledState(JsonObject st) {
+  st["on"] = masterOn; st["bri"] = master; st["transition"] = cfg.transMs / 100;
+  st["ps"] = curPreset >= 0 ? curPreset + 1 : -1; st["pl"] = -1; st["lor"] = 0; st["mainseg"] = 0;
+  JsonObject nl = st["nl"].to<JsonObject>(); nl["on"] = false; nl["dur"] = 60; nl["mode"] = 1; nl["tbri"] = 0; nl["rem"] = -1;
+  JsonObject u = st["udpn"].to<JsonObject>(); u["send"] = false; u["recv"] = false; u["sgrp"] = 0; u["rgrp"] = 0;
+  JsonObject sg = st["seg"].to<JsonArray>().add<JsonObject>();
+  int n = ledCount();
+  sg["id"] = 0; sg["start"] = 0; sg["stop"] = n; sg["len"] = n; sg["grp"] = 1; sg["spc"] = 0; sg["of"] = 0;
+  sg["on"] = true; sg["frz"] = false; sg["bri"] = 255; sg["cct"] = 127; sg["set"] = 0; sg["n"] = "Wand";
+  JsonArray col = sg["col"].to<JsonArray>();
+  JsonArray c0 = col.add<JsonArray>();
+  if (fx.id) { c0.add(fx.r); c0.add(fx.g); c0.add(fx.b); c0.add(fx.w); }
+  else { c0.add(P[0].r); c0.add(P[0].g); c0.add(P[0].b); c0.add(P[0].w); }
+  for (int k = 0; k < 2; k++) { JsonArray z = col.add<JsonArray>(); for (int j = 0; j < 4; j++) z.add(0); }
+  sg["fx"] = fx.id; sg["sx"] = (fx.speed * 255 + 50) / 100; sg["ix"] = fx.inten; sg["pal"] = fx.pal;
+  sg["c1"] = 128; sg["c2"] = 128; sg["c3"] = 16; sg["sel"] = true; sg["rev"] = false; sg["mi"] = false;
+  sg["o1"] = false; sg["o2"] = false; sg["o3"] = false; sg["si"] = 0; sg["m12"] = 0;
+}
+
+// Befehl im WLED-Format auf Trilumag übertragen
+void wledApply(JsonVariantConst in) {
+  if (in["ps"].is<int>()) { presetLoad(in["ps"].as<int>() - 1); return; }
+  JsonDocument d;
+  if (in["on"].is<bool>()) d["state"] = in["on"].as<bool>() ? "ON" : "OFF";
+  else if (in["on"].is<const char*>() && !strcmp(in["on"], "t")) d["state"] = masterOn ? "OFF" : "ON";
+  if (in["bri"].is<int>()) { int b = in["bri"]; if (b <= 0) d["state"] = "OFF"; else d["brightness"] = b; }
+  JsonVariantConst sg = in["seg"].is<JsonArrayConst>() ? in["seg"][0] : in["seg"];
+  if (!sg.isNull()) {
+    if (sg["fx"].is<int>() && sg["fx"].as<int>() < FX_COUNT) d["effect"] = sg["fx"].as<int>();
+    if (sg["sx"].is<int>()) d["speed"] = constrain((sg["sx"].as<int>() * 100 + 127) / 255, 1, 100);
+    if (sg["ix"].is<int>()) d["intensity"] = sg["ix"].as<int>();
+    if (sg["pal"].is<int>() && sg["pal"].as<int>() < PAL_COUNT) d["palette"] = sg["pal"].as<int>();
+    JsonVariantConst c = sg["col"][0];
+    if (c.is<JsonArrayConst>() && c.size() >= 3) {
+      JsonObject o = d["color"].to<JsonObject>();
+      o["r"] = c[0]; o["g"] = c[1]; o["b"] = c[2]; o["w"] = c.size() > 3 ? c[3].as<int>() : 0;
+    }
+  }
+  if (d.size()) applyAll(d.as<JsonVariantConst>());
+}
+
+String wledJson(const char* what) {
+  JsonDocument d;
+  if (!strcmp(what, "info")) wledInfo(d.to<JsonObject>());
+  else if (!strcmp(what, "state")) wledState(d.to<JsonObject>());
+  else if (!strcmp(what, "eff")) { JsonArray a = d.to<JsonArray>(); for (uint8_t k = 0; k < FX_COUNT; k++) a.add(FX[k].name); }
+  else if (!strcmp(what, "pal")) { JsonArray a = d.to<JsonArray>(); for (uint8_t k = 0; k < PAL_COUNT; k++) a.add(PALS[k].name); }
+  else if (!strcmp(what, "presets")) {
+    d["0"].to<JsonObject>();
+    for (uint8_t k = 0; k < PRESET_MAX; k++) if (presetNames[k].length()) d[String(k + 1)]["n"] = presetNames[k];
+  } else {                                           // alles zusammen (/json)
+    wledState(d["state"].to<JsonObject>()); wledInfo(d["info"].to<JsonObject>());
+    JsonArray e = d["effects"].to<JsonArray>(); for (uint8_t k = 0; k < FX_COUNT; k++) e.add(FX[k].name);
+    JsonArray p = d["palettes"].to<JsonArray>(); for (uint8_t k = 0; k < PAL_COUNT; k++) p.add(PALS[k].name);
+  }
+  String out; serializeJson(d, out); return out;
+}
+
+// ---------- Diagnose für die App ----------
+String diagJson() {
+  JsonDocument d;
+  d["bus"] = cfg.bus; d["up"] = millis() / 1000;
+  d["frames"] = busFramesSent; d["crc"] = busCrcErr; d["timeouts"] = busTimeouts; d["discovers"] = busDiscovers;
+  d["heap"] = ESP.getFreeHeap();
+  JsonArray pa = d["panels"].to<JsonArray>();
+  for (int i = 1; i < SLOTS; i++) {
+    const Panel& p = P[i];
+    if (!p.used || !p.attached) continue;
+    JsonObject o = pa.add<JsonObject>();
+    o["id"] = hex(p.chip); o["addr"] = p.addr; o["pings"] = p.pings; o["missed"] = p.missed;
+    o["rtt"] = p.rtt; o["rttMax"] = p.rttMax; o["fw"] = p.fw; o["att"] = p.attaches; o["depth"] = p.depth;
+  }
+  JsonArray lg = d["log"].to<JsonArray>();
+  for (uint8_t k = 0; k < diagCount; k++) {                  // neueste zuerst
+    const DiagEvent& e = diagLogBuf[(diagHead + DIAG_N - 1 - k) % DIAG_N];
+    JsonObject o = lg.add<JsonObject>(); o["ago"] = (millis() - e.t) / 1000; o["m"] = e.m;
+  }
+  String out; serializeJson(d, out); return out;
 }
 
 // ---------- Sichern und Wiederherstellen ----------
@@ -1659,11 +1826,31 @@ const char* apiCall(const char* path, JsonDocument& d) {
     if (!testMode) outForce = true;               // Test beenden: wieder das normale Bild
     return nullptr;
   }
+  if (!strcmp(path, "/api/diag")) {                // Zähler zurücksetzen
+    busFramesSent = busCrcErr = busTimeouts = busDiscovers = 0;
+    for (int i = 0; i < SLOTS; i++) { P[i].pings = P[i].missed = 0; P[i].rttMax = 0; }
+    diagCount = 0; diagHead = 0;
+    return nullptr;
+  }
   // Licht-Einstellungen ohne Neustart: {"trans":700,"pwrMax":5000,"pwrCh":12}
   if (!strcmp(path, "/api/light")) {
     if (d["trans"].is<int>()) { cfg.transMs = constrain(d["trans"].as<int>(), 0, 10000); prefs.putUShort("trans", cfg.transMs); }
     if (d["pwrMax"].is<int>()) { cfg.pwrMax = constrain(d["pwrMax"].as<int>(), 0, 60000); prefs.putUShort("pwrMax", cfg.pwrMax); measScale = 1; }
     if (d["pwrCh"].is<int>()) { cfg.pwrCh = constrain(d["pwrCh"].as<int>(), 1, 100); prefs.putUChar("pwrCh", cfg.pwrCh); }
+    if (d["sda"].is<int>() || d["scl"].is<int>() || d["shunt"].is<int>()) {   // Stromsensor, gilt sofort
+      int sda = d["sda"] | (int)cfg.i2cSda, scl = d["scl"] | (int)cfg.i2cScl;
+      if ((sda < 0) != (scl < 0)) return "Für den Stromsensor beide Pins wählen oder keinen";
+      if (sda >= 0) {
+        if (!pinValid(sda) || !pinValid(scl) || sda == scl) return "Pins für den Stromsensor ungültig";
+        const int8_t used[6] = {cfg.pins.rx, cfg.pins.tx, cfg.pins.de, cfg.pins.led, cfg.pins.snsR, cfg.pins.snsL};
+        for (int8_t u : used) if (u == sda || u == scl) return "Pin ist schon für den Bus oder die LEDs belegt";
+      }
+      cfg.i2cSda = sda; cfg.i2cScl = scl;
+      if (d["shunt"].is<int>()) cfg.shuntUo = constrain(d["shunt"].as<int>(), 1, 10000);
+      prefs.putChar("i2cSda", sda); prefs.putChar("i2cScl", scl); prefs.putUShort("shunt", cfg.shuntUo);
+      ina::begin();
+      if (mqtt.connected()) publishExtras();          // Spannung-Sensor in Home Assistant ein- oder ausblenden
+    }
     outForce = true;
     return nullptr;
   }
@@ -1731,7 +1918,7 @@ void setupWeb() {
   server.on("/", HTTP_GET, [] { server.send(200, "text/html; charset=utf-8", INDEX_HTML); });
   server.on("/api/state", HTTP_GET, replyState);
   // Befehle laufen über apiCall(), damit HTTP und WebSocket dasselbe tun
-  const char* cmds[] = {"/api/set", "/api/presets", "/api/effect", "/api/test", "/api/ota", "/api/light", "/api/sim/new", "/api/sim/attach", "/api/sim/detach"};
+  const char* cmds[] = {"/api/set", "/api/presets", "/api/effect", "/api/test", "/api/ota", "/api/light", "/api/diag", "/api/sim/new", "/api/sim/attach", "/api/sim/detach"};
   for (const char* path : cmds) {
     server.on(path, HTTP_POST, [path] {
       JsonDocument d;
@@ -1739,11 +1926,31 @@ void setupWeb() {
       if (const char* err = apiCall(path, d)) return replyError(err);
       if (!strcmp(path, "/api/test")) server.send(200, "application/json", "{\"ok\":true}");
       else if (!strcmp(path, "/api/ota")) server.send(200, "application/json", otaJson());
+      else if (!strcmp(path, "/api/diag")) server.send(200, "application/json", diagJson());
       else replyState();
     });
   }
   server.on("/api/live", HTTP_GET, [] { server.send(200, "application/json", liveJson()); });
   server.on("/api/ota", HTTP_GET, [] { server.send(200, "application/json", otaJson()); });
+  server.on("/api/diag", HTTP_GET, [] { server.send(200, "application/json", diagJson()); });
+  // WLED-Schnittstelle
+  server.on("/json", HTTP_GET, [] { server.send(200, "application/json", wledJson("all")); });
+  server.on("/json/si", HTTP_GET, [] { server.send(200, "application/json", wledJson("all")); });
+  server.on("/json/info", HTTP_GET, [] { server.send(200, "application/json", wledJson("info")); });
+  server.on("/json/state", HTTP_GET, [] { server.send(200, "application/json", wledJson("state")); });
+  server.on("/json/eff", HTTP_GET, [] { server.send(200, "application/json", wledJson("eff")); });
+  server.on("/json/pal", HTTP_GET, [] { server.send(200, "application/json", wledJson("pal")); });
+  server.on("/presets.json", HTTP_GET, [] { server.send(200, "application/json", wledJson("presets")); });
+  auto wledPost = [] {
+    JsonDocument d; if (!readBody(d)) return replyError("JSON fehlt");
+    wledApply(d.as<JsonVariantConst>());
+    wsKick();
+    if (d["v"] | false) server.send(200, "application/json", wledJson("state"));
+    else server.send(200, "application/json", "{\"success\":true}");
+  };
+  server.on("/json/state", HTTP_POST, wledPost);
+  server.on("/json", HTTP_POST, wledPost);
+  server.on("/json/si", HTTP_POST, wledPost);
   server.on("/api/backup", HTTP_GET, [] {
     server.sendHeader("Content-Disposition", String("attachment; filename=\"trilumag-sicherung-") + FW_VERSION + ".json\"");
     server.send(200, "application/json", backupJson());
@@ -1921,7 +2128,7 @@ void wifiConnected() {
   wlanOk = true;
   if (wSaveLate) { saveWifi(wSsid, wPass); wSaveLate = false; }
   if (apMode) { WiFi.softAPdisconnect(true); WiFi.mode(WIFI_STA); apMode = false; }
-  MDNS.end(); MDNS.begin(HOSTNAME); MDNS.addService("http", "tcp", 80);
+  mdnsStart();
   logf("[WLAN] verbunden. App: http://%s  oder  http://%s.local\n", WiFi.localIP().toString().c_str(), HOSTNAME);
   // Webinstaller Bescheid geben, auch wenn die Verbindung erst nach seiner Wartezeit kam
   Stream* outs[2] = {&Serial, nullptr};
@@ -2060,8 +2267,7 @@ void setup() {
   WiFi.setHostname(HOSTNAME);
   if (ss.length()) wifiStart(ss, pw, 15000, false);   // nicht warten, Improv muss sofort antworten können
   else startSetupAp();
-  MDNS.begin(HOSTNAME);
-  MDNS.addService("http", "tcp", 80);
+  mdnsStart();
 
   netClient.setTimeout(800);       // ist der Broker nicht erreichbar, nicht 3 s lang hängen
   mqtt.setSocketTimeout(2);
@@ -2069,6 +2275,7 @@ void setup() {
   mqtt.setBufferSize(1024);
   mqtt.setCallback(onMqtt);
 
+  diag("Trilumag %s gestartet (%s, %s)", FW_VERSION, CHIP_FAMILY, cfg.bus ? "Bus" : "Simulation");
   if (cfg.bus) bus::begin();
   else if (!simLoad()) { for (int k = 0; k < 3; k++) simNewPanel(); simSave(); }   // sonst liegen drei Panels in der Ablage bereit
   setupWeb();
