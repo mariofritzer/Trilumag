@@ -38,21 +38,45 @@ Ab Version 0.2 gibt es zwei Betriebsarten, umschaltbar in der App: **Simulation*
 
 **Panels:** [ch32fun](https://github.com/cnlohr/ch32fun) und eine RISC-V-Toolchain, dann `make -C firmware/panel CH32FUN=<pfad>/ch32fun/ch32fun`. Fertige Dateien gibt es auf der Installer-Seite.
 
+## Web-App
+
+Die App ist aufgebaut wie bei WLED: oben Ein/Aus und Gesamthelligkeit der ganzen Wand, unten fünf Tabs.
+
+- **Farben:** Farbrad mit Helligkeit, Weißanteil, Schnellfarben und Hex-Eingabe. Ohne Auswahl gilt die Farbe für die ganze Wand. In der Vorschau oben angetippte Panels bekommen ihre eigene Farbe. Läuft ein Effekt, der eine Farbe benutzt, färbt das Farbrad den Effekt ein, statt ihn zu beenden.
+- **Effekte:** Tempo, Intensität, Effektliste mit Suche und Paletten.
+- **Wand:** Panels anordnen (in der Simulation per Ziehen), Details, Helligkeit und Ein/Aus pro Panel.
+- **Presets:** Szenen speichern, abrufen und löschen (bis zu 16).
+- **Optionen:** WLAN, Betriebsart, Board und Pins, Farbreihenfolge mit Farbtest, MQTT.
+
+## Effekte und Paletten
+
+Effekte laufen immer über die ganze Wand: Einfarbig, Regenbogen, Regenbogenwelle, Atmen, Farbwechsel, Funkeln, Ausbreiten (Wellen vom Hauptpanel nach außen), Feuer und Polarlicht. Die **Intensität** ändert je nach Effekt die Streuung, die Tiefe des Atmens, wie oft es funkelt, die Breite der Wellen oder wie stark das Feuer flackert.
+
+**Paletten:** Standard (die eigenen Farben des Effekts), Regenbogen, Effektfarbe, Ozean, Lava, Wald, Sonnenuntergang, Party, Pastell und Eis.
+
+Das Hauptpanel rechnet die Bilder selbst und schickt etwa 25 pro Sekunde mit einem FRAME-Befehl an alle Panels. Neu angeklipste Panels pulsieren erst 5-mal blau (etwa 8 Sekunden) und laufen dann mit. Bekommt ein einzelnes Panel eine feste Farbe, endet der Effekt. Der zuletzt gewählte Effekt läuft nach einem Neustart weiter.
+
+## Presets
+
+Ein Preset merkt sich Ein/Aus, Gesamthelligkeit, den Effekt mit Tempo, Intensität, Palette und Effektfarbe und die Farbe jedes bekannten Panels über seine Chip-ID. Ist ein Panel beim Laden gerade nicht an der Wand, bekommt es seine Farbe beim nächsten Anklipsen.
+
 ## Home Assistant
 
-In der App unter Einstellungen die Adresse des MQTT-Brokers eintragen. Jedes Panel erscheint dann automatisch als eigenes Licht, dazu ein Licht „Alle Panels“. Bei „Alle Panels“ stehen die Effekte in der Effektliste, und ein Schieberegler „Effekt-Tempo“ stellt die Geschwindigkeit ein.
+In der App unter Optionen die Adresse des MQTT-Brokers eintragen. Danach erscheinen automatisch:
 
-## Effekte
-
-Effekte laufen immer über die ganze Wand: Regenbogen, Regenbogenwelle, Atmen, Farbwechsel, Funkeln, Ausbreiten (Wellen vom Hauptpanel nach außen), Feuer und Polarlicht. Atmen, Funkeln und Ausbreiten benutzen eine wählbare Effektfarbe. Das Hauptpanel rechnet die Bilder selbst und schickt etwa 25 pro Sekunde mit einem FRAME-Befehl an alle Panels. Neu angeklipste Panels pulsieren erst 5-mal blau (etwa 8 Sekunden) und laufen dann mit. Sobald ein Panel eine feste Farbe bekommt, endet der Effekt und alle Panels kehren zu ihren festen Farben zurück. Der zuletzt gewählte Effekt läuft nach einem Neustart weiter.
+- **Ein Licht pro Panel**
+- **„Alle Panels“:** Ein/Aus, Gesamthelligkeit, Farbe und die Effektliste.
+- **Schieberegler:** „Effekt-Tempo“ und „Effekt-Intensität“.
+- **Auswahlen:** „Palette“ und „Preset“.
 
 ## API
 
 | Aufruf | Zweck |
 | --- | --- |
-| `GET /api/state` | alle Panels mit Position, Drehung und Farbe |
-| `POST /api/set` | Farbe setzen: `{"id":"A3F2C1D0" oder "alle","state":"ON","brightness":180,"color":{"r":255,"g":0,"b":0,"w":0}}` |
-| `POST /api/effect` | Effekt wählen oder ändern: `{"effect":"regenbogen","speed":50,"brightness":180,"color":{"r":255,"g":120,"b":30,"w":0}}`, alle Felder optional, `"aus"` beendet ihn |
+| `GET /api/state` | alle Panels mit Position, Drehung und Farbe, dazu Ein/Aus, Gesamthelligkeit, Effekt, Effekte, Paletten und Presets |
+| `POST /api/set` | ein Panel: `{"id":"A3F2C1D0","state":"ON","brightness":180,"color":{"r":255,"g":0,"b":0,"w":0}}`, mehrere: `{"ids":[…],…}`, ganze Wand: `{"id":"alle","state":"ON","brightness":200,"color":{…}}` (hier ist `brightness` die Gesamthelligkeit) |
+| `POST /api/effect` | `{"effect":"welle","speed":50,"intensity":128,"palette":"ozean"}`, alle Felder optional, `"aus"` heißt Einfarbig |
+| `POST /api/presets` | `{"action":"save","name":"Abend"}`, `{"action":"load","id":0}`, `{"action":"delete","id":0}` |
 | `GET /api/live` | aktuelles Effektbild aller Panels als RRGGBBWW |
 | `POST /api/sim/attach` | Simulation: Panel anklipsen |
 | `POST /api/sim/detach` | Simulation: Panel abklipsen |

@@ -1,336 +1,543 @@
 #pragma once
-// Web-App von Trilumag. Wird vom ESP32 unter "/" ausgeliefert.
+// Web-App von Trilumag im Stil von WLED. Wird vom ESP32 unter "/" ausgeliefert.
 
 const char INDEX_HTML[] = R"HTML(<!doctype html>
 <html lang="de"><head>
 <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#111">
 <title>Trilumag</title>
 <style>
-:root{--bg:#0d0f13;--panel:#161a21;--line:#2a303a;--fg:#e7eaef;--muted:#8d96a3;--accent:#6e8bff;--ghost:#3a4250;--snap:#6e8bff;color-scheme:dark}
-*{box-sizing:border-box}
+:root{--bg:#111;--card:#1c1c1c;--card2:#252525;--line:#333;--fg:#eee;--muted:#999;--acc:#6e8bff;--accfg:#111;color-scheme:dark}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
 [hidden]{display:none!important}
-html,body{margin:0;background:var(--bg);color:var(--fg);font:15px/1.5 system-ui,-apple-system,"Segoe UI",sans-serif}
-.wrap{max-width:960px;margin:0 auto;padding:16px;display:flex;flex-direction:column;gap:14px}
-header{display:flex;justify-content:space-between;align-items:baseline;gap:12px;flex-wrap:wrap}
-h1{font-size:22px;margin:0;font-weight:650;letter-spacing:-.01em}
-.status{font:12px ui-monospace,Menlo,monospace;color:var(--muted)}
-.wall{background:#090b0e;border:1px solid var(--line);border-radius:14px;overflow:hidden;position:relative}
-#wall{display:block;width:100%;height:min(62vh,560px);touch-action:none;user-select:none;-webkit-user-select:none}
-.hint{position:absolute;left:12px;bottom:10px;font:12px ui-monospace,Menlo,monospace;color:var(--muted);pointer-events:none}
-.tri{stroke:#05060a;stroke-width:1.5;cursor:grab;transition:fill .12s linear}
-.tri.main{cursor:default;stroke:#7d8796;stroke-width:2}
-.tri.sel{stroke:#fff;stroke-width:2.5}
-.dark{fill:#1b1e24}
+html,body{margin:0;background:var(--bg);color:var(--fg);font:15px/1.45 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+body{padding-bottom:calc(72px + env(safe-area-inset-bottom))}
+button{font:inherit;color:inherit}
+/* Kopfzeile */
+.top{position:sticky;top:0;z-index:5;background:rgba(17,17,17,.94);backdrop-filter:blur(8px);border-bottom:1px solid var(--line);padding:10px 14px 8px}
+.toprow{display:flex;align-items:center;gap:12px;max-width:720px;margin:0 auto}
+.pwr{width:46px;height:46px;flex:none;border-radius:50%;border:2px solid var(--line);background:var(--card);display:grid;place-items:center;cursor:pointer;transition:box-shadow .2s,border-color .2s}
+.pwr svg{width:22px;height:22px;stroke:var(--muted);stroke-width:2.4;fill:none;stroke-linecap:round}
+.pwr.on{border-color:var(--acc);box-shadow:0 0 16px -2px var(--acc)}
+.pwr.on svg{stroke:var(--acc)}
+.bri{flex:1;display:flex;align-items:center;gap:10px}
+.bri svg{width:20px;height:20px;flex:none;fill:var(--muted)}
+.status{max-width:720px;margin:4px auto 0;font:11.5px ui-monospace,Menlo,monospace;color:var(--muted);display:flex;justify-content:space-between;gap:8px}
+.status b{color:var(--fg);font-weight:600;font-family:system-ui,sans-serif;letter-spacing:.02em}
+/* Regler */
+input[type=range]{-webkit-appearance:none;appearance:none;width:100%;height:28px;background:transparent;margin:0}
+input[type=range]::-webkit-slider-runnable-track{height:8px;border-radius:4px;background:linear-gradient(90deg,var(--acc) var(--p,50%),#3a3a3a var(--p,50%))}
+input[type=range]::-moz-range-track{height:8px;border-radius:4px;background:linear-gradient(90deg,var(--acc) var(--p,50%),#3a3a3a var(--p,50%))}
+input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:22px;height:22px;border-radius:50%;background:#eee;border:0;margin-top:-7px;box-shadow:0 1px 4px rgba(0,0,0,.6)}
+input[type=range]::-moz-range-thumb{width:22px;height:22px;border-radius:50%;background:#eee;border:0}
+main{max-width:720px;margin:0 auto;padding:12px 14px;display:flex;flex-direction:column;gap:12px}
+.card{background:var(--card);border-radius:14px;padding:14px;display:flex;flex-direction:column;gap:12px}
+.card h3{margin:0;font-size:12px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.09em}
+.sl{display:grid;grid-template-columns:96px 1fr 38px;align-items:center;gap:10px;font-size:14px;color:var(--muted)}
+.sl output{text-align:right;font:12px ui-monospace,Menlo,monospace;color:var(--fg)}
+.note{font-size:13px;color:var(--muted);margin:0}
+.note:empty{display:none}
+.banner{background:#2b2410;border:1px solid #5a4a1a;color:#f0d890;border-radius:12px;padding:12px;font-size:14px;display:flex;gap:10px;align-items:center;justify-content:space-between}
+/* Wand */
+.wall{background:#000;border-radius:14px;overflow:hidden;position:relative}
+.wall svg{display:block;width:100%;touch-action:none;user-select:none;-webkit-user-select:none}
+#mini{height:150px}
+#big{height:min(48vh,440px)}
+.hint{position:absolute;left:12px;bottom:8px;right:12px;font:11.5px ui-monospace,Menlo,monospace;color:var(--muted);pointer-events:none}
+.tri{stroke:#000;stroke-width:1.6;transition:fill .12s linear;cursor:pointer}
+.tri.main{stroke:#666;stroke-width:2}
+.tri.sel{stroke:#fff;stroke-width:3}
+.dark{fill:#1a1a1a}
 .pulse{animation:pl 1.6s ease-in-out infinite}
 @keyframes pl{0%,100%{fill:#0f2350}50%{fill:#3d6dff}}
-.ghost{fill:none;stroke:var(--ghost);stroke-width:1.2;stroke-dasharray:4 4}
-.ghost.hot{stroke:var(--snap);stroke-width:2.2;fill:rgba(110,139,255,.12)}
-.lbl{font:9px ui-monospace,Menlo,monospace;fill:rgba(255,255,255,.55);pointer-events:none;text-anchor:middle}
-.lbl.dk{fill:rgba(0,0,0,.55)}
+.ghost{fill:none;stroke:#444;stroke-width:1.2;stroke-dasharray:4 4}
+.ghost.hot{stroke:var(--acc);stroke-width:2.2;fill:rgba(110,139,255,.15)}
+.lbl{font:9px ui-monospace,Menlo,monospace;fill:rgba(255,255,255,.6);pointer-events:none;text-anchor:middle}
+.lbl.dk{fill:rgba(0,0,0,.6)}
 .edge1{fill:rgba(255,255,255,.75);pointer-events:none}
-.tray{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:12px;display:flex;flex-direction:column;gap:10px}
-.tray h2,.ctl h2{font-size:13px;margin:0;color:var(--muted);font-weight:500;text-transform:uppercase;letter-spacing:.08em}
-.items{display:flex;flex-wrap:wrap;gap:10px;align-items:center;min-height:56px}
+/* Auswahl-Chips */
+.chips{display:flex;gap:8px;flex-wrap:wrap}
+.chip{border:1px solid var(--line);background:var(--card2);border-radius:999px;padding:8px 14px;font-size:14px;cursor:pointer}
+.chip.on{background:var(--acc);border-color:var(--acc);color:var(--accfg);font-weight:600}
+/* Farbrad */
+.wheelbox{display:flex;justify-content:center}
+.wheel{position:relative;width:min(300px,78vw);aspect-ratio:1;touch-action:none}
+.wheel canvas{width:100%;height:100%;border-radius:50%;display:block}
+.knob{position:absolute;width:26px;height:26px;margin:-13px 0 0 -13px;border-radius:50%;border:3px solid #fff;box-shadow:0 0 0 1px rgba(0,0,0,.5),0 2px 6px rgba(0,0,0,.6);pointer-events:none}
+.quick{display:grid;grid-template-columns:repeat(6,1fr);gap:8px}
+.qc{aspect-ratio:1;border-radius:50%;border:2px solid rgba(255,255,255,.12);cursor:pointer;padding:0}
+.qc.txt{border-radius:10px;aspect-ratio:auto;height:36px;font-size:12px;color:#111;font-weight:600;grid-column:span 3}
+.hexrow{display:flex;gap:8px;align-items:center}
+input[type=text],input[type=password],input:not([type]),select{width:100%;height:42px;border:1px solid var(--line);border-radius:10px;background:#0c0c0c;color:var(--fg);padding:0 12px;font:15px system-ui,sans-serif}
+#hex{font-family:ui-monospace,Menlo,monospace;text-transform:uppercase;max-width:130px}
+/* Listen */
+.list{display:flex;flex-direction:column;border-radius:12px;overflow:hidden;background:var(--card2)}
+.row{display:flex;align-items:center;gap:12px;padding:12px 14px;border:0;border-bottom:1px solid var(--card);cursor:pointer;font-size:15px;background:none;text-align:left;width:100%}
+.row:last-child{border-bottom:0}
+.row .dot{width:18px;height:18px;border-radius:50%;border:2px solid #555;flex:none}
+.row.on{background:#2f2f2f}
+.row.on .dot{border-color:var(--acc);background:radial-gradient(circle,var(--acc) 0 45%,transparent 50%)}
+.row .grad{height:16px;border-radius:8px;flex:1;max-width:46%;margin-left:auto}
+.row small{color:var(--muted);margin-left:auto;font-size:12px}
+/* Presets */
+.pgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:10px}
+.pgrid:empty{display:none}
+.preset{position:relative;background:var(--card2);border:1px solid var(--line);border-radius:12px;padding:16px 40px 16px 12px;min-height:64px;text-align:left;cursor:pointer;font-size:15px;font-weight:550;overflow-wrap:anywhere}
+.preset.on{border-color:var(--acc);box-shadow:inset 0 0 0 1px var(--acc)}
+.preset .del{position:absolute;top:6px;right:6px;min-width:30px;height:30px;border-radius:999px;border:0;background:transparent;color:var(--muted);font-size:17px;cursor:pointer}
+.preset .del.ask{padding:0 10px;background:#5a1d1d;color:#ffb4b4;font-size:12px}
+.btn{border:1px solid var(--line);background:var(--card2);border-radius:999px;padding:10px 16px;cursor:pointer;font-size:14px;white-space:nowrap}
+.btn.pri{background:var(--acc);border-color:var(--acc);color:var(--accfg);font-weight:600}
+.btn:disabled{opacity:.4;cursor:default}
+.btnrow{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.tray{display:flex;flex-wrap:wrap;gap:10px;align-items:center;min-height:56px}
 .item{width:56px;height:52px;touch-action:none;cursor:grab}
 .item svg{width:56px;height:52px;display:block}
-.empty{color:var(--muted);font-size:14px}
-button{font:500 14px/1 system-ui,sans-serif;color:var(--fg);background:#1f242d;border:1px solid var(--line);border-radius:999px;padding:10px 14px;cursor:pointer}
-button.on{background:var(--accent);color:#0d0f13;border-color:var(--accent)}
-button:disabled{opacity:.4;cursor:default}
-.ctl{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:12px;display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:12px;align-items:end}
-.ctl h2{grid-column:1/-1}
-label{display:flex;flex-direction:column;gap:6px;font-size:13px;color:var(--muted)}
-input[type=range]{width:100%;accent-color:var(--accent)}
-input[type=text],input[type=password],input:not([type]){width:100%;height:40px;border:1px solid var(--line);border-radius:8px;background:#0d0f13;color:var(--fg);padding:0 10px;font:15px system-ui,sans-serif}
-select{width:100%;height:40px;border:1px solid var(--line);border-radius:8px;background:#0d0f13;color:var(--fg);padding:0 8px;font:15px system-ui,sans-serif}
-.pins{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:10px}
-summary{cursor:pointer;list-style:none}
-summary::-webkit-details-marker{display:none}
-summary h2::after{content:" ▾"}
-details[open] summary h2::after{content:" ▴"}
-input[type=color]{width:100%;height:40px;border:1px solid var(--line);border-radius:8px;background:none;padding:2px}
-.row{display:flex;gap:8px;flex-wrap:wrap}
-.fxs{grid-column:1/-1;display:flex;flex-wrap:wrap;gap:8px}
-.fx{display:flex;align-items:center;gap:8px;padding:8px 14px 8px 8px}
-.fx i{width:22px;height:22px;border-radius:50%;flex:none;border:1px solid rgba(255,255,255,.15)}
-.fx.on i{border-color:#0d0f13}
-.toast{position:fixed;left:50%;bottom:20px;transform:translateX(-50%);background:#232935;border:1px solid var(--line);padding:10px 14px;border-radius:10px;font-size:14px;opacity:0;transition:opacity .2s;pointer-events:none}
+label.f{display:flex;flex-direction:column;gap:6px;font-size:13px;color:var(--muted)}
+.pins{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px}
+.kv{display:grid;grid-template-columns:auto 1fr;gap:4px 14px;font-size:14px}
+.kv span:nth-child(odd){color:var(--muted)}
+/* Tabs unten */
+nav.tabs{position:fixed;left:0;right:0;bottom:0;z-index:6;background:rgba(24,24,24,.97);backdrop-filter:blur(8px);border-top:1px solid var(--line);display:flex;justify-content:center;padding-bottom:env(safe-area-inset-bottom)}
+nav.tabs button{flex:1;max-width:144px;background:none;border:0;padding:9px 2px 8px;display:flex;flex-direction:column;align-items:center;gap:3px;font-size:11px;color:var(--muted);cursor:pointer}
+nav.tabs svg{width:24px;height:24px;stroke:currentColor;stroke-width:1.9;fill:none;stroke-linecap:round;stroke-linejoin:round}
+nav.tabs button.on{color:var(--acc)}
+.toast{position:fixed;left:50%;bottom:calc(84px + env(safe-area-inset-bottom));transform:translateX(-50%);background:#2a2a2a;border:1px solid var(--line);padding:10px 14px;border-radius:10px;font-size:14px;opacity:0;transition:opacity .2s;pointer-events:none;z-index:9;max-width:90vw}
 .toast.show{opacity:1}
 </style></head><body>
-<div class="wrap">
-  <header><h1>Trilumag</h1><span class="status" id="status">verbinde …</span></header>
-  <div class="tray" id="wifiBox" hidden>
-    <h2>WLAN einrichten</h2>
-    <p class="empty">Trilumag ist noch mit keinem WLAN verbunden. Wähle dein Netz, danach startet das Hauptpanel neu und ist unter http://trilumag.local erreichbar.</p>
-    <label>WLAN<input id="ssid" list="nets" autocomplete="off" placeholder="Name deines WLANs"><datalist id="nets"></datalist></label>
-    <label>Passwort<input id="pass" type="password" autocomplete="off"></label>
-    <div class="row"><button id="scanBtn">Netze suchen</button><button id="wifiBtn" class="on">Speichern und verbinden</button></div>
+<header class="top">
+  <div class="toprow">
+    <button class="pwr" id="pwr" aria-label="Wand ein/aus"><svg viewBox="0 0 24 24"><path d="M12 3v8"/><path d="M6.3 6.8a8 8 0 1 0 11.4 0"/></svg></button>
+    <div class="bri"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="4.2"/><g stroke="#999" stroke-width="2" stroke-linecap="round"><path d="M12 2.5v2M12 19.5v2M2.5 12h2M19.5 12h2M5.3 5.3l1.4 1.4M17.3 17.3l1.4 1.4M5.3 18.7l1.4-1.4M17.3 6.7l1.4-1.4"/></g></svg>
+      <input type="range" id="master" min="1" max="255" value="255" aria-label="Gesamthelligkeit"></div>
   </div>
-  <div class="wall">
-    <svg id="wall" aria-label="Wand mit Panels"></svg>
-    <div class="hint" id="hint">Panel aus der Ablage an eine freie Kante ziehen</div>
-  </div>
-  <div class="tray" id="trayBox">
-    <h2>Ablage · abgeklipste Panels</h2>
-    <div class="items" id="tray"></div>
-    <div class="row"><button id="newBtn">Neues Panel</button></div>
-  </div>
-  <div class="ctl" id="fxBox">
-    <h2>Effekte · ganze Wand</h2>
-    <div class="fxs" id="fxList"></div>
-    <label>Tempo <span id="fsv">50</span><input type="range" id="fspeed" min="1" max="100" value="50"></label>
-    <label>Helligkeit <span id="fbv">180</span><input type="range" id="fbri" min="1" max="255" value="180"></label>
-    <label id="fcolL">Effektfarbe<input type="color" id="fcol" value="#ff781e"></label>
-  </div>
-  <div class="ctl">
-    <h2 id="selTitle">Kein Panel ausgewählt</h2>
-    <label>Farbe<input type="color" id="col" value="#3d6dff"></label>
-    <label>Weißanteil <span id="wv">0</span><input type="range" id="w" min="0" max="255" value="0"></label>
-    <label>Helligkeit <span id="bv">180</span><input type="range" id="bri" min="1" max="255" value="180"></label>
-    <div class="row"><button id="onBtn">Ein / Aus</button><button id="allBtn">Für alle</button></div>
-  </div>
-  <details class="tray" id="setBox">
-    <summary><h2 style="display:inline">Einstellungen</h2></summary>
-    <p class="empty" id="setInfo"></p>
-    <label>Betriebsart<select id="mode"><option value="sim">Simulation: Panels in der App anklipsen</option><option value="bus">Bus: echte Panels über RS-485</option></select></label>
-    <label>Board<select id="board"></select></label>
-    <div class="pins">
-      <label>RS-485 RX (RO)<select id="p_rx"></select></label>
-      <label>RS-485 TX (DI)<select id="p_tx"></select></label>
-      <label>RS-485 DE + /RE<select id="p_de"></select></label>
-      <label>LED-Daten<select id="p_led"></select></label>
-      <label>SNS rechts (Kante 2)<select id="p_snsR"></select></label>
-      <label>SNS links (Kante 3)<select id="p_snsL"></select></label>
+  <div class="status"><b>Trilumag</b><span id="status">verbinde …</span></div>
+</header>
+
+<main>
+  <div class="banner" id="apBanner" hidden><span>Noch kein WLAN eingerichtet.</span><button class="btn pri" data-go="opt">Einrichten</button></div>
+  <div class="wall" id="miniBox"><svg id="mini" aria-label="Vorschau der Wand"></svg><div class="hint" id="miniHint"></div></div>
+
+  <!-- Farben -->
+  <section id="t-col" class="tab">
+    <div class="card">
+      <div class="chips"><button class="chip" id="tgtAll">Ganze Wand</button><button class="chip" id="tgtSel">Auswahl</button></div>
+      <p class="note" id="colNote"></p>
+      <div class="wheelbox"><div class="wheel" id="wheel"><canvas id="wcv"></canvas><div class="knob" id="knob"></div></div></div>
+      <div class="sl">Helligkeit<input type="range" id="cv" min="0" max="100" value="100"><output id="cvo">100</output></div>
+      <div class="sl">Weißanteil<input type="range" id="cw" min="0" max="255" value="0"><output id="cwo">0</output></div>
+      <div class="quick" id="quick"></div>
+      <div class="hexrow"><input id="hex" maxlength="7" value="#FF7800" aria-label="Farbe als Hex"><button class="btn" id="rnd">Zufall</button></div>
     </div>
-    <label>Farbreihenfolge der LEDs<select id="order"></select></label>
-    <div class="row"><span class="empty">Farbtest:</span><button data-t="0">Rot</button><button data-t="1">Grün</button><button data-t="2">Blau</button><button data-t="3">Weiß</button><button data-t="-1">Ende</button></div>
-    <p class="empty">Leuchtet bei „Rot“ etwas anderes als Rot, stimmt die Reihenfolge nicht. Dann eine andere wählen und speichern.</p>
-    <h2>Home Assistant (MQTT)</h2>
-    <div class="pins">
-      <label>Broker-Adresse<input id="m_host" placeholder="z. B. 192.168.1.10"></label>
-      <label>Port<input id="m_port" inputmode="numeric" value="1883"></label>
-      <label>Benutzer<input id="m_user" autocomplete="off"></label>
-      <label>Passwort<input id="m_pass" type="password" autocomplete="off" placeholder="unverändert"></label>
+  </section>
+
+  <!-- Effekte -->
+  <section id="t-fx" class="tab" hidden>
+    <div class="card">
+      <div class="sl">Tempo<input type="range" id="fspeed" min="1" max="100" value="50"><output id="fspeedo">50</output></div>
+      <div class="sl">Intensität<input type="range" id="finten" min="0" max="255" value="128"><output id="finteno">128</output></div>
+      <p class="note" id="fxNote"></p>
     </div>
-    <div class="row"><button id="saveBtn" class="on">Speichern und neu starten</button></div>
-    <p class="empty" id="setErr"></p>
-  </details>
-</div>
+    <div class="card">
+      <h3>Effekte</h3>
+      <input id="fxq" placeholder="Effekt suchen" autocomplete="off">
+      <div class="list" id="fxList"></div>
+    </div>
+    <div class="card">
+      <h3>Paletten</h3>
+      <div class="list" id="palList"></div>
+    </div>
+  </section>
+
+  <!-- Wand -->
+  <section id="t-wall" class="tab" hidden>
+    <div class="wall"><svg id="big" aria-label="Wand mit Panels"></svg><div class="hint" id="bigHint"></div></div>
+    <div class="card" id="panelCard">
+      <h3 id="pTitle">Panel</h3>
+      <div class="kv" id="pInfo"></div>
+      <div class="sl">Helligkeit<input type="range" id="pbri" min="1" max="255" value="180"><output id="pbrio">180</output></div>
+      <div class="btnrow"><button class="btn" id="pOn">Ein / Aus</button><button class="btn pri" id="pCol">Farbe wählen</button></div>
+    </div>
+    <div class="card" id="trayCard">
+      <h3>Ablage · abgeklipste Panels</h3>
+      <div class="tray" id="tray"></div>
+      <div class="btnrow"><button class="btn" id="newBtn">Neues Panel</button></div>
+    </div>
+  </section>
+
+  <!-- Presets -->
+  <section id="t-pre" class="tab" hidden>
+    <div class="card">
+      <h3>Presets</h3>
+      <div class="pgrid" id="pgrid"></div>
+      <p class="note" id="preEmpty">Noch keine Presets. Stell eine Szene ein und speichere sie unten.</p>
+    </div>
+    <div class="card">
+      <h3>Aktuelle Szene speichern</h3>
+      <div class="hexrow"><input id="pname" maxlength="24" placeholder="Name, z. B. Abend"><button class="btn pri" id="psave">Speichern</button></div>
+      <p class="note">Ein Preset merkt sich Ein/Aus, Gesamthelligkeit, Effekt mit Tempo, Intensität und Palette und die Farbe jedes Panels. In Home Assistant erscheinen die Presets als Auswahl „Preset“. Gleicher Name überschreibt.</p>
+    </div>
+  </section>
+
+  <!-- Optionen -->
+  <section id="t-opt" class="tab" hidden>
+    <div class="card" id="wifiCard">
+      <h3>WLAN</h3>
+      <p class="note" id="wifiInfo"></p>
+      <label class="f">WLAN<input id="ssid" list="nets" autocomplete="off" placeholder="Name deines WLANs"><datalist id="nets"></datalist></label>
+      <label class="f">Passwort<input id="pass" type="password" autocomplete="off"></label>
+      <div class="btnrow"><button class="btn" id="scanBtn">Netze suchen</button><button class="btn pri" id="wifiBtn">Speichern und verbinden</button></div>
+    </div>
+    <div class="card">
+      <h3>Hardware</h3>
+      <label class="f">Betriebsart<select id="mode"><option value="sim">Simulation: Panels in der App anklipsen</option><option value="bus">Bus: echte Panels über RS-485</option></select></label>
+      <label class="f">Board<select id="board"></select></label>
+      <div class="pins">
+        <label class="f">RS-485 RX (RO)<select id="p_rx"></select></label>
+        <label class="f">RS-485 TX (DI)<select id="p_tx"></select></label>
+        <label class="f">RS-485 DE + /RE<select id="p_de"></select></label>
+        <label class="f">LED-Daten<select id="p_led"></select></label>
+        <label class="f">SNS rechts (Kante 2)<select id="p_snsR"></select></label>
+        <label class="f">SNS links (Kante 3)<select id="p_snsL"></select></label>
+      </div>
+      <label class="f">Farbreihenfolge der LEDs<select id="order"></select></label>
+      <div class="btnrow"><span class="note">Farbtest:</span><button class="btn" data-t="0">Rot</button><button class="btn" data-t="1">Grün</button><button class="btn" data-t="2">Blau</button><button class="btn" data-t="3">Weiß</button><button class="btn" data-t="-1">Ende</button></div>
+      <p class="note">Leuchtet bei „Rot“ etwas anderes als Rot, stimmt die Reihenfolge nicht. Dann eine andere wählen und speichern.</p>
+    </div>
+    <div class="card">
+      <h3>Home Assistant (MQTT)</h3>
+      <div class="pins">
+        <label class="f">Broker-Adresse<input id="m_host" placeholder="z. B. 192.168.1.10"></label>
+        <label class="f">Port<input id="m_port" inputmode="numeric" value="1883"></label>
+        <label class="f">Benutzer<input id="m_user" autocomplete="off"></label>
+        <label class="f">Passwort<input id="m_pass" type="password" autocomplete="off" placeholder="unverändert"></label>
+      </div>
+      <div class="btnrow"><button class="btn pri" id="saveBtn">Speichern und neu starten</button></div>
+      <p class="note" id="setErr"></p>
+    </div>
+    <div class="card"><h3>Info</h3><div class="kv" id="info"></div></div>
+  </section>
+</main>
+
+<nav class="tabs" id="tabs">
+  <button data-tab="col" class="on"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><circle cx="8.5" cy="9" r="1.4"/><circle cx="13" cy="7.5" r="1.4"/><circle cx="16.5" cy="11" r="1.4"/><path d="M12 21a3 3 0 0 1 0-6h1.5a2.5 2.5 0 0 0 0-5"/></svg>Farben</button>
+  <button data-tab="fx"><svg viewBox="0 0 24 24"><path d="M12 3l1.8 4.6L18.5 9l-4.7 1.6L12 15l-1.8-4.4L5.5 9l4.7-1.4z"/><path d="M18 15l.8 2 2 .8-2 .8-.8 2-.8-2-2-.8 2-.8z"/></svg>Effekte</button>
+  <button data-tab="wall"><svg viewBox="0 0 24 24"><path d="M3 19h9L7.5 11z"/><path d="M12 19l4.5-8H7.5"/><path d="M12 19h9l-4.5-8"/></svg>Wand</button>
+  <button data-tab="pre"><svg viewBox="0 0 24 24"><path d="M6 3h12v18l-6-4-6 4z"/></svg>Presets</button>
+  <button data-tab="opt"><svg viewBox="0 0 24 24"><path d="M4 6h10M18 6h2M4 12h4M12 12h8M4 18h12M20 18h0"/><circle cx="16" cy="6" r="2"/><circle cx="10" cy="12" r="2"/><circle cx="18" cy="18" r="2"/></svg>Optionen</button>
+</nav>
 <div class="toast" id="toast"></div>
+
 <script>
 const S=60,H=S*Math.sqrt(3)/2,SNAP=S*0.6,NS='http://www.w3.org/2000/svg';
 const $=id=>document.getElementById(id);
-const svg=$('wall'),tray=$('tray');
-let st=null,sel=null,drag=null,vbFix=null,applyAll=false;
+let st=null,tab='col',sel=new Set(),focus=null,drag=null,vbFix=null,live={},joining=[],inflight=false,lastState=0;
 
-function geom(x,y,up){const cx=x*S/2,t=y*H;const p=up?[[cx-S/2,t+H],[cx+S/2,t+H],[cx,t]]:[[cx-S/2,t],[cx+S/2,t],[cx,t+H]];return{p,c:[cx,up?t+2*H/3:t+H/3]};}
-function shrink(g,k){return g.p.map(q=>[g.c[0]+(q[0]-g.c[0])*k,g.c[1]+(q[1]-g.c[1])*k]);}
-function pts(a){return a.map(q=>q[0].toFixed(1)+','+q[1].toFixed(1)).join(' ');}
+// ---------- Hilfen ----------
 function el(n,a){const e=document.createElementNS(NS,n);for(const k in a)e.setAttribute(k,a[k]);return e;}
-function shade(p){if(!p.on)return'#22252b';const k=.22+.78*p.bri/255,f=c=>Math.min(255,Math.round((c+p.w*.85)*k));return`rgb(${f(p.r)},${f(p.g)},${f(p.b)})`;}
-function light(p){if(!p.on||p.state!==2)return false;return(p.r+p.g+p.b+p.w*1.5)*p.bri/255>330;}
-function edge1Mid(p){const g=geom(p.x,p.y,p.up);const L=p.up?['B','R','L']:['T','L','R'];const d=L[(p.rot)%3];const [a,b,c]=g.p;
-  let m;if(p.up)m=d==='B'?[a,b]:d==='R'?[b,c]:[a,c];else m=d==='T'?[a,b]:d==='L'?[a,c]:[b,c];
-  const mx=(m[0][0]+m[1][0])/2,my=(m[0][1]+m[1][1])/2;return[mx+(g.c[0]-mx)*.28,my+(g.c[1]-my)*.28];}
-function toast(t){const e=$('toast');e.textContent=t;e.classList.add('show');clearTimeout(e._t);e._t=setTimeout(()=>e.classList.remove('show'),2200);}
+function toast(t){const e=$('toast');e.textContent=t;e.classList.add('show');clearTimeout(e._t);e._t=setTimeout(()=>e.classList.remove('show'),2400);}
+function hx(v){return Math.round(v).toString(16).padStart(2,'0');}
+function rgbHex(r,g,b){return('#'+hx(r)+hx(g)+hx(b)).toUpperCase();}
+function hsv2rgb(h,s,v){const f=n=>{const k=(n+h*6)%6;return v*(1-s*Math.max(0,Math.min(k,4-k,1)));};return[f(5)*255,f(3)*255,f(1)*255];}
+function rgb2hsv(r,g,b){r/=255;g/=255;b/=255;const M=Math.max(r,g,b),m=Math.min(r,g,b),d=M-m;let h=0;
+  if(d){h=M===r?((g-b)/d)%6:M===g?(b-r)/d+2:(r-g)/d+4;h/=6;if(h<0)h+=1;}return[h,M?d/M:0,M];}
+function setFill(r){r.style.setProperty('--p',((r.value-r.min)/(r.max-r.min)*100)+'%');}
+document.querySelectorAll('input[type=range]').forEach(r=>{setFill(r);r.addEventListener('input',()=>setFill(r));});
+function setRange(id,v){const r=$(id);if(document.activeElement===r)return;r.value=v;setFill(r);const o=$(id+'o');if(o)o.textContent=v;}
+// Akzentfarbe folgt der aktuellen Farbe, wie bei WLED
+function accent(r,g,b){if(r+g+b<60){r=110;g=139;b=255;}const root=document.documentElement.style;root.setProperty('--acc',`rgb(${r|0},${g|0},${b|0})`);
+  root.setProperty('--accfg',(0.3*r+0.59*g+0.11*b)>150?'#111':'#fff');}
 
 async function api(path,body){
   const r=await fetch(path,body?{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)}:{});
-  const j=await r.json();if(!r.ok){toast(j.error||'Fehler');return null;}st=j;return j;}
-// Der ESP32 beantwortet eine Anfrage nach der anderen. Deshalb nie zwei Abfragen gleichzeitig,
-// damit Klicks nicht hinter einem Stau von Abfragen warten.
-let inflight=false,lastState=0;
+  const j=await r.json();if(!r.ok){toast(j.error||'Fehler');return null;}if(j.panels)st=j;return j;}
+// Der ESP32 beantwortet eine Anfrage nach der anderen: Abfragen nie gleichzeitig, Klicks gehen vor.
 async function poll(){if(drag||inflight)return;if(fxOn()&&Date.now()-lastState<2000)return;
   inflight=true;try{await api('/api/state');lastState=Date.now();render();}catch(e){$('status').textContent='keine Verbindung zum ESP32';}inflight=false;}
-
-function fitViewBox(){
-  const xs=[],ys=[];const add=(x,y,up)=>{geom(x,y,up).p.forEach(q=>{xs.push(q[0]);ys.push(q[1]);});};
-  st.panels.forEach(p=>add(p.x,p.y,p.up));st.ghosts.forEach(g=>add(g.x,g.y,g.up));
-  let x0=Math.min(...xs)-S*.8,x1=Math.max(...xs)+S*.8,y0=Math.min(...ys)-S*.6,y1=Math.max(...ys)+S*.6;
-  const r=svg.clientWidth/svg.clientHeight||1.6;let w=Math.max(x1-x0,S*3.4),h=Math.max(y1-y0,S*2.2);
-  if(w/h<r)w=h*r;else h=w/r;const cx=(x0+x1)/2,cy=(y0+y1)/2;
-  return[cx-w/2,cy-h/2,w,h];}
-
-function render(){
-  if(!st)return;
-  const n=st.panels.length;
-  $('status').textContent=`${n} von ${st.max} Panels · ${st.sim?'Simulation':'Bus'} · MQTT ${st.mqtt?'verbunden':'aus'}`;
-  if(!drag){vbFix=fitViewBox();}
-  svg.setAttribute('viewBox',vbFix.map(v=>v.toFixed(1)).join(' '));
-  svg.innerHTML='';
-  const gG=el('g',{}),gP=el('g',{}),gO=el('g',{id:'ov'});svg.append(gG,gP,gO);
-  if(drag){st.ghosts.forEach((g,i)=>{const gg=geom(g.x,g.y,g.up);gG.append(el('polygon',{points:pts(shrink(gg,.94)),class:'ghost'+(drag.snap===i?' hot':'')}));});}
-  st.panels.forEach(p=>{
-    const g=geom(p.x,p.y,p.up);
-    const cls=['tri'];if(p.main)cls.push('main');if(sel===p.id)cls.push('sel');
-    let fill=null;if(p.state===0)cls.push('dark');else if(fxOn()&&joining.includes(p.id))cls.push('pulse');else if(fxOn()&&live[p.id])fill=liveCol(live[p.id]);else if(p.state===1)cls.push('pulse');else fill=shade(p);
-    const poly=el('polygon',{points:pts(shrink(g,.94)),class:cls.join(' ')});if(fill)poly.setAttribute('fill',fill);
-    poly.dataset.id=p.id;if(cls.includes('pulse'))syncPulse(poly);gP.append(poly);
-    if(!p.main){const m=edge1Mid(p);gP.append(el('circle',{cx:m[0],cy:m[1],r:2.4,class:'edge1'}));}
-    else{const a=g.p[0],b=g.p[1];gP.append(el('line',{x1:a[0]+8,y1:a[1]+5,x2:b[0]-8,y2:b[1]+5,stroke:'#7d8796','stroke-width':3,'stroke-linecap':'round'}));}
-    const t=el('text',{x:g.c[0],y:g.c[1]+3,class:'lbl'+(light(p)?' dk':'')});t.textContent=p.main?'Haupt':p.id.slice(4);gP.append(t);
-  });
-  drawDrag();
-  tray.innerHTML='';
-  if(!st.loose.length){const e=document.createElement('span');e.className='empty';e.textContent='Leer. Mit „Neues Panel“ eins dazunehmen oder ein Panel von der Wand hierher ziehen.';tray.append(e);}
-  st.loose.forEach(id=>{
-    const d=document.createElement('div');d.className='item';d.dataset.id=id;
-    const s=el('svg',{viewBox:`${-S/2-4} ${-4} ${S+8} ${H+8}`});
-    s.append(el('polygon',{points:pts([[-S/2,H],[S/2,H],[0,0]]),fill:'#1b1e24',stroke:'#3a4250','stroke-width':1.5}));
-    const t=el('text',{x:0,y:H*.68,class:'lbl'});t.textContent=id.slice(4);s.append(t);
-    d.append(s);tray.append(d);d.addEventListener('pointerdown',e=>startDrag(e,id,'tray'));
-  });
-  $('newBtn').hidden=!st.sim;
-  $('wifiBox').hidden=!st.ap;
-  $('hint').textContent=!st.sim?'Echte Panels: anklipsen, und sie erscheinen hier':st.loose.length?'Panel aus der Ablage an eine freie Kante ziehen':'Panel antippen zum Einstellen, wegziehen zum Abklipsen';
-  updateCtl();renderFx();
-}
-
-// ----- Effekte -----
-const FX_ICON={aus:'#2a303a',regenbogen:'conic-gradient(red,yellow,lime,cyan,blue,magenta,red)',welle:'linear-gradient(90deg,red,yellow,lime,cyan,blue,magenta)',
-  atmen:'radial-gradient(circle,var(--c) 0,#111 75%)',farbwechsel:'linear-gradient(135deg,#ff4f8b,#4f9dff,#59e38c)',funkeln:'radial-gradient(circle,#fff 0 18%,var(--c) 22%,#221 80%)',
-  ausbreiten:'repeating-radial-gradient(circle,var(--c) 0 3px,#111 3px 6px)',feuer:'linear-gradient(0deg,#ff3a00,#ffb000)',polarlicht:'linear-gradient(160deg,#16e39a,#2bb6ff,#9a4dff)'};
-let live={},fxBuilt=false,tFx=null;
 function fxOn(){return st&&st.fx&&st.fx.id!=='aus';}
-function liveCol(h){const v=[0,2,4,6].map(i=>parseInt(h.slice(i,i+2),16));const f=c=>Math.round(255*Math.pow(Math.min(1,(c+v[3]*.85)/255),.55));return`rgb(${f(v[0])},${f(v[1])},${f(v[2])})`;}
-function hex2(c){const h=v=>v.toString(16).padStart(2,'0');return'#'+h(c.r)+h(c.g)+h(c.b);}
-function renderFx(){
-  if(!st.effects)return;
-  const box=$('fxList');
-  if(!fxBuilt){fxBuilt=true;box.innerHTML='';st.effects.forEach(e=>{const b=document.createElement('button');b.className='fx';b.dataset.fx=e.id;
-    const i=document.createElement('i');i.style.background=FX_ICON[e.id]||'#444';b.append(i,document.createTextNode(e.name));
-    b.addEventListener('click',()=>setFx(e.id));box.append(b);});}
-  const f=st.fx;document.documentElement.style.setProperty('--c',hex2(f));
-  box.querySelectorAll('.fx').forEach(b=>b.classList.toggle('on',b.dataset.fx===f.id));
-  const def=st.effects.find(e=>e.id===f.id);$('fcolL').hidden=!(def&&def.color);
-  if(document.activeElement.tagName!=='INPUT'){$('fspeed').value=f.speed;$('fsv').textContent=f.speed;$('fbri').value=f.bri;$('fbv').textContent=f.bri;$('fcol').value=hex2(f);}
-}
-function fxBody(){const c=$('fcol').value;return{speed:+$('fspeed').value,brightness:+$('fbri').value,color:{r:parseInt(c.slice(1,3),16),g:parseInt(c.slice(3,5),16),b:parseInt(c.slice(5,7),16),w:0}};}
-async function setFx(id){
-  st.fx.id=id;live={};joining=[];renderFx();             // Knopf sofort umschalten, nicht erst nach der Antwort
-  const r=await api('/api/effect',{effect:id,...fxBody()});if(r){render();pollLive();}}
-function fxInput(){$('fsv').textContent=$('fspeed').value;$('fbv').textContent=$('fbri').value;
-  clearTimeout(tFx);tFx=setTimeout(async()=>{await api('/api/effect',fxBody());render();},120);}
-['fspeed','fbri','fcol'].forEach(k=>$(k).addEventListener('input',fxInput));
-let joining=[];
 async function pollLive(){
-  if(!fxOn()||drag||document.hidden||inflight)return;
-  inflight=true;
+  if(!fxOn()||drag||document.hidden||inflight)return;inflight=true;
   try{const j=await (await fetch('/api/live')).json();if(j.fx!=='aus'){live=j.c;joining=j.j||[];paintLive();}}catch(e){}
-  inflight=false;
+  inflight=false;}
+const tSend={};function later(k,fn,ms){clearTimeout(tSend[k]);tSend[k]=setTimeout(()=>{tSend[k]=null;fn();},ms||110);}
+
+// ---------- Tabs ----------
+function showTab(t){tab=t;document.querySelectorAll('.tab').forEach(s=>s.hidden=s.id!=='t-'+t);
+  document.querySelectorAll('#tabs button').forEach(b=>b.classList.toggle('on',b.dataset.tab===t));
+  $('miniBox').hidden=(t==='wall'||t==='opt');
+  if(t==='opt')loadCfg();if(t==='col')requestAnimationFrame(()=>{drawWheel();syncColUi();});
+  vbFix=null;render();scrollTo(0,0);}
+document.querySelectorAll('#tabs button').forEach(b=>b.addEventListener('click',()=>showTab(b.dataset.tab)));
+document.querySelectorAll('[data-go]').forEach(b=>b.addEventListener('click',()=>showTab(b.dataset.go)));
+
+// ---------- Wand ----------
+function geom(x,y,up){const cx=x*S/2,t=y*H;const p=up?[[cx-S/2,t+H],[cx+S/2,t+H],[cx,t]]:[[cx-S/2,t],[cx+S/2,t],[cx,t+H]];return{p,c:[cx,up?t+2*H/3:t+H/3]};}
+function shrink(g,k){return g.p.map(q=>[g.c[0]+(q[0]-g.c[0])*k,g.c[1]+(q[1]-g.c[1])*k]);}
+function pts(a){return a.map(q=>q[0].toFixed(1)+','+q[1].toFixed(1)).join(' ');}
+function edge1Mid(p){const g=geom(p.x,p.y,p.up);const L=p.up?['B','R','L']:['T','L','R'];const d=L[(p.rot)%3];const [a,b,c]=g.p;
+  let m;if(p.up)m=d==='B'?[a,b]:d==='R'?[b,c]:[a,c];else m=d==='T'?[a,b]:d==='L'?[a,c]:[b,c];
+  const mx=(m[0][0]+m[1][0])/2,my=(m[0][1]+m[1][1])/2;return[mx+(g.c[0]-mx)*.28,my+(g.c[1]-my)*.28];}
+// Anzeige: dunkle LED-Werte etwas anheben, damit man sie am Bildschirm sieht
+function disp(r,g,b,w){const f=c=>Math.round(255*Math.pow(Math.min(1,(c+w*.85)/255),.55));return`rgb(${f(r)},${f(g)},${f(b)})`;}
+function staticCol(p){const k=(st.on?st.master:0)/255*p.bri/255;if(!p.on||!k)return'#141414';return disp(p.r*k,p.g*k,p.b*k,p.w*k);}
+function liveCol(h){const v=[0,2,4,6].map(i=>parseInt(h.slice(i,i+2),16));return disp(...v);}
+function lightish(p){if(fxOn())return false;return st.on&&p.on&&p.state===2&&(p.r+p.g+p.b+p.w*1.5)*p.bri*st.master/65025>330;}
+function syncPulse(p){p.style.animationDelay=(-(Date.now()%1600))+'ms';}
+
+function fit(svg,big){
+  const xs=[],ys=[];const add=(x,y,up)=>{geom(x,y,up).p.forEach(q=>{xs.push(q[0]);ys.push(q[1]);});};
+  st.panels.forEach(p=>add(p.x,p.y,p.up));if(big)st.ghosts.forEach(g=>add(g.x,g.y,g.up));
+  const pad=big?.8:.25;let x0=Math.min(...xs)-S*pad,x1=Math.max(...xs)+S*pad,y0=Math.min(...ys)-S*pad,y1=Math.max(...ys)+S*(big?pad:.6);   // unten Platz für den Hinweis
+  const r=svg.clientWidth/svg.clientHeight||2;let w=Math.max(x1-x0,S*(big?3.4:1.6)),h=Math.max(y1-y0,S*(big?2.2:1));
+  if(w/h<r)w=h*r;else h=w/r;const cx=(x0+x1)/2,cy=(y0+y1)/2;return[cx-w/2,cy-h/2,w,h];}
+
+function drawWall(svg,big){
+  const vb=big&&drag&&vbFix?vbFix:fit(svg,big);if(big)vbFix=vb;
+  svg.setAttribute('viewBox',vb.map(v=>v.toFixed(1)).join(' '));svg.innerHTML='';
+  const gG=el('g',{}),gP=el('g',{}),gO=el('g',{class:'ov'});svg.append(gG,gP,gO);
+  if(big&&drag)st.ghosts.forEach((g,i)=>{gG.append(el('polygon',{points:pts(shrink(geom(g.x,g.y,g.up),.94)),class:'ghost'+(drag.snap===i?' hot':'')}));});
+  st.panels.forEach(p=>{
+    const g=geom(p.x,p.y,p.up);const cls=['tri'];if(p.main)cls.push('main');
+    if(big?focus===p.id:(tab==='col'&&sel.has(p.id)))cls.push('sel');
+    let fill=null;
+    if(p.state===0)cls.push('dark');
+    else if(fxOn()&&joining.includes(p.id))cls.push('pulse');
+    else if(fxOn()&&live[p.id])fill=st.on?liveCol(live[p.id]):'#141414';
+    else if(p.state===1&&st.on)cls.push('pulse');
+    else fill=staticCol(p);
+    const poly=el('polygon',{points:pts(shrink(g,.94)),class:cls.join(' ')});if(fill)poly.style.fill=fill;
+    poly.dataset.id=p.id;if(cls.includes('pulse'))syncPulse(poly);gP.append(poly);
+    if(big){
+      if(!p.main){const m=edge1Mid(p);gP.append(el('circle',{cx:m[0],cy:m[1],r:2.4,class:'edge1'}));}
+      else{const a=g.p[0],b=g.p[1];gP.append(el('line',{x1:a[0]+8,y1:a[1]+5,x2:b[0]-8,y2:b[1]+5,stroke:'#777','stroke-width':3,'stroke-linecap':'round'}));}
+      const t=el('text',{x:g.c[0],y:g.c[1]+3,class:'lbl'+(lightish(p)?' dk':'')});t.textContent=p.main?'Haupt':p.id.slice(4);gP.append(t);
+    }
+  });
+  if(big)drawDrag(svg);
 }
 function paintLive(){
-  svg.querySelectorAll('polygon[data-id]').forEach(p=>{const id=p.dataset.id,h=live[id];
-    if(joining.includes(id)){if(!p.classList.contains('pulse')){p.style.fill='';p.classList.add('pulse');syncPulse(p);}}
-    else if(h){p.classList.remove('pulse');p.style.fill=liveCol(h);}});
-}
-// alle Pulsier-Animationen im selben Takt, auch wenn die Wand neu gezeichnet wird
-function syncPulse(p){p.style.animationDelay=(-(Date.now()%1600))+'ms';}
-setInterval(pollLive,120);
-
-function drawDrag(){
-  const ov=$('ov');if(!ov||!drag||!drag.moved)return;ov.innerHTML='';
-  let poly;
-  if(drag.snap!=null){const g=st.ghosts[drag.snap];poly=shrink(geom(g.x,g.y,g.up),.94);}
-  else{const c=drag.pt;poly=[[c.x-S/2,c.y+H/3],[c.x+S/2,c.y+H/3],[c.x,c.y-2*H/3]].map(q=>[q[0],q[1]]);}
-  ov.append(el('polygon',{points:pts(poly),fill:drag.snap!=null?'rgba(110,139,255,.35)':'rgba(40,46,58,.9)',stroke:drag.snap!=null?'#6e8bff':'#7d8796','stroke-width':2}));
+  ['mini','big'].forEach(id=>$(id).querySelectorAll('polygon[data-id]').forEach(p=>{const i=p.dataset.id,h=live[i];
+    if(joining.includes(i)){if(!p.classList.contains('pulse')){p.style.fill='';p.classList.add('pulse');syncPulse(p);}}
+    else if(h){p.classList.remove('pulse');p.style.fill=st.on?liveCol(h):'#141414';}}));
 }
 
-function toSvg(e){const p=svg.createSVGPoint();p.x=e.clientX;p.y=e.clientY;return p.matrixTransform(svg.getScreenCTM().inverse());}
+// Vorschau oben: Panels antippen wählt sie für die Farbe aus
+// beim Antippen auswerten: die Vorschau wird laufend neu gezeichnet, ein "click" ginge dabei verloren
+$('mini').addEventListener('pointerdown',e=>{const id=e.target.dataset&&e.target.dataset.id;if(!id)return;
+  if(sel.has(id))sel.delete(id);else sel.add(id);if(tab!=='col'&&sel.size)showTab('col');else render();});
 
+// ---------- Ziehen und Anklipsen (Simulation) ----------
+function drawDrag(svg){const ov=svg.querySelector('.ov');if(!ov||!drag||!drag.moved)return;ov.innerHTML='';
+  let poly;if(drag.snap!=null){const g=st.ghosts[drag.snap];poly=shrink(geom(g.x,g.y,g.up),.94);}
+  else{const c=drag.pt;poly=[[c.x-S/2,c.y+H/3],[c.x+S/2,c.y+H/3],[c.x,c.y-2*H/3]];}
+  ov.append(el('polygon',{points:pts(poly),fill:drag.snap!=null?'rgba(110,139,255,.35)':'rgba(40,40,40,.9)',stroke:drag.snap!=null?'#6e8bff':'#888','stroke-width':2}));}
+function toSvg(e){const svg=$('big');const p=svg.createSVGPoint();p.x=e.clientX;p.y=e.clientY;return p.matrixTransform(svg.getScreenCTM().inverse());}
 function startDrag(e,id,from){
-  if(!st||!st.sim&&from==='tray')return;
-  e.preventDefault();
+  if(!st||(!st.sim&&from==='tray'))return;e.preventDefault();
   drag={id,from,x0:e.clientX,y0:e.clientY,moved:from==='tray',pt:toSvg(e),snap:null,detached:from==='tray'};
-  window.addEventListener('pointermove',onMove);window.addEventListener('pointerup',onUp,{once:true});
-  if(drag.moved)render();
-}
+  window.addEventListener('pointermove',onMove);window.addEventListener('pointerup',onUp,{once:true});if(drag.moved)render();}
 async function onMove(e){
   if(!drag)return;
-  if(!drag.moved&&Math.hypot(e.clientX-drag.x0,e.clientY-drag.y0)>6){
-    drag.moved=true;
-    if(drag.from==='wall'&&!drag.detached){drag.detached=true;sel=null;await api('/api/sim/detach',{id:drag.id});toast('abgeklipst');}
-  }
-  if(!drag||!drag.moved)return;
-  drag.pt=toSvg(e);
-  let best=null,bd=SNAP;
-  st.ghosts.forEach((g,i)=>{const c=geom(g.x,g.y,g.up).c;const d=Math.hypot(c[0]-drag.pt.x,c[1]-drag.pt.y);if(d<bd){bd=d;best=i;}});
-  drag.snap=best;render();
-}
+  if(!drag.moved&&Math.hypot(e.clientX-drag.x0,e.clientY-drag.y0)>6){drag.moved=true;
+    if(drag.from==='wall'&&!drag.detached){drag.detached=true;focus=null;sel.delete(drag.id);await api('/api/sim/detach',{id:drag.id});toast('abgeklipst');}}
+  if(!drag||!drag.moved)return;drag.pt=toSvg(e);
+  let best=null,bd=SNAP;st.ghosts.forEach((g,i)=>{const c=geom(g.x,g.y,g.up).c;const d=Math.hypot(c[0]-drag.pt.x,c[1]-drag.pt.y);if(d<bd){bd=d;best=i;}});
+  drag.snap=best;render();}
 async function onUp(){
-  window.removeEventListener('pointermove',onMove);
-  const d=drag;if(!d)return;
-  if(!d.moved){drag=null;sel=d.id;render();return;}
+  window.removeEventListener('pointermove',onMove);const d=drag;if(!d)return;
+  if(!d.moved){drag=null;focus=d.id;render();return;}
   const g=d.snap!=null?st.ghosts[d.snap]:null;drag=null;
-  if(g){const r=await api('/api/sim/attach',{id:d.id,parent:g.parent,edge:g.edge});if(r){sel=d.id;toast('angeklipst, wird erkannt …');}}
-  render();
-}
-svg.addEventListener('pointerdown',e=>{
-  const id=e.target.dataset&&e.target.dataset.id;if(!id)return;
-  const p=st.panels.find(q=>q.id===id);if(!p)return;
-  if(p.main||!st.sim){sel=id;render();return;}
-  startDrag(e,id,'wall');
-});
+  if(g){const r=await api('/api/sim/attach',{id:d.id,parent:g.parent,edge:g.edge});if(r){focus=d.id;toast('angeklipst, wird erkannt …');}}
+  render();}
+$('big').addEventListener('pointerdown',e=>{const id=e.target.dataset&&e.target.dataset.id;if(!id)return;
+  const p=st.panels.find(q=>q.id===id);if(!p)return;if(p.main||!st.sim){focus=id;render();return;}startDrag(e,id,'wall');});
 
-// ----- Einstellungen -----
-function cur(){return st&&sel?st.panels.find(p=>p.id===sel):null;}
-function updateCtl(){
-  const p=cur();const has=!!p||applyAll;
-  $('selTitle').textContent=applyAll?'Alle Panels':p?(p.main?'Hauptpanel':'Panel '+p.id.slice(4))+(p.state===1?' · wartet auf erste Farbe':''):'Panel antippen zum Einstellen';
-  ['col','w','bri','onBtn'].forEach(k=>$(k).disabled=!has);
-  $('allBtn').classList.toggle('on',applyAll);
-  if(p&&!applyAll&&document.activeElement.tagName!=='INPUT'){
-    const h=v=>v.toString(16).padStart(2,'0');$('col').value='#'+h(p.r)+h(p.g)+h(p.b);
-    $('w').value=p.w;$('wv').textContent=p.w;$('bri').value=p.bri;$('bv').textContent=p.bri;
-    $('onBtn').classList.toggle('on',p.on);}
+// ---------- Darstellung ----------
+function render(){
+  if(!st)return;
+  $('status').textContent=`${st.panels.length}/${st.max} Panels · ${st.sim?'Simulation':'Bus'} · MQTT ${st.mqtt?'an':'aus'}`;
+  $('pwr').classList.toggle('on',st.on);setRange('master',st.master);
+  $('apBanner').hidden=!st.ap||tab==='opt';
+  [...sel].forEach(id=>{if(!st.panels.some(p=>p.id===id))sel.delete(id);});     // abgeklipste Panels aus der Auswahl nehmen
+  if(tab!=='wall'&&tab!=='opt'){drawWall($('mini'),false);
+    $('miniHint').textContent=tab==='col'?(sel.size?`${sel.size} Panel${sel.size>1?'s':''} ausgewählt`:'Panels antippen, um nur diese einzufärben'):'';}
+  if(tab==='wall')renderWall();
+  if(tab==='col')renderCol();
+  if(tab==='fx')renderFx();
+  if(tab==='pre')renderPre();
+  const c=curColor();accent(c[0],c[1],c[2]);
 }
-let tSend=null;
-function send(extra){
-  const target=applyAll?'alle':sel;if(!target)return;
-  const c=$('col').value;const body={id:target,color:{r:parseInt(c.slice(1,3),16),g:parseInt(c.slice(3,5),16),b:parseInt(c.slice(5,7),16),w:+$('w').value},brightness:+$('bri').value,state:'ON',...extra};
-  const wasFx=fxOn();
-  clearTimeout(tSend);tSend=setTimeout(async()=>{await api('/api/set',body);if(wasFx&&!fxOn()){live={};toast('Effekt beendet, feste Farben');}render();},120);
+
+// ---------- Tab Farben ----------
+let hsv=[0.08,1,1],cw=0,wheelBusy=false;
+function target(){return sel.size?'sel':'all';}
+function curColor(){
+  if(!st)return[110,139,255,0];
+  if(target()==='all'&&st.fx.usesColor)return[st.fx.r,st.fx.g,st.fx.b,st.fx.w];
+  const id=sel.size?[...sel][0]:null;const p=st.panels.find(q=>q.id===id)||st.panels.find(q=>q.main);
+  return p?[p.r,p.g,p.b,p.w]:[255,120,0,0];}
+function renderCol(){
+  $('tgtAll').classList.toggle('on',!sel.size);$('tgtSel').classList.toggle('on',!!sel.size);
+  $('tgtSel').textContent=sel.size?`Auswahl (${sel.size})`:'Auswahl';
+  const fxName=(st.effects.find(e=>e.id===st.fx.id)||{}).name;
+  $('colNote').textContent=!fxOn()?'':target()==='all'?(st.fx.usesColor?`Färbt den laufenden Effekt „${fxName}“.`:`„${fxName}“ hat eigene Farben. Eine Farbe wählen wechselt auf Einfarbig.`):'Eine Farbe für einzelne Panels beendet den Effekt.';
+  if(!wheelBusy&&!tSend.col){const c=curColor();hsv=rgb2hsv(c[0],c[1],c[2]);cw=c[3];syncColUi();}
 }
-$('col').addEventListener('input',()=>send());
-$('w').addEventListener('input',()=>{$('wv').textContent=$('w').value;send();});
-$('bri').addEventListener('input',()=>{$('bv').textContent=$('bri').value;send();});
-$('onBtn').addEventListener('click',async()=>{const p=cur();const on=applyAll?true:!(p&&p.on);await api('/api/set',{id:applyAll?'alle':sel,state:on?'ON':'OFF'});render();});
-$('allBtn').addEventListener('click',()=>{applyAll=!applyAll;updateCtl();});
+function syncColUi(){
+  const w=$('wheel').clientWidth,r=w/2,a=hsv[0]*2*Math.PI;
+  $('knob').style.left=(r+Math.cos(a)*hsv[1]*r)+'px';$('knob').style.top=(r+Math.sin(a)*hsv[1]*r)+'px';
+  $('knob').style.background=rgbHex(...hsv2rgb(hsv[0],hsv[1],1));
+  setRange('cv',Math.round(hsv[2]*100));setRange('cw',cw);
+  if(document.activeElement!==$('hex'))$('hex').value=rgbHex(...hsv2rgb(...hsv));
+}
+function drawWheel(){
+  const cv=$('wcv'),n=Math.round($('wheel').clientWidth*(devicePixelRatio||1));if(!n||cv.width===n)return;cv.width=cv.height=n;
+  const ctx=cv.getContext('2d'),img=ctx.createImageData(n,n),R=n/2;
+  for(let y=0;y<n;y++)for(let x=0;x<n;x++){const dx=x-R+.5,dy=y-R+.5,d=Math.hypot(dx,dy);const i=(y*n+x)*4;
+    if(d>R){img.data[i+3]=0;continue;}let h=Math.atan2(dy,dx)/(2*Math.PI);if(h<0)h+=1;const c=hsv2rgb(h,Math.min(1,d/R),1);
+    img.data[i]=c[0];img.data[i+1]=c[1];img.data[i+2]=c[2];img.data[i+3]=d>R-1?255*(R-d):255;}
+  ctx.putImageData(img,0,0);}
+function sendColor(){
+  const c=hsv2rgb(...hsv).map(Math.round);const color={r:c[0],g:c[1],b:c[2],w:+cw};
+  accent(c[0],c[1],c[2]);
+  later('col',async()=>{
+    const wasFx=fxOn();
+    if(target()==='all')await api('/api/set',{id:'alle',color,state:'ON'});
+    else await api('/api/set',{ids:[...sel],color,state:'ON'});
+    if(wasFx&&!fxOn()){live={};toast(target()==='all'?'Auf Einfarbig gewechselt':'Effekt beendet, feste Farben');}
+    render();},120);}
+function wheelPick(e){const b=$('wheel').getBoundingClientRect(),r=b.width/2;const dx=e.clientX-b.left-r,dy=e.clientY-b.top-r;
+  let h=Math.atan2(dy,dx)/(2*Math.PI);if(h<0)h+=1;hsv[0]=h;hsv[1]=Math.min(1,Math.hypot(dx,dy)/r);if(hsv[2]<.05)hsv[2]=1;syncColUi();sendColor();}
+$('wheel').addEventListener('pointerdown',e=>{wheelBusy=true;$('wheel').setPointerCapture(e.pointerId);wheelPick(e);});
+$('wheel').addEventListener('pointermove',e=>{if(wheelBusy)wheelPick(e);});
+$('wheel').addEventListener('pointerup',()=>{wheelBusy=false;});
+$('cv').addEventListener('input',()=>{hsv[2]=$('cv').value/100;$('cvo').textContent=$('cv').value;sendColor();});
+$('cw').addEventListener('input',()=>{cw=+$('cw').value;$('cwo').textContent=cw;sendColor();});
+$('hex').addEventListener('change',()=>{const m=$('hex').value.trim().replace('#','');if(!/^[0-9a-f]{6}$/i.test(m)){toast('Bitte als #RRGGBB eingeben');return;}
+  hsv=rgb2hsv(parseInt(m.slice(0,2),16),parseInt(m.slice(2,4),16),parseInt(m.slice(4,6),16));syncColUi();sendColor();});
+$('rnd').addEventListener('click',()=>{hsv=[Math.random(),.75+Math.random()*.25,1];cw=0;syncColUi();sendColor();});
+$('tgtAll').addEventListener('click',()=>{sel.clear();render();});
+$('tgtSel').addEventListener('click',()=>{if(!sel.size)toast('Oben in der Vorschau Panels antippen');});
+const QUICK=[['#FF0000'],['#FF5000'],['#FFC800'],['#00FF00'],['#00FFC8'],['#00A0FF'],['#0000FF'],['#7800FF'],['#FF00C8'],['#FF0050'],['#FFFFFF'],['#000000'],['Warmweiß','#FFB46E',220],['Kaltweiß','#C8DCFF',255]];
+QUICK.forEach(q=>{const b=document.createElement('button');const txt=q.length>1;const col=txt?q[1]:q[0];
+  b.className='qc'+(txt?' txt':'');b.style.background=col;if(txt)b.textContent=q[0];b.setAttribute('aria-label',txt?q[0]:col);
+  b.addEventListener('click',()=>{const m=col.slice(1);hsv=rgb2hsv(parseInt(m.slice(0,2),16),parseInt(m.slice(2,4),16),parseInt(m.slice(4,6),16));
+    if(txt){cw=q[2];hsv[2]=.25;}else cw=0;syncColUi();sendColor();});$('quick').append(b);});
+
+// ---------- Tab Effekte ----------
+let fxBuilt=false;
+function palGrad(p){
+  if(p.id==='standard')return'linear-gradient(90deg,#444,#888,#444)';
+  if(p.id==='effektfarbe'){const c=[st.fx.r,st.fx.g,st.fx.b];const d=c.map(v=>v*.25|0),l=c.map(v=>v*.6+102|0);return`linear-gradient(90deg,rgb(${d}),rgb(${c}),rgb(${l}),rgb(${d}))`;}
+  return'linear-gradient(90deg,'+p.c.concat([p.c[0]]).join(',')+')';}
+function renderFx(){
+  if(!fxBuilt){fxBuilt=true;
+    st.effects.forEach(e=>{const b=document.createElement('button');b.className='row';b.dataset.fx=e.id;
+      b.innerHTML='<span class="dot"></span><span></span>'+(e.color?'<small>nutzt Effektfarbe</small>':'');b.children[1].textContent=e.name;
+      b.addEventListener('click',()=>setFx({effect:e.id}));$('fxList').append(b);});
+    st.palettes.forEach(p=>{const b=document.createElement('button');b.className='row';b.dataset.pal=p.id;
+      b.innerHTML='<span class="dot"></span><span></span><span class="grad"></span>';b.children[1].textContent=p.name;
+      b.addEventListener('click',()=>setFx({palette:p.id}));$('palList').append(b);});}
+  const q=$('fxq').value.trim().toLowerCase();
+  $('fxList').querySelectorAll('.row').forEach(r=>{r.classList.toggle('on',r.dataset.fx===st.fx.id);r.hidden=!!q&&!r.textContent.toLowerCase().includes(q);});
+  $('palList').querySelectorAll('.row').forEach(r=>{r.classList.toggle('on',r.dataset.pal===st.fx.pal);
+    r.querySelector('.grad').style.background=palGrad(st.palettes.find(p=>p.id===r.dataset.pal));});
+  setRange('fspeed',st.fx.speed);setRange('finten',st.fx.inten);
+  $('fxNote').textContent=fxOn()?(st.fx.usesColor?'Die Effektfarbe stellst du im Tab Farben ein.':''):'Einfarbig: jedes Panel leuchtet in seiner eigenen Farbe. Tempo, Intensität und Palette wirken erst mit einem Effekt.';
+}
+async function setFx(body){
+  if(body.effect){st.fx.id=body.effect;live={};joining=[];}
+  if(body.palette)st.fx.pal=body.palette;
+  renderFx();                                        // sofort umschalten, nicht erst nach der Antwort
+  const r=await api('/api/effect',body);if(r){render();pollLive();}}
+$('fxq').addEventListener('input',renderFx);
+$('fspeed').addEventListener('input',()=>{$('fspeedo').textContent=$('fspeed').value;later('fx',()=>api('/api/effect',{speed:+$('fspeed').value}));});
+$('finten').addEventListener('input',()=>{$('finteno').textContent=$('finten').value;later('fx',()=>api('/api/effect',{intensity:+$('finten').value}));});
+
+// ---------- Kopfzeile ----------
+$('pwr').addEventListener('click',async()=>{if(!st)return;st.on=!st.on;render();await api('/api/set',{id:'alle',state:st.on?'ON':'OFF'});render();});
+$('master').addEventListener('input',()=>{if(!st)return;st.master=+$('master').value;later('m',async()=>{await api('/api/set',{id:'alle',brightness:st.master});render();});});
+
+// ---------- Tab Wand ----------
+function renderWall(){
+  drawWall($('big'),true);
+  const tray=$('tray');tray.innerHTML='';
+  if(!st.loose.length){const e=document.createElement('span');e.className='note';e.textContent=st.sim?'Leer. Mit „Neues Panel“ eins dazunehmen oder ein Panel von der Wand hierher ziehen.':'Abgeklipste Panels erscheinen hier.';tray.append(e);}
+  st.loose.forEach(id=>{const d=document.createElement('div');d.className='item';
+    const s=el('svg',{viewBox:`${-S/2-4} ${-4} ${S+8} ${H+8}`});
+    s.append(el('polygon',{points:pts([[-S/2,H],[S/2,H],[0,0]]),fill:'#1a1a1a',stroke:'#444','stroke-width':1.5}));
+    const t=el('text',{x:0,y:H*.68,class:'lbl'});t.textContent=id.slice(4);s.append(t);d.append(s);tray.append(d);
+    d.addEventListener('pointerdown',e=>startDrag(e,id,'tray'));});
+  $('newBtn').hidden=!st.sim;
+  $('bigHint').textContent=!st.sim?'Echte Panels: anklipsen, und sie erscheinen hier':st.loose.length?'Panel aus der Ablage an eine freie Kante ziehen':'Panel antippen für Details, wegziehen zum Abklipsen';
+  const p=st.panels.find(q=>q.id===focus);$('panelCard').hidden=!p;
+  if(p){
+    $('pTitle').textContent=p.main?'Hauptpanel':'Panel '+p.id.slice(4);
+    const stx=['dunkel, wird erkannt','pulsiert blau, wartet auf erste Farbe','leuchtet'][p.state];
+    const par=st.panels.find(q=>q.id===p.parent);
+    $('pInfo').innerHTML='';[['Chip-ID',p.id],['Zustand',stx],['Position',`${p.x} / ${p.y} · Spitze ${p.up?'oben':'unten'}`],['Hängt an',p.main?'–':par?(par.main?'Hauptpanel':'Panel '+par.id.slice(4)):'–'],['Farbe',rgbHex(p.r,p.g,p.b)+(p.w?' + Weiß '+p.w:'')]]
+      .forEach(([k,v])=>{const a=document.createElement('span');a.textContent=k;const b=document.createElement('span');b.textContent=v;$('pInfo').append(a,b);});
+    setRange('pbri',p.bri);
+    $('pOn').classList.toggle('pri',p.on);$('pOn').textContent=p.on?'Ein':'Aus';
+  }
+}
 $('newBtn').addEventListener('click',async()=>{if(await api('/api/sim/new',{}))render();});
+$('pbri').addEventListener('input',()=>{$('pbrio').textContent=$('pbri').value;const id=focus;later('pb',async()=>{await api('/api/set',{id,brightness:+$('pbri').value});render();});});
+$('pOn').addEventListener('click',async()=>{const p=st.panels.find(q=>q.id===focus);if(!p)return;await api('/api/set',{id:p.id,state:p.on?'OFF':'ON'});render();});
+$('pCol').addEventListener('click',()=>{if(!focus)return;sel=new Set([focus]);showTab('col');});
+
+// ---------- Tab Presets ----------
+let askDel=null;
+function renderPre(){
+  const g=$('pgrid');g.innerHTML='';$('preEmpty').hidden=st.presets.length>0;
+  st.presets.forEach(p=>{const b=document.createElement('div');b.className='preset'+(st.preset===p.id?' on':'');b.setAttribute('role','button');b.tabIndex=0;
+    const n=document.createElement('span');n.textContent=p.name;b.append(n);
+    const d=document.createElement('button');d.className='del'+(askDel===p.id?' ask':'');d.textContent=askDel===p.id?'Löschen?':'×';d.setAttribute('aria-label','Preset löschen');
+    d.addEventListener('click',async e=>{e.stopPropagation();if(askDel!==p.id){askDel=p.id;renderPre();setTimeout(()=>{if(askDel===p.id){askDel=null;renderPre();}},3000);return;}
+      askDel=null;await api('/api/presets',{action:'delete',id:p.id});toast('„'+p.name+'“ gelöscht');render();});
+    b.append(d);
+    b.addEventListener('click',async()=>{st.preset=p.id;renderPre();const r=await api('/api/presets',{action:'load',id:p.id});if(r){live={};render();pollLive();toast('„'+p.name+'“');}});
+    g.append(b);});
+}
+$('psave').addEventListener('click',async()=>{const name=$('pname').value.trim();if(!name){toast('Bitte einen Namen eingeben');return;}
+  const r=await api('/api/presets',{action:'save',name});if(r){$('pname').value='';toast('„'+name+'“ gespeichert');render();}});
+$('pname').addEventListener('keydown',e=>{if(e.key==='Enter')$('psave').click();});
+
+// ---------- Tab Optionen ----------
+let cfg=null;const PIN_KEYS=['rx','tx','de','led','snsR','snsL'];
+async function loadCfg(){
+  $('wifiInfo').textContent=st&&st.ssid?`Verbunden mit „${st.ssid}“. Hier kannst du ein anderes WLAN eintragen.`:'Noch mit keinem WLAN verbunden. Danach startet das Hauptpanel neu und ist unter http://trilumag.local erreichbar.';
+  try{cfg=await (await fetch('/api/config')).json();}catch(e){return;}
+  $('mode').value=cfg.mode;
+  const b=$('board');b.innerHTML='';cfg.boards.forEach(x=>{const o=document.createElement('option');o.value=x.id;o.textContent=x.name;b.append(o);});
+  const c=document.createElement('option');c.value='custom';c.textContent='Eigene Belegung';b.append(c);
+  b.value=cfg.boards.some(x=>x.id===cfg.board)?cfg.board:'custom';
+  PIN_KEYS.forEach(k=>{const s=$('p_'+k);s.innerHTML='';cfg.validPins.forEach(p=>{const o=document.createElement('option');o.value=p;o.textContent='GPIO '+p;s.append(o);});s.value=cfg.pins[k];});
+  $('order').innerHTML='';cfg.orders.forEach(o=>{const e=document.createElement('option');e.value=o;e.textContent=o;$('order').append(e);});$('order').value=cfg.order;
+  $('m_host').value=cfg.mqtt.host;$('m_port').value=cfg.mqtt.port;$('m_user').value=cfg.mqtt.user;
+  $('info').innerHTML='';[['Chip',cfg.chip],['Firmware',cfg.ver],['Betriebsart',cfg.mode==='bus'?'Bus':'Simulation'],['WLAN',st&&st.ssid||'–']]
+    .forEach(([k,v])=>{const a=document.createElement('span');a.textContent=k;const x=document.createElement('span');x.textContent=v;$('info').append(a,x);});
+}
+$('board').addEventListener('change',()=>{const x=cfg.boards.find(b=>b.id===$('board').value);if(x)PIN_KEYS.forEach(k=>$('p_'+k).value=x.pins[k]);});
+PIN_KEYS.forEach(k=>$('p_'+k).addEventListener('change',()=>{$('board').value='custom';}));
+document.querySelectorAll('[data-t]').forEach(b=>b.addEventListener('click',()=>fetch('/api/test',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({ch:+b.dataset.t})})));
+$('saveBtn').addEventListener('click',async()=>{
+  const pins={};PIN_KEYS.forEach(k=>pins[k]=+$('p_'+k).value);
+  if(new Set(Object.values(pins)).size<6){$('setErr').textContent='Ein Pin ist doppelt belegt.';return;}
+  const body={mode:$('mode').value,board:$('board').value,pins,order:$('order').value,mqtt:{host:$('m_host').value.trim(),port:+$('m_port').value||1883,user:$('m_user').value.trim()}};
+  if($('m_pass').value)body.mqtt.pass=$('m_pass').value;
+  const r=await fetch('/api/config',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)}).catch(()=>null);
+  if(r&&!r.ok){const j=await r.json();$('setErr').textContent=j.error||'Speichern fehlgeschlagen';return;}
+  $('setErr').textContent='';toast('Gespeichert. Trilumag startet neu …');setTimeout(()=>location.reload(),7000);});
 $('scanBtn').addEventListener('click',async()=>{$('scanBtn').disabled=true;$('scanBtn').textContent='Suche …';
   try{const r=await fetch('/api/wifi/scan');const j=await r.json();$('nets').innerHTML='';j.networks.forEach(n=>{const o=document.createElement('option');o.value=n;$('nets').append(o);});toast(j.networks.length+' Netze gefunden');}catch(e){toast('Suche fehlgeschlagen');}
   $('scanBtn').disabled=false;$('scanBtn').textContent='Netze suchen';});
 $('wifiBtn').addEventListener('click',async()=>{const ssid=$('ssid').value.trim();if(!ssid){toast('Bitte WLAN-Namen eingeben');return;}
   await fetch('/api/wifi',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({ssid,pass:$('pass').value})}).catch(()=>{});
   toast('Gespeichert. Trilumag startet neu und verbindet sich mit '+ssid);});
-// ----- Einstellungen -----
-let cfg=null;
-const PIN_KEYS=['rx','tx','de','led','snsR','snsL'];
-async function loadCfg(){
-  try{cfg=await (await fetch('/api/config')).json();}catch(e){return;}
-  $('setInfo').textContent=`${cfg.chip} · Firmware ${cfg.ver}`;
-  $('mode').value=cfg.mode;
-  const b=$('board');b.innerHTML='';
-  cfg.boards.forEach(x=>{const o=document.createElement('option');o.value=x.id;o.textContent=x.name;b.append(o);});
-  const c=document.createElement('option');c.value='custom';c.textContent='Eigene Belegung';b.append(c);
-  b.value=cfg.boards.some(x=>x.id===cfg.board)?cfg.board:'custom';
-  PIN_KEYS.forEach(k=>{const s=$('p_'+k);s.innerHTML='';cfg.validPins.forEach(p=>{const o=document.createElement('option');o.value=p;o.textContent='GPIO '+p;s.append(o);});s.value=cfg.pins[k];});
-  $('order').innerHTML='';cfg.orders.forEach(o=>{const e=document.createElement('option');e.value=o;e.textContent=o;$('order').append(e);});$('order').value=cfg.order;
-  $('m_host').value=cfg.mqtt.host;$('m_port').value=cfg.mqtt.port;$('m_user').value=cfg.mqtt.user;
-}
-$('board').addEventListener('change',()=>{const x=cfg.boards.find(b=>b.id===$('board').value);if(x)PIN_KEYS.forEach(k=>$('p_'+k).value=x.pins[k]);});
-PIN_KEYS.forEach(k=>$('p_'+k).addEventListener('change',()=>{$('board').value='custom';}));
-$('setBox').addEventListener('toggle',()=>{if($('setBox').open)loadCfg();});
-document.querySelectorAll('[data-t]').forEach(b=>b.addEventListener('click',()=>fetch('/api/test',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({ch:+b.dataset.t})})));
-$('saveBtn').addEventListener('click',async()=>{
-  const pins={};PIN_KEYS.forEach(k=>pins[k]=+$('p_'+k).value);
-  const uniq=new Set(Object.values(pins));if(uniq.size<6){$('setErr').textContent='Ein Pin ist doppelt belegt.';return;}
-  const body={mode:$('mode').value,board:$('board').value,pins,order:$('order').value,mqtt:{host:$('m_host').value.trim(),port:+$('m_port').value||1883,user:$('m_user').value.trim()}};
-  if($('m_pass').value)body.mqtt.pass=$('m_pass').value;
-  const r=await fetch('/api/config',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)}).catch(()=>null);
-  if(r&&!r.ok){const j=await r.json();$('setErr').textContent=j.error||'Speichern fehlgeschlagen';return;}
-  $('setErr').textContent='';toast('Gespeichert. Trilumag startet neu …');setTimeout(()=>location.reload(),7000);
-});
-window.addEventListener('resize',()=>{if(!drag)render();});
-poll();setInterval(poll,700);
+
+// ---------- Start ----------
+window.addEventListener('resize',()=>{if(drag)return;vbFix=null;drawWheel();syncColUi();render();});
+drawWheel();syncColUi();
+poll();setInterval(poll,700);setInterval(pollLive,120);
 </script></body></html>)HTML";
