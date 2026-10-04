@@ -6,11 +6,13 @@ Dreieckige RGBW-Lichtpanels zum Selberbauen, ähnlich wie Nanoleaf: Die Panels w
 
 ## Stand
 
+Aktuell: **Version 0.5**. Was sich wann geändert hat, steht im [Versionsverlauf](CHANGELOG.md).
+
 Ab Version 0.2 gibt es zwei Betriebsarten, umschaltbar in der App: **Simulation** (Panels werden in der App per Ziehen angeklipst) und **Bus** (echte Panels über RS-485). Das Protokoll steht in [docs/protokoll.md](docs/protokoll.md).
 
 | Teil | Stand |
 | --- | --- |
-| Firmware Hauptpanel (ESP32) | Simulation und echter Bus, Web-App, Pin-Einstellungen pro Board, MQTT mit Home-Assistant-Discovery, WLAN per Improv |
+| Firmware Hauptpanel (ESP32) | Simulation und echter Bus, Web-App im Stil von WLED mit fester Verbindung, Effekte mit Paletten, Presets, Pin-Einstellungen pro Board, MQTT mit Home-Assistant-Discovery, WLAN per Improv |
 | Bus zu den Panels (RS-485) | Protokoll v1 fertig, am PC mit echter Firmware simuliert und getestet, Steckbrett-Test folgt |
 | Firmware Panels (CH32V003) | Version 1: Erkennung, Farben, blau pulsieren bis zur ersten Farbe |
 | Platinen | Entwurf v0.1 |

@@ -3,6 +3,7 @@ name: Firmware bauen und Installer veröffentlichen
 on:
   push:
     branches: [main]
+    paths-ignore: ["**.md", "docs/**"]   # reine Text-Änderungen brauchen keinen neuen Build
   workflow_dispatch:
 
 permissions:
