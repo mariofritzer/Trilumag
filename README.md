@@ -14,7 +14,7 @@ Ab Version 0.2 gibt es zwei Betriebsarten, umschaltbar in der App: **Simulation*
 | --- | --- |
 | Firmware Hauptpanel (ESP32) | Simulation und echter Bus, Web-App im Stil von WLED mit fester Verbindung, Effekte mit Paletten, Presets, Pin-Einstellungen pro Board, MQTT mit Home-Assistant-Discovery, WLAN per Improv |
 | Bus zu den Panels (RS-485) | Protokoll v1 fertig, am PC mit echter Firmware simuliert und getestet, Steckbrett-Test folgt |
-| Firmware Panels (CH32V003) | Version 1: Erkennung, Farben, blau pulsieren bis zur ersten Farbe |
+| Firmware Panels (CH32V003) | Version 3: Erkennung, Farben, Kanten einzeln, Antippen per Bewegungssensor, Updates über den Bus mit eigenem Bootloader |
 | Platinen | Entwurf v0.1 |
 
 ## Aufbau
@@ -38,7 +38,7 @@ Ab Version 0.2 gibt es zwei Betriebsarten, umschaltbar in der App: **Simulation*
 
 **Hauptpanel:** Arduino IDE mit dem Boardpaket **esp32** von Espressif, dazu die Bibliotheken **ArduinoJson** (ab 7), **PubSubClient** und **Adafruit NeoPixel**. Bei ESP32-S3, ESP32-C3 und ESP32-C6 unter Werkzeuge „USB CDC On Boot“ auf „Enabled“ stellen. Unter „Partition Scheme“ immer **Minimal SPIFFS (1.9MB APP with OTA)** wählen, sonst ist für Online-Updates kein Platz.
 
-**Panels:** [ch32fun](https://github.com/cnlohr/ch32fun) und eine RISC-V-Toolchain, dann `make -C firmware/panel CH32FUN=<pfad>/ch32fun/ch32fun`. Fertige Dateien gibt es auf der Installer-Seite.
+**Panels:** [ch32fun](https://github.com/cnlohr/ch32fun) und eine RISC-V-Toolchain. Ein neues Panel wird einmal mit dem WCH-LinkE programmiert: `make -C firmware/panel flashall CH32FUN=<pfad>/ch32fun/ch32fun` schreibt Bootloader, Option-Byte und Firmware. Danach bekommt es neue Versionen über den Bus vom Hauptpanel (Optionen → Panel-Firmware). Fertige Dateien gibt es bei jedem Release (`trilumag-panel.bin`, `trilumag-panel-bootloader.bin`).
 
 ## Web-App
 
@@ -87,6 +87,8 @@ In der App unter Optionen „MQTT aktiv“ einschalten und die Adresse des Broke
 | `GET /api/diag` | Bus-Diagnose: Zähler, Antwortzeiten pro Panel, Ereignisprotokoll |
 | `GET /api/backup`, `POST /api/restore` | Sicherung herunterladen und einspielen |
 | `POST /api/light` | Übergangszeit, Stromlimit und Stromsensor-Pins |
+| `POST /api/touch` | Antippen: an/aus, Empfindlichkeit 1–10, Aktion für einmal (`a1`) und doppelt (`a2`) |
+| `POST /api/panelfw` | Panel-Firmware: `{"action":"all"}`, `{"action":"one","id":"…"}`, `{"action":"auto","on":true}` |
 | `/json`, `/json/state`, `/json/info`, `/presets.json` | WLED-kompatible Schnittstelle (eine Wand = ein Segment) |
 | `POST /api/sim/attach` | Simulation: Panel anklipsen |
 | `POST /api/sim/detach` | Simulation: Panel abklipsen |
