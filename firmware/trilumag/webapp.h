@@ -94,6 +94,7 @@ input[type=text],input[type=password],input:not([type]),select{width:100%;height
 .row.on .dot{border-color:var(--acc);background:radial-gradient(circle,var(--acc) 0 45%,transparent 50%)}
 .row .grad{height:16px;border-radius:8px;flex:1;max-width:46%;margin-left:auto}
 .row small{color:var(--muted);margin-left:auto;font-size:12px}
+.erow input{width:20px;height:20px;margin:0;accent-color:var(--acc);flex:none;cursor:pointer}
 /* Presets */
 .pgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:10px}
 .pgrid:empty{display:none}
@@ -226,6 +227,12 @@ nav.tabs button.on{color:var(--acc)}
       <div class="btnrow"><button class="btn" id="pOn">Ein / Aus</button><button class="btn pri" id="pCol">Farbe wählen</button></div>
       <label class="tog"><input type="checkbox" id="pEdges"><span class="sw"></span>Kanten einzeln</label>
       <p class="note">Effekte bekommen dann drei Farben pro Panel, eine je Kante. Feste Farben bleiben pro Panel.</p>
+    </div>
+    <div class="card" id="edgeCard">
+      <h3>Kanten einzeln</h3>
+      <p class="note">Angehakte Panels zeigen bei Effekten drei Farben, eine je Kante.</p>
+      <div class="btnrow"><button class="btn" id="eAllOn">Alle an</button><button class="btn" id="eAllOff">Alle aus</button><span class="note" id="eCount"></span></div>
+      <div class="list" id="eList"></div>
     </div>
   </section>
 
@@ -463,7 +470,7 @@ function drawWall(svg,big){
 function paintLive(){
   let rebuild=false;
   ['mini','big'].forEach(id=>$(id).querySelectorAll('polygon[data-id]').forEach(p=>{const i=p.dataset.id,h=live[i];
-    if(h&&(h.includes(',')!==(p.dataset.e!==undefined)))rebuild=true;            // Kanten ein-/ausgeschaltet: neu zeichnen
+    if(h&&(h.includes(',')!==(p.dataset.e!==undefined))){rebuild=true;return;}   // Kanten ein-/ausgeschaltet: neu zeichnen
     if(joining.includes(i)){if(!p.classList.contains('pulse')){p.style.fill='';p.classList.add('pulse');syncPulse(p);}}
     else if(h){const c=h.split(',')[p.dataset.e||0];p.classList.remove('pulse');p.style.fill=st.on?liveCol(c):'#141414';}}));
   if(rebuild&&!drag)render();
@@ -621,7 +628,7 @@ $('master').addEventListener('input',()=>{if(!st)return;const p=+$('master').val
 
 // ---------- Tab Wand ----------
 function renderWall(){
-  drawWall($('big'),true);
+  drawWall($('big'),true);renderEdges();
   const tray=$('tray');tray.innerHTML='';
   if(!st.loose.length){const e=document.createElement('span');e.className='note';e.textContent=st.sim?'Leer. Mit „Neues Panel“ eins dazunehmen oder ein Panel von der Wand hierher ziehen.':'Abgeklipste Panels erscheinen hier.';tray.append(e);}
   st.loose.forEach(id=>{const d=document.createElement('div');d.className='item';
@@ -645,6 +652,25 @@ function renderWall(){
   }
 }
 $('newBtn').addEventListener('click',async()=>{if(await api('/api/sim/new',{}))render();});
+// Kanten einzeln: Liste zum An- und Abhaken, oder alle auf einmal
+function renderEdges(){
+  const ps=st.panels.slice().sort((a,b)=>(b.main-a.main)||a.id.localeCompare(b.id));
+  $('edgeCard').hidden=!ps.length;
+  const l=$('eList'),key=ps.map(p=>p.id).join();
+  if(l.dataset.key!==key){l.dataset.key=key;l.innerHTML='';
+    ps.forEach(p=>{const r=document.createElement('label');r.className='row erow';r.dataset.id=p.id;
+      const c=document.createElement('input');c.type='checkbox';
+      c.addEventListener('change',async()=>{focus=p.id;render();await api('/api/set',{id:p.id,edges:c.checked});render();});   // angehaktes Panel auf der Wand markieren
+      const n=document.createElement('span');n.textContent=p.main?'Hauptpanel':'Panel '+p.id.slice(4);
+      r.append(c,n);l.append(r);});}
+  let on=0;l.querySelectorAll('.erow').forEach(r=>{const p=ps.find(q=>q.id===r.dataset.id);const c=r.firstChild;
+    if(document.activeElement!==c)c.checked=!!p.edges;if(p.edges)on++;});
+  $('eCount').textContent=on+' von '+ps.length+' an';
+  $('eAllOn').disabled=on===ps.length;$('eAllOff').disabled=!on;
+}
+async function edgesAll(v){if(await api('/api/set',{ids:st.panels.map(p=>p.id),edges:v})){toast(v?'Kanten einzeln: alle an':'Kanten einzeln: alle aus');render();}}
+$('eAllOn').addEventListener('click',()=>edgesAll(true));
+$('eAllOff').addEventListener('click',()=>edgesAll(false));
 $('pbri').addEventListener('input',()=>{$('pbrio').textContent=$('pbri').value+' %';const id=focus;later('pb',async()=>{await api('/api/set',{id,brightness:fromPct(+$('pbri').value)});render();});});
 $('pOn').addEventListener('click',async()=>{const p=st.panels.find(q=>q.id===focus);if(!p)return;await api('/api/set',{id:p.id,state:p.on?'OFF':'ON'});render();});
 $('pEdges').addEventListener('change',async()=>{if(!focus)return;await api('/api/set',{id:focus,edges:$('pEdges').checked});
