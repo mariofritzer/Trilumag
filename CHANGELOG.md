@@ -4,7 +4,22 @@ Die Versionsnummer im Webinstaller und in der App setzt sich aus der Version in 
 
 ## Nächster Build
 
-- Die App im Browser zeigt das Trilumag-Logo als Symbol im Tab und in den Lesezeichen.
+**Online-Updates**
+- Die App zeigt unter Optionen → Updates alle verfügbaren Versionen an, auch ältere für Downgrades, und installiert sie auf Knopfdruck.
+- Mit „Automatisch aktualisieren“ installiert das Hauptpanel neue Versionen von selbst. Es sieht alle 6 Stunden nach.
+- Gibt es eine neue Version, zeigt der Tab Optionen einen Punkt.
+- Eigene Builds lassen sich als Datei hochladen.
+- Die Firmware jeder Version liegt als GitHub-Release bereit. Die Downloads prüft das Hauptpanel über HTTPS mit den Stammzertifikaten. Der Build kontrolliert jedes Mal, dass die echten Zertifikate der GitHub-Server dazu passen.
+
+**Webinstaller**
+- Das Hauptpanel beginnt jede Antwort an den Webinstaller mit einem Zeilenwechsel. Vorher konnte ein halb ausgegebener Log-Text die Antwort verdecken, und der Installer bot kein WLAN an.
+
+**App**
+- Zwischen den Kästchen ist wieder Abstand.
+- Jedes Kästchen lässt sich über seine Überschrift zu- und aufklappen. Die App merkt sich das.
+- WLAN: deutliche Anzeige „Verbunden mit …“ mit Empfangsqualität, Signalstärke in dBm und IP-Adresse.
+- Wand: Die Ablage steht über der Wand. Beim Ziehen eines Panels aus der Ablage rückt die Wand ins Bild.
+- Trilumag-Logo als Symbol im Browser-Tab.
 
 ## 0.5.11 · 4. Oktober 2026
 
