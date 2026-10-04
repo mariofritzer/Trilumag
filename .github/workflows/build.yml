@@ -120,6 +120,16 @@ jobs:
           json.dump({'latest':out[0]['v'] if out else '','versions':out[:20]},open('site/versions.json','w'),ensure_ascii=False)
           print(open('site/versions.json').read())
           PY
+          # vollständiger Versionsverlauf als JSON für die App (Abschnitte "## <Version> · <Datum>")
+          python3 - <<'PY'
+          import json,re
+          out={}; cur=None
+          for l in open('CHANGELOG.md',encoding='utf-8').read().split('\n'):
+            m=re.match(r'^## (\S+)',l)
+            if m: cur=m.group(1); out[cur]=[]; continue
+            if cur: out[cur].append(l)
+          json.dump({k:'\n'.join(v).strip() for k,v in out.items()},open('site/changelog.json','w'),ensure_ascii=False)
+          PY
 
       - name: Panel-Firmware (CH32V003) bauen
         run: |

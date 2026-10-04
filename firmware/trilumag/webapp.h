@@ -130,6 +130,15 @@ label.f{display:flex;flex-direction:column;gap:6px;font-size:13px;color:var(--mu
 .row .vinfo span{font-size:12px;color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .row .ib{border:1px solid var(--line);background:#1c1c1c;border-radius:999px;padding:6px 12px;font-size:13px;cursor:pointer;flex:none}
 .row .ib.ask{background:#5a1d1d;border-color:#5a1d1d;color:#ffb4b4}
+.vbox{border-bottom:1px solid var(--card)}
+.vbox:last-child{border-bottom:0}
+.vbox .row{border-bottom:0}
+.clog{padding:0 14px 14px;font-size:14px;color:#ccc}
+.clog h4{margin:10px 0 4px;font-size:13px;color:var(--fg)}
+.clog ul{margin:0;padding-left:18px}
+.clog li{margin:3px 0}
+.clog p{margin:6px 0}
+.lnk{background:none;border:0;color:var(--acc);font-size:12px;padding:0;cursor:pointer;text-align:left;width:max-content}
 details.more summary{cursor:pointer;color:var(--muted);font-size:14px}
 details.more[open] summary{margin-bottom:10px}
 code{font:12px ui-monospace,Menlo,monospace;background:#0c0c0c;padding:1px 5px;border-radius:4px}
@@ -667,9 +676,20 @@ function renderOta(){
   if(document.activeElement!==$('otaAuto'))$('otaAuto').checked=!!o.auto;
   $('otaCheck').disabled=!!o.busy;
   const L=$('otaList');L.innerHTML='';
-  o.versions.forEach(v=>{const c=cmpV(v.v,o.cur);const r=document.createElement('div');r.className='row';
+  o.versions.forEach(v=>{const c=cmpV(v.v,o.cur);const box=document.createElement('div');box.className='vbox';
+    const r=document.createElement('div');r.className='row';box.append(r);
     const info=document.createElement('div');info.className='vinfo';const b=document.createElement('b');b.textContent=v.v;
-    const sp=document.createElement('span');sp.textContent=[v.date,v.notes].filter(Boolean).join(' · ');info.append(b,sp);
+    const sp=document.createElement('span');sp.textContent=[v.date,v.notes].filter(Boolean).join(' · ');
+    const tg=document.createElement('button');tg.className='lnk';const open=openLog.has(v.v);
+    tg.textContent=open?'Änderungen ausblenden':'Änderungen anzeigen';tg.setAttribute('aria-expanded',open);
+    tg.addEventListener('click',()=>{if(openLog.has(v.v))openLog.delete(v.v);else{openLog.add(v.v);loadLog();}renderOta();});
+    info.append(b,sp,tg);
+    if(open){const cl=document.createElement('div');cl.className='clog';
+      if(logData&&logData[v.v])cl.innerHTML=md(logData[v.v]);
+      else if(logData===false)cl.innerHTML='<p>Der Versionsverlauf lässt sich gerade nicht laden (kein Internet?). Er steht auch auf <a href="https://github.com/mariofritzer/Trilumag/blob/main/CHANGELOG.md" target="_blank" rel="noopener">GitHub</a>.</p>';
+      else if(logData)cl.textContent=v.notes||'Keine Beschreibung vorhanden.';
+      else cl.textContent='Lade …';
+      box.append(cl);}
     const tag=document.createElement('span');tag.className='tag'+(c>0?' new':'');tag.textContent=c===0?'installiert':c>0?'neuer':'älter';
     r.append(info,tag);
     if(c!==0){const btn=document.createElement('button');btn.className='ib'+(askVer===v.v?' ask':'');btn.disabled=!!o.busy;
@@ -678,7 +698,7 @@ function renderOta(){
         askVer=null;otaInfo.busy=true;otaInfo.p=0;renderOta();
         const r2=await api('/api/ota',{action:'install',version:v.v});if(!wsOk&&r2){toast('Update läuft, die Seite lädt danach neu');setTimeout(()=>location.reload(),60000);}});
       r.append(btn);}
-    L.append(r);});
+    L.append(box);});
 }
 $('otaAuto').addEventListener('change',async()=>{otaInfo&&(otaInfo.auto=$('otaAuto').checked);await api('/api/ota',{action:'auto',on:$('otaAuto').checked});
   toast($('otaAuto').checked?'Automatische Updates an':'Automatische Updates aus');if(!wsOk)loadOta();});
@@ -688,6 +708,22 @@ $('otaUp').addEventListener('click',()=>{const f=$('otaFile').files[0];if(!f){to
   $('otaProg').hidden=false;x.upload.onprogress=e=>{if(e.lengthComputable){$('otaBar').style.width=(e.loaded/e.total*100)+'%';$('otaT').textContent=`Lade hoch … ${Math.round(e.loaded/e.total*100)} %`;}};
   x.onload=()=>{if(x.status===200){toast('Installiert, Trilumag startet neu …');setTimeout(()=>location.reload(),9000);}else{let m='Hochladen fehlgeschlagen';try{m=JSON.parse(x.responseText).error||m;}catch(e){}toast(m);$('otaProg').hidden=true;}};
   x.onerror=()=>{toast('Hochladen fehlgeschlagen');$('otaProg').hidden=true;};x.send(fd);});
+
+// Versionsverlauf: kommt direkt von der Installer-Seite (die App braucht dafür Internet, das Hauptpanel nicht)
+let logData=null,openLog=new Set();
+async function loadLog(){if(logData)return;
+  try{const r=await fetch('https://mariofritzer.github.io/Trilumag/changelog.json',{cache:'no-cache'});logData=await r.json();}catch(e){logData=false;}
+  renderOta();}
+// kleiner Markdown-Leser für den Versionsverlauf: **Überschrift**, - Liste, `Code`
+function md(t){const esc=x=>x.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+  const inl=x=>esc(x).replace(/\*\*(.+?)\*\*/g,'<b>$1</b>').replace(/`(.+?)`/g,'<code>$1</code>').replace(/\[(.+?)\]\((https?:[^)]+)\)/g,'<a href="$2" target="_blank" rel="noopener">$1</a>').replace(/\*(.+?)\*/g,'<i>$1</i>');
+  let h='',ul=false;
+  t.split('\n').forEach(l=>{l=l.trimEnd();
+    if(/^- /.test(l)){if(!ul){h+='<ul>';ul=true;}h+='<li>'+inl(l.slice(2))+'</li>';return;}
+    if(ul){h+='</ul>';ul=false;}
+    if(!l.trim())return;
+    const m=l.match(/^\*\*(.+)\*\*$/);h+=m?'<h4>'+esc(m[1])+'</h4>':'<p>'+inl(l)+'</p>';});
+  if(ul)h+='</ul>';return h;}
 
 // ---------- Ausklappbare Kästchen ----------
 document.querySelectorAll('.card').forEach(c=>{const h=c.querySelector(':scope>h3');if(!h)return;
