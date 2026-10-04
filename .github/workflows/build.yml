@@ -7,7 +7,7 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: read
+  contents: write   # für die Releases (Firmware-Dateien für Online-Updates und Downgrades)
   pages: write
   id-token: write
 
@@ -39,6 +39,9 @@ jobs:
           arduino-cli core update-index
           arduino-cli core install "esp32:esp32@${ESP32_CORE}"
           arduino-cli lib install "ArduinoJson@7.2.1" "PubSubClient@2.8" "Adafruit NeoPixel@1.12.3"
+
+      - name: Zertifikate für Online-Updates prüfen
+        run: python3 .github/scripts/check_certs.py
 
       - name: Firmware kompilieren
         run: |
@@ -85,6 +88,38 @@ jobs:
           cp installer/* site/
           sed -i "s/__VERSION__/${VERSION}/g" site/manifest.json site/index.html
           touch site/.nojekyll
+          echo "VERSION=${VERSION}" >> "$GITHUB_ENV"
+
+      - name: Release für Online-Updates anlegen
+        if: github.ref == 'refs/heads/main'      # Probe-Builds anderer Zweige veröffentlichen nichts
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          mkdir -p release
+          for n in esp32 esp32s3 esp32c3 esp32c6; do cp "site/firmware/$n/app.bin" "release/trilumag-$n.bin"; done
+          # Text zur Version aus dem Versionsverlauf (Abschnitt "## <Version>"), sonst ein kurzer Standardtext
+          awk -v v="## ${VERSION}" 'index($0,v)==1{f=1;next} /^## /{if(f)exit} f' CHANGELOG.md > notes.md || true
+          [ -s notes.md ] || echo "Automatischer Build ${VERSION}. Details im Versionsverlauf (CHANGELOG.md)." > notes.md
+          gh release create "v${VERSION}" release/*.bin --title "Trilumag ${VERSION}" --notes-file notes.md --target "${GITHUB_SHA}"
+          # Versionsliste für die Geräte: neueste zuerst, höchstens 20
+          gh api "repos/${GITHUB_REPOSITORY}/releases?per_page=30" > releases.json
+          python3 - <<'PY'
+          import json,re
+          rs=json.load(open('releases.json'))
+          out=[]
+          for r in rs:
+            if r.get('draft') or not r['tag_name'].startswith('v'): continue
+            names={a['name'] for a in r.get('assets',[])}
+            if 'trilumag-esp32s3.bin' not in names: continue
+            body=(r.get('body') or '').replace('\r','')
+            first=next((re.sub(r'[*_`#>-]+\s*','',l).strip() for l in body.split('\n') if l.strip() and not l.startswith('#')),'')
+            out.append({'v':r['tag_name'][1:],'date':(r.get('published_at') or '')[:10],'notes':first[:110]})
+          def key(x): return [int(p) for p in re.findall(r'\d+',x['v'])]
+          out.sort(key=key,reverse=True)
+          json.dump({'latest':out[0]['v'] if out else '','versions':out[:20]},open('site/versions.json','w'),ensure_ascii=False)
+          print(open('site/versions.json').read())
+          PY
 
       - name: Panel-Firmware (CH32V003) bauen
         run: |
@@ -98,11 +133,13 @@ jobs:
           ls -l site/firmware/panel
 
       - uses: actions/upload-pages-artifact@v3
+        if: github.ref == 'refs/heads/main'
         with:
           path: site
 
   deploy:
     needs: build
+    if: github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     environment:
       name: github-pages

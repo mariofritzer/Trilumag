@@ -12,8 +12,11 @@ enum Type : uint8_t { CURRENT_STATE = 0x01, ERROR_STATE = 0x02, RPC = 0x03, RPC_
 enum Command : uint8_t { WIFI_SETTINGS = 0x01, GET_CURRENT_STATE = 0x02, GET_DEVICE_INFO = 0x03, GET_WIFI_NETWORKS = 0x04 };
 
 inline void send(Stream& s, uint8_t type, const uint8_t* data, uint8_t len) {
-  uint8_t buf[268];
+  uint8_t buf[270];
   uint16_t n = 0;
+  // Der Webinstaller erkennt Pakete nur am Zeilenanfang. Ein Zeilenwechsel davor beendet
+  // eine eventuell halb ausgegebene Log-Zeile, sonst würde er das Paket verwerfen.
+  buf[n++] = '\n';
   const char* h = "IMPROV";
   for (int i = 0; i < 6; i++) buf[n++] = (uint8_t)h[i];
   buf[n++] = 0x01;            // Version
@@ -21,7 +24,7 @@ inline void send(Stream& s, uint8_t type, const uint8_t* data, uint8_t len) {
   buf[n++] = len;
   if (len) { memcpy(buf + n, data, len); n += len; }
   uint8_t sum = 0;
-  for (uint16_t i = 0; i < n; i++) sum += buf[i];
+  for (uint16_t i = 1; i < n; i++) sum += buf[i];   // Prüfsumme ohne den Zeilenwechsel
   buf[n++] = sum;
   buf[n++] = '\n';
   s.write(buf, n);

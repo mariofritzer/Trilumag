@@ -33,8 +33,19 @@ input[type=range]::-moz-range-track{height:8px;border-radius:4px;background:line
 input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:22px;height:22px;border-radius:50%;background:#eee;border:0;margin-top:-7px;box-shadow:0 1px 4px rgba(0,0,0,.6)}
 input[type=range]::-moz-range-thumb{width:22px;height:22px;border-radius:50%;background:#eee;border:0}
 main{max-width:720px;margin:0 auto;padding:12px 14px;display:flex;flex-direction:column;gap:12px}
+.tab{display:flex;flex-direction:column;gap:12px}
 .card{background:var(--card);border-radius:14px;padding:14px;display:flex;flex-direction:column;gap:12px}
 .card h3{margin:0;font-size:12px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.09em}
+.card h3.fold{display:flex;align-items:center;justify-content:space-between;cursor:pointer;user-select:none;min-height:24px;margin:-4px 0}
+.card h3.fold::after{content:"";width:8px;height:8px;border-right:2px solid var(--muted);border-bottom:2px solid var(--muted);transform:rotate(45deg);margin:0 4px 4px 0;transition:transform .15s}
+.card.closed h3.fold::after{transform:rotate(-45deg);margin:4px 4px 0 0}
+.card.closed>:not(h3){display:none!important}
+.wstat{display:flex;gap:12px;align-items:center;background:#13261a;border:1px solid #2c5a3a;border-radius:12px;padding:12px}
+.wstat.bad{background:#2b1a12;border-color:#5a3a2a}
+.wstat .ic{width:30px;height:30px;border-radius:50%;background:#2fbf65;display:grid;place-items:center;flex:none;color:#08130c;font-weight:800}
+.wstat.bad .ic{background:#e2894a}
+.wstat b{display:block;font-size:15px}
+.wstat span{font-size:13px;color:var(--muted)}
 .sl{display:grid;grid-template-columns:96px 1fr 38px;align-items:center;gap:10px;font-size:14px;color:var(--muted)}
 .sl output{text-align:right;font:12px ui-monospace,Menlo,monospace;color:var(--fg)}
 .note{font-size:13px;color:var(--muted);margin:0}
@@ -111,6 +122,18 @@ label.f{display:flex;flex-direction:column;gap:6px;font-size:13px;color:var(--mu
 .bars{display:flex;align-items:flex-end;gap:2px;height:14px;flex:none}
 .bars i{width:4px;background:#555;border-radius:1px}
 .bars i.on{background:var(--fg)}
+.prog{height:8px;border-radius:4px;background:#333;overflow:hidden}
+.prog i{display:block;height:100%;width:0;background:var(--acc);transition:width .3s}
+.row .tag{font-size:11px;padding:2px 8px;border-radius:999px;background:#333;color:var(--fg);flex:none}
+.row .tag.new{background:var(--acc);color:var(--accfg)}
+.row .vinfo{display:flex;flex-direction:column;gap:2px;min-width:0;flex:1}
+.row .vinfo span{font-size:12px;color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.row .ib{border:1px solid var(--line);background:#1c1c1c;border-radius:999px;padding:6px 12px;font-size:13px;cursor:pointer;flex:none}
+.row .ib.ask{background:#5a1d1d;border-color:#5a1d1d;color:#ffb4b4}
+details.more summary{cursor:pointer;color:var(--muted);font-size:14px}
+details.more[open] summary{margin-bottom:10px}
+code{font:12px ui-monospace,Menlo,monospace;background:#0c0c0c;padding:1px 5px;border-radius:4px}
+.badge{display:inline-block;width:8px;height:8px;border-radius:50%;background:var(--acc);margin-left:4px;vertical-align:top}
 .kv{display:grid;grid-template-columns:auto 1fr;gap:4px 14px;font-size:14px}
 .kv span:nth-child(odd){color:var(--muted)}
 /* Tabs unten */
@@ -136,7 +159,8 @@ nav.tabs button.on{color:var(--acc)}
 
   <!-- Farben -->
   <section id="t-col" class="tab">
-    <div class="card">
+    <div class="card" id="colCard">
+      <h3>Farbe</h3>
       <div class="chips"><button class="chip" id="tgtAll">Ganze Wand</button><button class="chip" id="tgtSel">Auswahl</button></div>
       <p class="note" id="colNote"></p>
       <div class="wheelbox"><div class="wheel" id="wheel"><canvas id="wcv"></canvas><div class="knob" id="knob"></div></div></div>
@@ -149,7 +173,8 @@ nav.tabs button.on{color:var(--acc)}
 
   <!-- Effekte -->
   <section id="t-fx" class="tab" hidden>
-    <div class="card">
+    <div class="card" id="fxSet">
+      <h3>Tempo und Intensität</h3>
       <div class="sl">Tempo<input type="range" id="fspeed" min="1" max="100" value="50"><output id="fspeedo">50</output></div>
       <div class="sl">Intensität<input type="range" id="finten" min="0" max="255" value="128"><output id="finteno">128</output></div>
       <p class="note" id="fxNote"></p>
@@ -167,17 +192,17 @@ nav.tabs button.on{color:var(--acc)}
 
   <!-- Wand -->
   <section id="t-wall" class="tab" hidden>
+    <div class="card" id="trayCard">
+      <h3>Ablage · abgeklipste Panels</h3>
+      <div class="tray" id="tray"></div>
+      <div class="btnrow"><button class="btn" id="newBtn">Neues Panel</button></div>
+    </div>
     <div class="wall"><svg id="big" aria-label="Wand mit Panels"></svg><div class="hint" id="bigHint"></div></div>
     <div class="card" id="panelCard">
       <h3 id="pTitle">Panel</h3>
       <div class="kv" id="pInfo"></div>
       <div class="sl">Helligkeit<input type="range" id="pbri" min="1" max="100" value="71"><output id="pbrio">71 %</output></div>
       <div class="btnrow"><button class="btn" id="pOn">Ein / Aus</button><button class="btn pri" id="pCol">Farbe wählen</button></div>
-    </div>
-    <div class="card" id="trayCard">
-      <h3>Ablage · abgeklipste Panels</h3>
-      <div class="tray" id="tray"></div>
-      <div class="btnrow"><button class="btn" id="newBtn">Neues Panel</button></div>
     </div>
   </section>
 
@@ -199,6 +224,7 @@ nav.tabs button.on{color:var(--acc)}
   <section id="t-opt" class="tab" hidden>
     <div class="card" id="wifiCard">
       <h3>WLAN</h3>
+      <div class="wstat" id="wifiStat"><div class="ic" id="wifiIc">✓</div><div><b id="wifiT"></b><span id="wifiS"></span></div></div>
       <p class="note" id="wifiInfo"></p>
       <div class="nets" id="netList"></div>
       <label class="f">WLAN<input id="ssid" autocomplete="off" placeholder="Name deines WLANs"></label>
@@ -221,6 +247,19 @@ nav.tabs button.on{color:var(--acc)}
       <div class="btnrow"><span class="note">Farbtest:</span><button class="btn" data-t="0">Rot</button><button class="btn" data-t="1">Grün</button><button class="btn" data-t="2">Blau</button><button class="btn" data-t="3">Weiß</button><button class="btn" data-t="-1">Ende</button></div>
       <p class="note">Leuchtet bei „Rot“ etwas anderes als Rot, stimmt die Reihenfolge nicht. Dann eine andere wählen und speichern.</p>
     </div>
+    <div class="card" id="otaCard">
+      <h3>Updates</h3>
+      <div class="wstat" id="otaStat"><div class="ic" id="otaIc">✓</div><div><b id="otaT">Version …</b><span id="otaS"></span></div></div>
+      <div class="prog" id="otaProg" hidden><i id="otaBar"></i></div>
+      <label class="tog"><input type="checkbox" id="otaAuto"><span class="sw"></span>Automatisch aktualisieren</label>
+      <p class="note">Ist das an, installiert das Hauptpanel neue Versionen von selbst (es sieht alle 6 Stunden nach). Sonst zeigt die App sie hier an, und du entscheidest.</p>
+      <div class="btnrow"><button class="btn" id="otaCheck">Nach Updates suchen</button></div>
+      <div class="list" id="otaList"></div>
+      <details class="more"><summary>Firmware-Datei hochladen</summary>
+        <p class="note">Für eigene Builds: die Datei <code>trilumag.ino.bin</code> bzw. <code>app.bin</code> für deinen Chip.</p>
+        <div class="btnrow"><input type="file" id="otaFile" accept=".bin"><button class="btn" id="otaUp">Hochladen</button></div>
+      </details>
+    </div>
     <div class="card">
       <h3>Home Assistant (MQTT)</h3>
       <label class="tog"><input type="checkbox" id="m_on"><span class="sw"></span>MQTT aktiv</label>
@@ -242,7 +281,7 @@ nav.tabs button.on{color:var(--acc)}
   <button data-tab="fx"><svg viewBox="0 0 24 24"><path d="M12 3l1.8 4.6L18.5 9l-4.7 1.6L12 15l-1.8-4.4L5.5 9l4.7-1.4z"/><path d="M18 15l.8 2 2 .8-2 .8-.8 2-.8-2-2-.8 2-.8z"/></svg>Effekte</button>
   <button data-tab="wall"><svg viewBox="0 0 24 24"><path d="M3 19h9L7.5 11z"/><path d="M12 19l4.5-8H7.5"/><path d="M12 19h9l-4.5-8"/></svg>Wand</button>
   <button data-tab="pre"><svg viewBox="0 0 24 24"><path d="M6 3h12v18l-6-4-6 4z"/></svg>Presets</button>
-  <button data-tab="opt"><svg viewBox="0 0 24 24"><path d="M4 6h10M18 6h2M4 12h4M12 12h8M4 18h12M20 18h0"/><circle cx="16" cy="6" r="2"/><circle cx="10" cy="12" r="2"/><circle cx="18" cy="18" r="2"/></svg>Optionen</button>
+  <button data-tab="opt"><svg viewBox="0 0 24 24"><path d="M4 6h10M18 6h2M4 12h4M12 12h8M4 18h12M20 18h0"/><circle cx="16" cy="6" r="2"/><circle cx="10" cy="12" r="2"/><circle cx="18" cy="18" r="2"/></svg><span>Optionen<i class="badge" id="updBadge" hidden></i></span></button>
 </nav>
 <div class="toast" id="toast"></div>
 
@@ -279,6 +318,9 @@ function wsConnect(){
   sock.onmessage=e=>{let m;try{m=JSON.parse(e.data);}catch(x){return;}
     if(m.t==='state'){takeState(m.d);if(!drag)render();}
     else if(m.t==='live'){if(m.d.fx!=='aus'){live=m.d.c;joining=m.d.j||[];if(!drag)paintLive();}}
+    else if(m.t==='ota'){otaInfo=m.d;renderOta();}
+    else if(m.t==='otap'){if(otaInfo){otaInfo.busy=true;otaInfo.p=m.p;renderOta();}}
+    else if(m.t==='otadone'){toast('Version '+m.v+' installiert, Trilumag startet neu …');setTimeout(()=>location.reload(),9000);}
     else if(m.t==='err')toast(m.m);};
   sock.onclose=()=>{wsOk=false;sock=null;render();setTimeout(wsConnect,2000);};
   sock.onerror=()=>{try{sock.close();}catch(x){}};
@@ -371,6 +413,7 @@ function drawDrag(svg){const ov=svg.querySelector('.ov');if(!ov||!drag||!drag.mo
 function toSvg(e){const svg=$('big');const p=svg.createSVGPoint();p.x=e.clientX;p.y=e.clientY;return p.matrixTransform(svg.getScreenCTM().inverse());}
 function startDrag(e,id,from){
   if(!st||(!st.sim&&from==='tray'))return;e.preventDefault();
+  if(from==='tray'){const r=$('big').getBoundingClientRect();if(r.top<0||r.bottom>innerHeight)$('big').scrollIntoView({block:'nearest'});}   // Wand sichtbar machen, damit man sieht, wohin
   drag={id,from,x0:e.clientX,y0:e.clientY,moved:from==='tray',pt:toSvg(e),snap:null,detached:from==='tray'};
   window.addEventListener('pointermove',onMove);window.addEventListener('pointerup',onUp,{once:true});if(drag.moved)render();}
 async function onMove(e){
@@ -396,6 +439,8 @@ function render(){
   $('pwr').classList.toggle('on',st.on);
   if(document.activeElement!==$('master')){const p=pct(st.master);setRange('master',p);$('mastero').textContent=p+' %';}
   $('apBanner').hidden=!st.ap||tab==='opt';
+  $('updBadge').hidden=!st.upd;
+  if(tab==='opt')renderWifi();
   [...sel].forEach(id=>{if(!st.panels.some(p=>p.id===id))sel.delete(id);});     // abgeklipste Panels aus der Auswahl nehmen
   if(tab!=='wall'&&tab!=='opt'){drawWall($('mini'),false);
     $('miniHint').textContent=tab==='col'?(sel.size?`${sel.size} Panel${sel.size>1?'s':''} ausgewählt`:'Panels antippen, um nur diese einzufärben'):'';}
@@ -548,7 +593,7 @@ $('pname').addEventListener('keydown',e=>{if(e.key==='Enter')$('psave').click();
 // ---------- Tab Optionen ----------
 let cfg=null;const PIN_KEYS=['rx','tx','de','led','snsR','snsL'];
 async function loadCfg(){
-  $('wifiInfo').textContent=st&&st.ssid?`Verbunden mit „${st.ssid}“. Hier kannst du ein anderes WLAN eintragen.`:'Noch mit keinem WLAN verbunden. Danach startet das Hauptpanel neu und ist unter http://trilumag.local erreichbar.';
+  renderWifi();loadOta();
   try{cfg=await (await fetch('/api/config')).json();}catch(e){return;}
   if(st&&(st.ap||!st.ssid)&&!$('netList').children.length)$('scanBtn').click();   // ohne WLAN gleich nach Netzen suchen
   $('mode').value=cfg.mode;
@@ -591,7 +636,68 @@ $('scanBtn').addEventListener('click',async()=>{$('scanBtn').disabled=true;$('sc
   $('scanBtn').disabled=false;$('scanBtn').textContent='Netze suchen';});
 $('wifiBtn').addEventListener('click',async()=>{const ssid=$('ssid').value.trim();if(!ssid){toast('Bitte WLAN-Namen eingeben');return;}
   await fetch('/api/wifi',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({ssid,pass:$('pass').value})}).catch(()=>{});
-  toast('Gespeichert. Trilumag startet neu und verbindet sich mit '+ssid);});
+  toast('Gespeichert. Trilumag startet neu und verbindet sich mit '+ssid);
+  $('wifiStat').classList.add('bad');$('wifiIc').textContent='…';$('wifiT').textContent=`Verbinde mit „${ssid}“ …`;
+  $('wifiS').textContent='Trilumag startet neu. Lade diese Seite in etwa 20 Sekunden neu, im neuen WLAN unter http://trilumag.local.';});
+
+// ---------- WLAN-Anzeige ----------
+function quality(r){return r>=-55?'sehr gut':r>=-65?'gut':r>=-75?'mittel':'schwach';}
+function renderWifi(){
+  if(!st)return;const ok=!!st.ssid;
+  $('wifiStat').classList.toggle('bad',!ok);$('wifiIc').textContent=ok?'✓':'!';
+  $('wifiT').textContent=ok?`Verbunden mit „${st.ssid}“`:'Nicht mit einem WLAN verbunden';
+  $('wifiS').textContent=ok?`Empfang ${quality(st.rssi)} (${st.rssi} dBm) · IP ${st.ip} · trilumag.local`:(st.ap?'Das Setup-Netz „Trilumag-Setup“ ist offen. Wähle unten dein WLAN.':'Wähle unten dein WLAN.');
+  $('wifiInfo').textContent=ok?'Anderes WLAN wählen:':'';
+}
+
+// ---------- Updates ----------
+let otaInfo=null,askVer=null;
+async function loadOta(){if(wsOk&&otaInfo){renderOta();return;}try{otaInfo=await (await fetch('/api/ota')).json();renderOta();}catch(e){}}
+function cmpV(a,b){const x=a.split('.').map(Number),y=b.split('.').map(Number);for(let i=0;i<Math.max(x.length,y.length);i++){const d=(x[i]||0)-(y[i]||0);if(d)return d<0?-1:1;}return 0;}
+function renderOta(){
+  const o=otaInfo;if(!o)return;
+  const installing=o.busy&&o.p>=0;
+  $('otaProg').hidden=!installing;$('otaBar').style.width=(installing?o.p:0)+'%';
+  const bad=!!o.err&&!installing;$('otaStat').classList.toggle('bad',bad);
+  if(installing){$('otaIc').textContent='↓';$('otaT').textContent=`Installiere … ${o.p} %`;$('otaS').textContent='Nicht ausschalten. Danach startet Trilumag neu.';}
+  else if(bad){$('otaIc').textContent='!';$('otaT').textContent=`Version ${o.cur}`;$('otaS').textContent=o.err;}
+  else if(o.newer){$('otaIc').textContent='↑';$('otaT').textContent=`Version ${o.latest} ist verfügbar`;$('otaS').textContent=`Installiert ist ${o.cur}.`;}
+  else{$('otaIc').textContent='✓';$('otaT').textContent=`Version ${o.cur}`;
+    $('otaS').textContent=o.busy?'Suche nach Updates …':o.ago<0?'Noch nicht nach Updates gesucht.':`Aktuell · zuletzt geprüft vor ${o.ago<90?'1':Math.round(o.ago/60)} Min.`;}
+  if(document.activeElement!==$('otaAuto'))$('otaAuto').checked=!!o.auto;
+  $('otaCheck').disabled=!!o.busy;
+  const L=$('otaList');L.innerHTML='';
+  o.versions.forEach(v=>{const c=cmpV(v.v,o.cur);const r=document.createElement('div');r.className='row';
+    const info=document.createElement('div');info.className='vinfo';const b=document.createElement('b');b.textContent=v.v;
+    const sp=document.createElement('span');sp.textContent=[v.date,v.notes].filter(Boolean).join(' · ');info.append(b,sp);
+    const tag=document.createElement('span');tag.className='tag'+(c>0?' new':'');tag.textContent=c===0?'installiert':c>0?'neuer':'älter';
+    r.append(info,tag);
+    if(c!==0){const btn=document.createElement('button');btn.className='ib'+(askVer===v.v?' ask':'');btn.disabled=!!o.busy;
+      btn.textContent=askVer===v.v?(c>0?'Wirklich?':'Wirklich zurück?'):(c>0?'Installieren':'Zurück');
+      btn.addEventListener('click',async()=>{if(askVer!==v.v){askVer=v.v;renderOta();setTimeout(()=>{if(askVer===v.v){askVer=null;renderOta();}},4000);return;}
+        askVer=null;otaInfo.busy=true;otaInfo.p=0;renderOta();
+        const r2=await api('/api/ota',{action:'install',version:v.v});if(!wsOk&&r2){toast('Update läuft, die Seite lädt danach neu');setTimeout(()=>location.reload(),60000);}});
+      r.append(btn);}
+    L.append(r);});
+}
+$('otaAuto').addEventListener('change',async()=>{otaInfo&&(otaInfo.auto=$('otaAuto').checked);await api('/api/ota',{action:'auto',on:$('otaAuto').checked});
+  toast($('otaAuto').checked?'Automatische Updates an':'Automatische Updates aus');if(!wsOk)loadOta();});
+$('otaCheck').addEventListener('click',async()=>{if(otaInfo){otaInfo.busy=true;renderOta();}await api('/api/ota',{action:'check'});if(!wsOk)setTimeout(loadOta,4000);});
+$('otaUp').addEventListener('click',()=>{const f=$('otaFile').files[0];if(!f){toast('Bitte zuerst eine .bin-Datei wählen');return;}
+  const fd=new FormData();fd.append('firmware',f,f.name);const x=new XMLHttpRequest();x.open('POST','/update');
+  $('otaProg').hidden=false;x.upload.onprogress=e=>{if(e.lengthComputable){$('otaBar').style.width=(e.loaded/e.total*100)+'%';$('otaT').textContent=`Lade hoch … ${Math.round(e.loaded/e.total*100)} %`;}};
+  x.onload=()=>{if(x.status===200){toast('Installiert, Trilumag startet neu …');setTimeout(()=>location.reload(),9000);}else{let m='Hochladen fehlgeschlagen';try{m=JSON.parse(x.responseText).error||m;}catch(e){}toast(m);$('otaProg').hidden=true;}};
+  x.onerror=()=>{toast('Hochladen fehlgeschlagen');$('otaProg').hidden=true;};x.send(fd);});
+
+// ---------- Ausklappbare Kästchen ----------
+document.querySelectorAll('.card').forEach(c=>{const h=c.querySelector(':scope>h3');if(!h)return;
+  h.classList.add('fold');h.tabIndex=0;h.setAttribute('role','button');const key='zu:'+(c.id||h.textContent);
+  try{if(localStorage.getItem(key)==='1')c.classList.add('closed');}catch(e){}
+  h.setAttribute('aria-expanded',!c.classList.contains('closed'));
+  const t=()=>{c.classList.toggle('closed');const open=!c.classList.contains('closed');h.setAttribute('aria-expanded',open);
+    try{localStorage.setItem(key,open?'0':'1');}catch(e){}
+    if(open&&c.id==='colCard')requestAnimationFrame(()=>{drawWheel();syncColUi();});};
+  h.addEventListener('click',t);h.addEventListener('keydown',e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();t();}});});
 
 // ---------- Start ----------
 window.addEventListener('resize',()=>{if(drag)return;vbFix=null;drawWheel();syncColUi();render();});

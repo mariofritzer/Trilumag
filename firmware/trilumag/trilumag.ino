@@ -15,6 +15,7 @@
    - Effekte für die ganze Wand (Regenbogen, Atmen, Feuer …) mit Paletten und Intensität
    - Gesamthelligkeit und Ein/Aus für die ganze Wand, Presets (gespeicherte Szenen)
    - Web-App im Stil von WLED
+   - Online-Updates von GitHub, auf Wunsch automatisch, auch Downgrades; Datei-Upload
    - Farben bleiben pro Panel (Chip-ID) gespeichert, auch über einen Neustart
    - HTTP-API und Home Assistant über MQTT mit Auto-Discovery, Broker in der App einstellbar
 
@@ -37,6 +38,7 @@
 #include "improv.h"
 #include "pins.h"
 #include "ws.h"
+#include "ota.h"
 
 // ================= Voreinstellungen =================
 // Alles hier lässt sich später in der App ändern. Diese Werte gelten nur, solange nichts gespeichert ist.
@@ -48,7 +50,7 @@ const uint32_t FX_JOIN_MS   = 5 * 1600; // bei laufendem Effekt pulsieren neue P
 // ====================================================
 
 const char* FW_NAME    = "Trilumag";
-const char* FW_VERSION = "0.5.0";
+const char* FW_VERSION = "0.6.0";
 const char* HOSTNAME   = "trilumag";
 const char* SETUP_SSID = "Trilumag-Setup";
 const char* SETUP_PASS = "trilumag";
@@ -104,6 +106,7 @@ struct Config {
   String board;
   PinSet pins;
   String order = "RGBW";
+  bool autoUpdate = false; // Häkchen "Automatisch aktualisieren"
   bool mqttOn = false;     // Häkchen "MQTT aktiv"; Zugangsdaten bleiben auch ausgeschaltet gespeichert
   String mqttHost;
   uint16_t mqttPort = 1883;
@@ -1103,7 +1106,8 @@ void loadConfig() {
   cfg.mqttPort = prefs.getUShort("mqttPort", 1883);
   cfg.mqttUser = prefs.getString("mqttUser", "");
   cfg.mqttPass = prefs.getString("mqttPass", "");
-  cfg.mqttOn = prefs.getBool("mqttOn", cfg.mqttHost.length() > 0);   // ältere Versionen: an, sobald eine Adresse da ist
+  cfg.mqttOn = prefs.getBool("mqttOn", cfg.mqttHost.length() > 0);
+  cfg.autoUpdate = prefs.getBool("autoUpd", false);   // ältere Versionen: an, sobald eine Adresse da ist
 }
 
 String configJson() {
@@ -1142,6 +1146,8 @@ String stateJson(bool meta) {
   d["mqttSet"] = cfg.mqttOn && cfg.mqttHost.length() > 0;
   d["ap"] = apMode;
   d["ssid"] = wlanOk ? WiFi.SSID() : String();
+  if (wlanOk) { d["rssi"] = WiFi.RSSI(); d["ip"] = WiFi.localIP().toString(); }
+  d["upd"] = ota::count && ota::cmp(ota::latest(), FW_VERSION) > 0 ? ota::latest() : String();   // neuere Version verfügbar
   d["ver"] = FW_VERSION;
   d["chip"] = CHIP_FAMILY;
   JsonObject f = d["fx"].to<JsonObject>();
@@ -1210,8 +1216,10 @@ const char* apiCall(const char* path, JsonDocument& d);
 String liveJson();
 void wsKick() { wsForce = true; }
 
+String otaJson();
 void wsOpen(uint8_t id) {
   ws::send(id, "{\"t\":\"state\",\"d\":" + stateJson(true) + "}");
+  ws::send(id, "{\"t\":\"ota\",\"d\":" + otaJson() + "}");
   wsLast = stateJson(false);
 }
 // Nachricht der App: {"p":"/api/set","b":{...}}
@@ -1239,6 +1247,56 @@ void wsLoop() {
   if (fx.id && now - wsLastLive >= 66) {        // Effektbild etwa 15-mal pro Sekunde
     wsLastLive = now;
     ws::broadcast("{\"t\":\"live\",\"d\":" + liveJson() + "}");
+  }
+}
+
+// ---------- Online-Updates ----------
+bool otaCheckNow = false;
+String otaInstallVer;
+uint32_t otaNext = 0;
+const uint32_t OTA_EVERY = 6UL * 3600 * 1000;    // alle 6 Stunden nachsehen
+
+String otaJson() {
+  JsonDocument d;
+  d["cur"] = FW_VERSION; d["chip"] = ota::CHIP_KEY; d["auto"] = cfg.autoUpdate;
+  d["latest"] = ota::latest();
+  d["newer"] = ota::count && ota::cmp(ota::latest(), FW_VERSION) > 0;
+  d["ago"] = ota::lastCheck ? (long)((millis() - ota::lastCheck) / 1000) : -1;
+  d["busy"] = otaCheckNow || otaInstallVer.length() > 0 || ota::progress >= 0;
+  d["p"] = ota::progress; d["err"] = ota::error;
+  JsonArray a = d["versions"].to<JsonArray>();
+  for (uint8_t k = 0; k < ota::count; k++) {
+    JsonObject o = a.add<JsonObject>(); o["v"] = ota::list[k].v; o["date"] = ota::list[k].date; o["notes"] = ota::list[k].notes;
+  }
+  String out; serializeJson(d, out); return out;
+}
+void otaPush() { ws::broadcast("{\"t\":\"ota\",\"d\":" + otaJson() + "}"); }
+
+void otaLoop() {
+  if (!wlanOk) return;
+  uint32_t now = millis();
+  if (!otaNext) otaNext = now + 15000;                         // erste Abfrage 15 s nach dem WLAN
+  if ((int32_t)(now - otaNext) >= 0) { otaCheckNow = true; otaNext = now + OTA_EVERY; }
+  if (otaCheckNow) {
+    otaCheckNow = false;
+    bool ok = ota::check();
+    logf("[OTA] %s\n", ok ? ("neueste Version " + ota::latest()).c_str() : ota::error.c_str());
+    otaPush(); wsForce = true;
+    if (ok && cfg.autoUpdate && ota::cmp(ota::latest(), FW_VERSION) > 0) otaInstallVer = ota::latest();
+  }
+  if (otaInstallVer.length()) {
+    String v = otaInstallVer; otaInstallVer = "";
+    logf("[OTA] installiere %s …\n", v.c_str());
+    saveColors(); fxSave();                                    // nichts verlieren
+    bool ok = ota::install(v);
+    otaPush();
+    if (ok) {
+      logf("[OTA] fertig, starte neu\n");
+      ws::broadcast("{\"t\":\"otadone\",\"v\":\"" + v + "\"}");
+      delay(600);
+      ESP.restart();
+    }
+    logf("[OTA] %s\n", ota::error.c_str());
   }
 }
 
@@ -1282,6 +1340,28 @@ const char* apiCall(const char* path, JsonDocument& d) {
     if (ch < 0) for (int i = 0; i < SLOTS; i++) if (P[i].used && P[i].attached) sendToPanel(i);   // Test beenden
     return nullptr;
   }
+  // Updates: {"action":"check"} / {"action":"install","version":"0.6.13"} / {"action":"auto","on":true}
+  if (!strcmp(path, "/api/ota")) {
+    const char* a = d["action"] | "";
+    if (!strcmp(a, "check")) { if (!wlanOk) return "Kein WLAN"; otaCheckNow = true; return nullptr; }
+    if (!strcmp(a, "install")) {
+      if (!wlanOk) return "Kein WLAN";
+      String v = d["version"] | "";
+      bool known = false;
+      for (uint8_t k = 0; k < ota::count; k++) if (ota::list[k].v == v) known = true;
+      if (!known) return "Version unbekannt, bitte zuerst nach Updates suchen";
+      otaInstallVer = v;
+      return nullptr;
+    }
+    if (!strcmp(a, "auto")) {
+      cfg.autoUpdate = d["on"] | false;
+      prefs.putBool("autoUpd", cfg.autoUpdate);
+      if (cfg.autoUpdate && ota::count && ota::cmp(ota::latest(), FW_VERSION) > 0) otaInstallVer = ota::latest();
+      otaPush();
+      return nullptr;
+    }
+    return "Unbekannte Aktion";
+  }
   if (!strncmp(path, "/api/sim/", 9) && cfg.bus) return "nur in der Simulation";
   if (!strcmp(path, "/api/sim/new")) return simNewPanel() < 0 ? "Ablage voll" : nullptr;
   if (!strcmp(path, "/api/sim/attach")) {
@@ -1324,17 +1404,38 @@ void setupWeb() {
   server.on("/", HTTP_GET, [] { server.send(200, "text/html; charset=utf-8", INDEX_HTML); });
   server.on("/api/state", HTTP_GET, replyState);
   // Befehle laufen über apiCall(), damit HTTP und WebSocket dasselbe tun
-  const char* cmds[] = {"/api/set", "/api/presets", "/api/effect", "/api/test", "/api/sim/new", "/api/sim/attach", "/api/sim/detach"};
+  const char* cmds[] = {"/api/set", "/api/presets", "/api/effect", "/api/test", "/api/ota", "/api/sim/new", "/api/sim/attach", "/api/sim/detach"};
   for (const char* path : cmds) {
     server.on(path, HTTP_POST, [path] {
       JsonDocument d;
       if (server.hasArg("plain") && server.arg("plain").length()) deserializeJson(d, server.arg("plain"));
       if (const char* err = apiCall(path, d)) return replyError(err);
       if (!strcmp(path, "/api/test")) server.send(200, "application/json", "{\"ok\":true}");
+      else if (!strcmp(path, "/api/ota")) server.send(200, "application/json", otaJson());
       else replyState();
     });
   }
   server.on("/api/live", HTTP_GET, [] { server.send(200, "application/json", liveJson()); });
+  server.on("/api/ota", HTTP_GET, [] { server.send(200, "application/json", otaJson()); });
+  // Firmware-Datei hochladen (wie bei WLED unter /update)
+  server.on("/update", HTTP_POST, [] {
+    bool ok = !Update.hasError();
+    server.send(ok ? 200 : 400, "application/json", ok ? "{\"ok\":true}" : "{\"error\":\"Datei passt nicht oder ist beschädigt\"}");
+    if (ok) { logf("[OTA] Datei installiert, starte neu\n"); delay(600); ESP.restart(); }
+  }, [] {
+    HTTPUpload& u = server.upload();
+    if (u.status == UPLOAD_FILE_START) {
+      logf("[OTA] Datei-Upload %s\n", u.filename.c_str());
+      saveColors(); fxSave();
+      Update.begin(UPDATE_SIZE_UNKNOWN);
+    } else if (u.status == UPLOAD_FILE_WRITE) {
+      Update.write(u.buf, u.currentSize);
+    } else if (u.status == UPLOAD_FILE_END) {
+      Update.end(true);
+    } else if (u.status == UPLOAD_FILE_ABORTED) {
+      Update.abort();
+    }
+  });
   server.on("/api/config", HTTP_GET, [] { server.send(200, "application/json", configJson()); });
   server.on("/api/config", HTTP_POST, [] {
     JsonDocument d; if (!readBody(d)) return replyError("JSON fehlt");
@@ -1391,6 +1492,9 @@ void setupWeb() {
     ESP.restart();
   });
   ws::onOpen = wsOpen; ws::onText = wsText;
+  ota::onProgress = [](int p) {                 // Fortschritt an die App; ws::loop läuft während des Downloads nicht
+    if (p % 5 == 0) { ws::broadcast("{\"t\":\"otap\",\"p\":" + String(p) + "}"); logf("[OTA] %d %%\n", p); }
+  };
   ws::begin();
   server.onNotFound([] { server.send(404, "text/plain", "Nicht gefunden"); });
   server.begin();
@@ -1633,6 +1737,7 @@ void loop() {
     }
   }
   fxLoop();
+  otaLoop();
   if (colorsDirty && millis() - colorsDirtyAt > 5000) saveColors();
   if (fxDirty && millis() - fxDirtyAt > 5000) fxSave();
 }
