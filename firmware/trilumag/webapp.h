@@ -60,6 +60,14 @@ main{max-width:720px;margin:0 auto;padding:12px 14px;display:flex;flex-direction
 .tri{stroke:#000;stroke-width:1.6;transition:fill .12s linear;cursor:pointer}
 .tri.main{stroke:#666;stroke-width:2}
 .tri.sel{stroke:#fff;stroke-width:3}
+.tri.tap{stroke:#fff;stroke-width:5;filter:brightness(1.6)}
+.prow{display:flex;flex-direction:column;gap:6px;padding:12px 14px;border-bottom:1px solid var(--card)}
+.prow:last-child{border-bottom:0}
+.prow .top{display:flex;align-items:center;gap:10px;font-size:15px}
+.prow .top span{white-space:nowrap}
+.prow .top small{color:var(--muted);font-size:13px;flex:1}
+.prow .top .btn{margin-left:auto}
+.prow .prog{height:6px}
 .tri.part{stroke-width:.8}
 .selo{fill:none;stroke:#fff;stroke-width:3;pointer-events:none}
 .dark{fill:#1a1a1a}
@@ -119,7 +127,7 @@ label.f{display:flex;flex-direction:column;gap:6px;font-size:13px;color:var(--mu
 .tog input:checked+.sw{background:var(--acc)}
 .tog input:checked+.sw::after{transform:translateX(18px)}
 .tog input:focus-visible+.sw{outline:2px solid var(--acc);outline-offset:2px}
-.pins.off{opacity:.45}
+.pins.off,#tBox.off{opacity:.45}
 .nets{display:flex;flex-direction:column;border-radius:12px;overflow:hidden;background:var(--card2)}
 .nets:empty{display:none}
 .nets .row{gap:10px}
@@ -225,6 +233,7 @@ nav.tabs button.on{color:var(--acc)}
       <div class="kv" id="pInfo"></div>
       <div class="sl">Helligkeit<input type="range" id="pbri" min="1" max="100" value="71"><output id="pbrio">71 %</output></div>
       <div class="btnrow"><button class="btn" id="pOn">Ein / Aus</button><button class="btn pri" id="pCol">Farbe wählen</button></div>
+      <div class="btnrow" id="pTapRow"><span class="note">Antippen ausprobieren:</span><button class="btn" id="pTap1">einmal</button><button class="btn" id="pTap2">doppelt</button></div>
       <label class="tog"><input type="checkbox" id="pEdges"><span class="sw"></span>Kanten einzeln</label>
       <p class="note">Effekte bekommen dann drei Farben pro Panel, eine je Kante. Feste Farben bleiben pro Panel.</p>
     </div>
@@ -283,6 +292,18 @@ nav.tabs button.on{color:var(--acc)}
       </div>
       <p class="note" id="sensInfo"></p>
     </div>
+    <div class="card" id="touchCard">
+      <h3>Antippen</h3>
+      <label class="tog"><input type="checkbox" id="tOn"><span class="sw"></span>Panels reagieren auf Antippen</label>
+      <div id="tBox">
+        <div class="sl">Empfindlichkeit<input type="range" id="tSens" min="1" max="10" value="5"><output id="tSenso">5</output></div>
+        <div class="pins">
+          <label class="f">Einmal antippen<select id="tA1"></select></label>
+          <label class="f">Doppelt antippen<select id="tA2"></select></label>
+        </div>
+      </div>
+      <p class="note" id="tNote"></p>
+    </div>
     <div class="card">
       <h3>Hardware</h3>
       <label class="f">Betriebsart<select id="mode"><option value="sim">Simulation: Panels in der App anklipsen</option><option value="bus">Bus: echte Panels über RS-485</option></select></label>
@@ -313,6 +334,14 @@ nav.tabs button.on{color:var(--acc)}
         <div class="btnrow"><input type="file" id="otaFile" accept=".bin"><button class="btn" id="otaUp">Hochladen</button></div>
       </details>
     </div>
+    <div class="card" id="pfwCard">
+      <h3>Panel-Firmware</h3>
+      <div class="wstat" id="pfwStat"><div class="ic" id="pfwIc">✓</div><div><b id="pfwT">–</b><span id="pfwS"></span></div></div>
+      <label class="tog"><input type="checkbox" id="pfwAuto"><span class="sw"></span>Panels automatisch aktualisieren</label>
+      <p class="note">Das Hauptpanel bringt die passende Firmware für die Panels mit und spielt sie über den Bus auf. Die Wand leuchtet dabei weiter, nur das Panel, das gerade dran ist, bleibt kurz stehen.</p>
+      <div class="btnrow"><button class="btn" id="pfwAll">Alle aktualisieren</button></div>
+      <div class="list" id="pfwList"></div>
+    </div>
     <div class="card">
       <h3>Home Assistant (MQTT)</h3>
       <label class="tog"><input type="checkbox" id="m_on"><span class="sw"></span>MQTT aktiv</label>
@@ -328,7 +357,7 @@ nav.tabs button.on{color:var(--acc)}
     <div class="card" id="diagCard">
       <h3>Bus-Diagnose</h3>
       <p class="note" id="diagSum">–</p>
-      <div class="dtab"><table><thead><tr><th>Panel</th><th>Adr.</th><th>Antwort</th><th>verpasst</th><th>FW</th></tr></thead><tbody id="diagRows"></tbody></table></div>
+      <div class="dtab"><table><thead><tr><th>Panel</th><th>Adr.</th><th>Antwort</th><th>verpasst</th><th>FW</th><th>Angekl.</th></tr></thead><tbody id="diagRows"></tbody></table></div>
       <h3 class="sub">Ereignisse</h3>
       <div class="dlog" id="diagLog"></div>
       <div class="btnrow"><button class="btn" id="diagReset">Zähler zurücksetzen</button></div>
@@ -388,11 +417,21 @@ function wsConnect(){
     else if(m.t==='ota'){otaInfo=m.d;renderOta();}
     else if(m.t==='otap'){if(otaInfo){otaInfo.busy=true;otaInfo.p=m.p;renderOta();}}
     else if(m.t==='otadone'){toast('Version '+m.v+' installiert, Trilumag startet neu …');setTimeout(()=>location.reload(),9000);}
+    else if(m.t==='touch')onTouch(m.d);
     else if(m.t==='err')toast(m.m);};
   sock.onclose=()=>{wsOk=false;sock=null;render();setTimeout(wsConnect,2000);};
   sock.onerror=()=>{try{sock.close();}catch(x){}};
 }
 
+// Ein Panel wurde angetippt: kurz aufleuchten lassen
+const tapUntil={};
+function onTouch(d){
+  tapUntil[d.id]=Date.now()+700;
+  const p=st&&st.panels.find(q=>q.id===d.id);
+  const a=cfg&&cfg.touch?cfg.touch.actions[d.k===2?cfg.touch.a2:cfg.touch.a1]:'';
+  toast(`${p&&p.main?'Hauptpanel':'Panel '+d.id.slice(4)} ${d.k===2?'doppelt':'einmal'} angetippt${a&&a!=='nichts'?': '+a:''}`);
+  if(!drag)render();setTimeout(()=>{if(!drag)render();},750);
+}
 async function api(path,body){
   if(body&&wsOk){sock.send(JSON.stringify({p:path,b:body}));return st;}   // Antwort kommt als neuer Zustand
   const r=await fetch(path,body?{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)}:{});
@@ -445,6 +484,7 @@ function drawWall(svg,big){
   st.panels.forEach(p=>{
     const g=geom(p.x,p.y,p.up);const cls=['tri'];if(p.main)cls.push('main');
     if(big?focus===p.id:(tab==='col'&&sel.has(p.id)))cls.push('sel');
+    if(tapUntil[p.id]>Date.now())cls.push('tap');
     let fill=null;
     if(p.state===0)cls.push('dark');
     else if(fxOn()&&joining.includes(p.id))cls.push('pulse');
@@ -521,7 +561,7 @@ function render(){
   if(document.activeElement!==$('master')){const p=pct(st.master);setRange('master',p);$('mastero').textContent=p+' %';}
   $('apBanner').hidden=!st.ap||tab==='opt';
   $('updBadge').hidden=!st.upd;
-  if(tab==='opt'){renderWifi();renderPower();}
+  if(tab==='opt'){renderWifi();renderPower();renderPfw();renderTouch();}
   [...sel].forEach(id=>{if(!st.panels.some(p=>p.id===id))sel.delete(id);});     // abgeklipste Panels aus der Auswahl nehmen
   if(tab!=='wall'&&tab!=='opt'){drawWall($('mini'),false);
     $('miniHint').textContent=tab==='col'?(sel.size?`${sel.size} Panel${sel.size>1?'s':''} ausgewählt`:'Panels antippen, um nur diese einzufärben'):'';}
@@ -644,11 +684,14 @@ function renderWall(){
     const stx=['dunkel, wird erkannt','pulsiert blau, wartet auf erste Farbe','leuchtet'][p.state];
     const par=st.panels.find(q=>q.id===p.parent);
     $('pInfo').innerHTML='';[['Chip-ID',p.id],['Zustand',stx],...(()=>{const q=diagData&&diagData.panels.find(x=>x.id===p.id);if(!q||!diagData.bus||p.main)return[];const pct=q.pings?Math.round(q.missed*1000/q.pings)/10:0;
-      return[['Bus',`Adresse ${q.addr} · Antwort ${(q.rtt/1000).toFixed(2)} ms · ${pct} % verpasst · Firmware ${q.fw}`]];})(),['Position',`${p.x} / ${p.y} · Spitze ${p.up?'oben':'unten'}`],['Hängt an',p.main?'–':par?(par.main?'Hauptpanel':'Panel '+par.id.slice(4)):'–'],['Farbe',rgbHex(p.r,p.g,p.b)+(p.w?' + Weiß '+p.w:'')]]
+      return[['Bus',`Adresse ${q.addr} · Antwort ${(q.rtt/1000).toFixed(2)} ms · ${pct} % verpasst · Firmware ${q.fw}`]];})(),['Position',`${p.x} / ${p.y} · Spitze ${p.up?'oben':'unten'}`],['Hängt an',p.main?'–':par?(par.main?'Hauptpanel':'Panel '+par.id.slice(4)):'–'],['Farbe',rgbHex(p.r,p.g,p.b)+(p.w?' + Weiß '+p.w:'')],
+      ...(p.main?[]:[['Angeklipst',(p.clips||0)===1?'einmal':(p.clips||0)+'-mal'],['Firmware',p.fw?p.fw+(p.upd===2?` · Update läuft ${p.pct||0} %`:p.fw<st.pfw?` · Update auf ${st.pfw} verfügbar`:''):'–'],
+        ['Antippen',!p.fw?'–':(p.caps&1)?'Sensor vorhanden':'kein Sensor']])]
       .forEach(([k,v])=>{const a=document.createElement('span');a.textContent=k;const b=document.createElement('span');b.textContent=v;$('pInfo').append(a,b);});
     if(document.activeElement!==$('pbri')){setRange('pbri',pct(p.bri));$('pbrio').textContent=pct(p.bri)+' %';}
     $('pOn').classList.toggle('pri',p.on);$('pOn').textContent=p.on?'Ein':'Aus';
     if(document.activeElement!==$('pEdges'))$('pEdges').checked=!!p.edges;
+    $('pTapRow').hidden=!st.sim||p.main;
   }
 }
 $('newBtn').addEventListener('click',async()=>{if(await api('/api/sim/new',{}))render();});
@@ -675,6 +718,8 @@ $('pbri').addEventListener('input',()=>{$('pbrio').textContent=$('pbri').value+'
 $('pOn').addEventListener('click',async()=>{const p=st.panels.find(q=>q.id===focus);if(!p)return;await api('/api/set',{id:p.id,state:p.on?'OFF':'ON'});render();});
 $('pEdges').addEventListener('change',async()=>{if(!focus)return;await api('/api/set',{id:focus,edges:$('pEdges').checked});
   toast($('pEdges').checked?'Kanten einzeln an: wirkt bei Effekten':'Kanten einzeln aus');render();});
+$('pTap1').addEventListener('click',()=>{if(focus)api('/api/sim/tap',{id:focus});});
+$('pTap2').addEventListener('click',()=>{if(focus)api('/api/sim/tap',{id:focus,double:true});});
 $('pCol').addEventListener('click',()=>{if(!focus)return;sel=new Set([focus]);showTab('col');});
 
 // ---------- Tab Presets ----------
@@ -714,6 +759,9 @@ async function loadCfg(){
   $('p_shunt').value=((L.shunt||50)/10).toLocaleString('de-AT');
   sensDef=L.defSda>=0?`★ = Vorgabe für dein Board: SDA GPIO ${L.defSda}, SCL GPIO ${L.defScl}. `:'';
   renderSensor(L.sda,L.sensor);
+  if(cfg.touch){const T=cfg.touch;$('tOn').checked=T.on;setRange('tSens',T.sens);$('tSenso').textContent=T.sens;
+    ['tA1','tA2'].forEach((k,n)=>{const s=$(k);s.innerHTML='';T.actions.forEach((a,i)=>{const o=document.createElement('option');o.value=i;o.textContent=a;s.append(o);});s.value=n?T.a2:T.a1;});
+    renderTouch();}
   $('m_on').checked=!!cfg.mqtt.on;$('mqttFields').classList.toggle('off',!cfg.mqtt.on);$('m_host').value=cfg.mqtt.host;$('m_port').value=cfg.mqtt.port;$('m_user').value=cfg.mqtt.user;
   $('info').innerHTML='';[['Chip',cfg.chip],['Firmware',cfg.ver],['Betriebsart',cfg.mode==='bus'?'Bus':'Simulation'],['WLAN',st&&st.ssid||'–']]
     .forEach(([k,v])=>{const a=document.createElement('span');a.textContent=k;const x=document.createElement('span');x.textContent=v;$('info').append(a,x);});
@@ -783,6 +831,51 @@ async function sendSensor(){
 
 // ---------- Bus-Diagnose ----------
 let diagData=null;
+// ---------- Antippen ----------
+function renderTouch(){
+  if(!st||!cfg||!cfg.touch)return;
+  $('tBox').classList.toggle('off',!$('tOn').checked);
+  const ps=st.panels.filter(p=>!p.main&&p.fw),n=ps.filter(p=>p.caps&1).length;
+  $('tNote').textContent=(st.sim?'In der Simulation probierst du es unter Wand aus: Panel antippen, dann „einmal“ oder „doppelt“. ':
+    ps.length?`${n} von ${ps.length} Panels haben einen Bewegungssensor. `:'')+'In Home Assistant gibt es dazu das Ereignis „Antippen“ für eigene Automationen.';
+}
+function saveTouch(){renderTouch();later('touch',()=>api('/api/touch',{on:$('tOn').checked,sens:+$('tSens').value,a1:+$('tA1').value,a2:+$('tA2').value}).then(()=>{
+  if(cfg&&cfg.touch)Object.assign(cfg.touch,{on:$('tOn').checked,sens:+$('tSens').value,a1:+$('tA1').value,a2:+$('tA2').value});}));}
+$('tOn').addEventListener('change',saveTouch);
+$('tSens').addEventListener('input',()=>{$('tSenso').textContent=$('tSens').value;saveTouch();});
+['tA1','tA2'].forEach(k=>$(k).addEventListener('change',saveTouch));
+
+// ---------- Panel-Firmware ----------
+function renderPfw(){
+  if(!st)return;
+  const ps=st.panels.filter(p=>!p.main&&p.fw);
+  const old=ps.filter(p=>p.fw<st.pfw||p.upd);
+  const busy=ps.find(p=>p.upd===2);
+  $('pfwStat').classList.toggle('bad',old.length>0);
+  $('pfwIc').textContent=old.length?'↑':'✓';
+  $('pfwT').textContent=busy?`Panel ${busy.id.slice(4)} wird aktualisiert`:old.length?`${old.length} Panel${old.length>1?'s':''} mit älterer Firmware`:'Alle Panels sind aktuell';
+  $('pfwS').textContent=`Aktuelle Panel-Firmware: ${st.pfw}`+(ps.length?` · ${ps.length} Panel${ps.length>1?'s':''} an der Wand`:'');
+  if(document.activeElement!==$('pfwAuto'))$('pfwAuto').checked=!!st.pAuto;
+  $('pfwAll').hidden=!old.some(p=>!p.upd||p.upd===3)||!old.some(p=>st.sim||(p.caps&2));
+  const l=$('pfwList');l.innerHTML='';
+  old.forEach(p=>{const r=document.createElement('div');r.className='prow';
+    const t=document.createElement('div');t.className='top';
+    const n=document.createElement('span');n.textContent='Panel '+p.id.slice(4);
+    const sm=document.createElement('small');
+    sm.textContent=p.upd===2?`Firmware ${p.fw} → ${st.pfw} · ${p.pct||0} %`:p.upd===1?'wartet':p.upd===3?'fehlgeschlagen, wird erneut versucht':
+      (!st.sim&&!(p.caps&2))?`Firmware ${p.fw} · ohne Bootloader, nur mit Programmieradapter`:`Firmware ${p.fw} → ${st.pfw}`;
+    t.append(n,sm);
+    if(p.upd!==2&&p.upd!==1&&(st.sim||(p.caps&2))){const b=document.createElement('button');b.className='btn';b.textContent=p.upd===3?'Nochmal':'Aktualisieren';
+      b.addEventListener('click',()=>api('/api/panelfw',{action:'one',id:p.id}));t.append(b);}
+    r.append(t);
+    if(p.upd===2){const g=document.createElement('div');g.className='prog';const i=document.createElement('i');i.style.width=(p.pct||0)+'%';g.append(i);r.append(g);}
+    l.append(r);});
+  l.hidden=!old.length;
+}
+$('pfwAuto').addEventListener('change',async()=>{await api('/api/panelfw',{action:'auto',on:$('pfwAuto').checked});
+  toast($('pfwAuto').checked?'Panels werden automatisch aktualisiert':'Panel-Updates nur noch per Knopf');});
+$('pfwAll').addEventListener('click',()=>api('/api/panelfw',{action:'all'}));
+
 function ago(s){return s<60?`vor ${s} s`:s<3600?`vor ${Math.round(s/60)} min`:`vor ${Math.round(s/3600)} h`;}
 async function loadDiag(){try{diagData=await (await fetch('/api/diag')).json();renderDiag();if(tab==='wall')renderWall();}catch(e){}}
 function renderDiag(){
@@ -791,7 +884,7 @@ function renderDiag(){
     'Simulation: Antwortzeiten und Fehler gibt es erst im Busbetrieb. Das Ereignisprotokoll läuft trotzdem.';
   const tb=$('diagRows');tb.innerHTML='';
   d.panels.forEach(p=>{const tr=document.createElement('tr');const pct=p.pings?Math.round(p.missed*1000/p.pings)/10:0;
-    const cells=[p.id.slice(4),p.addr||'–',p.rtt?(p.rtt/1000).toFixed(2)+' ms':'–',p.pings?pct+' %':'–',p.fw||'–'];
+    const cells=[p.id.slice(4),p.addr||'–',p.rtt?(p.rtt/1000).toFixed(2)+' ms':'–',p.pings?pct+' %':'–',p.fw||'–',(p.clips||0)+'×'];
     cells.forEach((c,i)=>{const td=document.createElement('td');td.textContent=c;if(i===3&&pct>=5)td.className=pct>=20?'bad':'warn';tr.append(td);});tb.append(tr);});
   const lg=$('diagLog');lg.innerHTML='';
   if(!d.log.length){const x=document.createElement('p');x.className='note';x.textContent='Noch keine Ereignisse.';lg.append(x);}
