@@ -137,7 +137,11 @@ function toast(t){const e=$('toast');e.textContent=t;e.classList.add('show');cle
 async function api(path,body){
   const r=await fetch(path,body?{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)}:{});
   const j=await r.json();if(!r.ok){toast(j.error||'Fehler');return null;}st=j;return j;}
-async function poll(){if(drag)return;try{await api('/api/state');render();}catch(e){$('status').textContent='keine Verbindung zum ESP32';}}
+// Der ESP32 beantwortet eine Anfrage nach der anderen. Deshalb nie zwei Abfragen gleichzeitig,
+// damit Klicks nicht hinter einem Stau von Abfragen warten.
+let inflight=false,lastState=0;
+async function poll(){if(drag||inflight)return;if(fxOn()&&Date.now()-lastState<2000)return;
+  inflight=true;try{await api('/api/state');lastState=Date.now();render();}catch(e){$('status').textContent='keine Verbindung zum ESP32';}inflight=false;}
 
 function fitViewBox(){
   const xs=[],ys=[];const add=(x,y,up)=>{geom(x,y,up).p.forEach(q=>{xs.push(q[0]);ys.push(q[1]);});};
@@ -159,9 +163,9 @@ function render(){
   st.panels.forEach(p=>{
     const g=geom(p.x,p.y,p.up);
     const cls=['tri'];if(p.main)cls.push('main');if(sel===p.id)cls.push('sel');
-    let fill=null;if(p.state===0)cls.push('dark');else if(fxOn()&&live[p.id])fill=liveCol(live[p.id]);else if(p.state===1)cls.push('pulse');else fill=shade(p);
+    let fill=null;if(p.state===0)cls.push('dark');else if(fxOn()&&joining.includes(p.id))cls.push('pulse');else if(fxOn()&&live[p.id])fill=liveCol(live[p.id]);else if(p.state===1)cls.push('pulse');else fill=shade(p);
     const poly=el('polygon',{points:pts(shrink(g,.94)),class:cls.join(' ')});if(fill)poly.setAttribute('fill',fill);
-    poly.dataset.id=p.id;gP.append(poly);
+    poly.dataset.id=p.id;if(cls.includes('pulse'))syncPulse(poly);gP.append(poly);
     if(!p.main){const m=edge1Mid(p);gP.append(el('circle',{cx:m[0],cy:m[1],r:2.4,class:'edge1'}));}
     else{const a=g.p[0],b=g.p[1];gP.append(el('line',{x1:a[0]+8,y1:a[1]+5,x2:b[0]-8,y2:b[1]+5,stroke:'#7d8796','stroke-width':3,'stroke-linecap':'round'}));}
     const t=el('text',{x:g.c[0],y:g.c[1]+3,class:'lbl'+(light(p)?' dk':'')});t.textContent=p.main?'Haupt':p.id.slice(4);gP.append(t);
@@ -202,15 +206,26 @@ function renderFx(){
   if(document.activeElement.tagName!=='INPUT'){$('fspeed').value=f.speed;$('fsv').textContent=f.speed;$('fbri').value=f.bri;$('fbv').textContent=f.bri;$('fcol').value=hex2(f);}
 }
 function fxBody(){const c=$('fcol').value;return{speed:+$('fspeed').value,brightness:+$('fbri').value,color:{r:parseInt(c.slice(1,3),16),g:parseInt(c.slice(3,5),16),b:parseInt(c.slice(5,7),16),w:0}};}
-async function setFx(id){const r=await api('/api/effect',{effect:id,...fxBody()});if(r){if(id==='aus')live={};render();}}
+async function setFx(id){
+  st.fx.id=id;live={};joining=[];renderFx();             // Knopf sofort umschalten, nicht erst nach der Antwort
+  const r=await api('/api/effect',{effect:id,...fxBody()});if(r){render();pollLive();}}
 function fxInput(){$('fsv').textContent=$('fspeed').value;$('fbv').textContent=$('fbri').value;
   clearTimeout(tFx);tFx=setTimeout(async()=>{await api('/api/effect',fxBody());render();},120);}
 ['fspeed','fbri','fcol'].forEach(k=>$(k).addEventListener('input',fxInput));
+let joining=[];
 async function pollLive(){
-  if(!fxOn()||drag||document.hidden)return;
-  try{const j=await (await fetch('/api/live')).json();if(j.fx==='aus')return;live=j.c;
-    svg.querySelectorAll('polygon[data-id]').forEach(p=>{const h=live[p.dataset.id];if(h){p.classList.remove('pulse');p.style.fill=liveCol(h);}});}catch(e){}
+  if(!fxOn()||drag||document.hidden||inflight)return;
+  inflight=true;
+  try{const j=await (await fetch('/api/live')).json();if(j.fx!=='aus'){live=j.c;joining=j.j||[];paintLive();}}catch(e){}
+  inflight=false;
 }
+function paintLive(){
+  svg.querySelectorAll('polygon[data-id]').forEach(p=>{const id=p.dataset.id,h=live[id];
+    if(joining.includes(id)){if(!p.classList.contains('pulse')){p.style.fill='';p.classList.add('pulse');syncPulse(p);}}
+    else if(h){p.classList.remove('pulse');p.style.fill=liveCol(h);}});
+}
+// alle Pulsier-Animationen im selben Takt, auch wenn die Wand neu gezeichnet wird
+function syncPulse(p){p.style.animationDelay=(-(Date.now()%1600))+'ms';}
 setInterval(pollLive,120);
 
 function drawDrag(){

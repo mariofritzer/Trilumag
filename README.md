@@ -44,7 +44,7 @@ In der App unter Einstellungen die Adresse des MQTT-Brokers eintragen. Jedes Pan
 
 ## Effekte
 
-Effekte laufen immer über die ganze Wand: Regenbogen, Regenbogenwelle, Atmen, Farbwechsel, Funkeln, Ausbreiten (Wellen vom Hauptpanel nach außen), Feuer und Polarlicht. Atmen, Funkeln und Ausbreiten benutzen eine wählbare Effektfarbe. Das Hauptpanel rechnet die Bilder selbst und schickt etwa 25 pro Sekunde mit einem FRAME-Befehl an alle Panels. Neu angeklipste Panels laufen sofort mit. Sobald ein Panel eine feste Farbe bekommt, endet der Effekt und alle Panels kehren zu ihren festen Farben zurück. Der zuletzt gewählte Effekt läuft nach einem Neustart weiter.
+Effekte laufen immer über die ganze Wand: Regenbogen, Regenbogenwelle, Atmen, Farbwechsel, Funkeln, Ausbreiten (Wellen vom Hauptpanel nach außen), Feuer und Polarlicht. Atmen, Funkeln und Ausbreiten benutzen eine wählbare Effektfarbe. Das Hauptpanel rechnet die Bilder selbst und schickt etwa 25 pro Sekunde mit einem FRAME-Befehl an alle Panels. Neu angeklipste Panels pulsieren erst 5-mal blau (etwa 8 Sekunden) und laufen dann mit. Sobald ein Panel eine feste Farbe bekommt, endet der Effekt und alle Panels kehren zu ihren festen Farben zurück. Der zuletzt gewählte Effekt läuft nach einem Neustart weiter.
 
 ## API
 

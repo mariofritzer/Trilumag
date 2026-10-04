@@ -41,10 +41,11 @@ const char* WLAN_SSID = "";
 const char* WLAN_PASS = "";
 const uint8_t  MAX_ATTACHED = 30;     // höchstens so viele Panels an der Wand (inkl. Hauptpanel)
 const uint32_t DETECT_MS    = 1200;   // simulierte Erkennungszeit nach dem Anklipsen
+const uint32_t FX_JOIN_MS   = 5 * 1600; // bei laufendem Effekt pulsieren neue Panels erst 5-mal blau
 // ====================================================
 
 const char* FW_NAME    = "Trilumag";
-const char* FW_VERSION = "0.3.0";
+const char* FW_VERSION = "0.3.1";
 const char* HOSTNAME   = "trilumag";
 const char* SETUP_SSID = "Trilumag-Setup";
 const char* SETUP_PASS = "trilumag";
@@ -89,6 +90,7 @@ struct Panel {
   uint8_t miss = 0;       // verpasste Antworten in Folge
   uint8_t state = DARK;
   uint32_t since = 0;
+  uint32_t joinAt = 0;    // bei laufendem Effekt: bis hierher noch blau pulsieren (0 = nicht)
   bool hasColor = false;
   bool on = true;
   uint8_t r = 0, g = 0, b = 0, w = 0, bri = 180;
@@ -110,7 +112,22 @@ struct FxCfg { uint8_t id = 0, speed = 50, bri = 180, r = 255, g = 120, b = 30, 
 Panel P[SLOTS];
 Config cfg;
 FxCfg fx;
-WebServer server(80);
+// Der WebServer bedient nur eine Verbindung nach der anderen und wartet auf eine leere Verbindung
+// bis zu 5 s. Browser öffnen solche Verbindungen gern auf Vorrat, dann hängt die App.
+// Hier wird eine Verbindung, die nach 200 ms noch nichts geschickt hat, sofort freigegeben.
+class AppServer : public WebServer {
+public:
+  using WebServer::WebServer;
+  void handleClient() override {
+    if (_currentStatus == HC_WAIT_READ && !_currentClient.available() && millis() - _statusChange > 200) {
+      _currentClient.stop();
+      _currentClient = NetworkClient();
+      _currentStatus = HC_NONE;
+    }
+    WebServer::handleClient();
+  }
+};
+AppServer server(80);
 WiFiClient netClient;
 PubSubClient mqtt(netClient);
 Preferences prefs;
@@ -364,6 +381,7 @@ void busHandleNew(uint32_t chip, uint8_t mask) {
     P[i].attached = false; reconcile(); return;
   }
   P[i].addr = addr; P[i].miss = 0;
+  P[i].joinAt = (millis() + FX_JOIN_MS) | 1;
   bus::sendOrder(addr);
   P[i].state = P[i].hasColor ? ACTIVE : PULSE;
   bus::sendColor(i);
@@ -443,7 +461,7 @@ const uint8_t FX_COUNT = sizeof(FX) / sizeof(FX[0]);
 const uint32_t FX_FRAME_MS = 40;
 
 float fxPhase = 0, fxA[SLOTS], fxB[SLOTS], fxT[SLOTS];
-uint32_t fxLast = 0, fxDirtyAt = 0;
+uint32_t fxLast = 0, fxDirtyAt = 0, fxLastFrame = 0;
 bool fxDirty = false;
 uint8_t OUT[SLOTS][4];          // aktuelles Effektbild pro Panel, Helligkeit schon eingerechnet
 
@@ -490,12 +508,18 @@ void fxCompute() {
     float c[4] = {0, 0, 0, 0};
     const Panel& p = P[i];
     if (!p.used || !p.attached || p.state == DARK) { memset(OUT[i], 0, 4); continue; }
+    if (p.joinAt && (int32_t)(now - p.joinAt) < 0) {      // gerade angeklipst: so pulsieren wie das Panel selbst
+      uint32_t t = (now - (p.joinAt - FX_JOIN_MS)) % 1600;
+      t = t < 800 ? t : 1600 - t;
+      OUT[i][0] = 0; OUT[i][1] = 0; OUT[i][2] = (uint8_t)(6 + (t * 26) / 800); OUT[i][3] = 0;
+      continue;
+    }
     float u = (p.x * 0.5f - minX) / spanX;                 // 0 links … 1 rechts
     float v = p.y * 0.866f;
     switch (fx.id) {
       case 1: hue(fxPhase * 0.1f, c); break;                                  // ganze Wand im Farbkreis
       case 2: hue(fxPhase * 0.15f + u * 0.85f, c); break;                     // Farbkreis wandert von links nach rechts
-      case 3: base(0.06f + 0.94f * (0.5f - 0.5f * cosf(fxPhase * TAU / 4)), c); break;
+      case 3: base(0.06f + 0.94f * (0.5f + 0.5f * cosf(fxPhase * TAU / 4)), c); break;   // startet hell
       case 4: {                                                               // jedes Panel blendet zu eigener Zufallsfarbe
         fxT[i] += dt * rate / 3.5f;
         if (fxT[i] >= 1) { fxA[i] = fxB[i]; fxB[i] = frand(); fxT[i] = 0; }
@@ -554,9 +578,8 @@ void fxSend() {
 }
 
 void fxLoop() {
-  static uint32_t lastFrame = 0;
-  if (!fx.id || millis() - lastFrame < FX_FRAME_MS) return;
-  lastFrame = millis();
+  if (!fx.id || millis() - fxLastFrame < FX_FRAME_MS) return;
+  fxLastFrame = millis();
   fxCompute();
   fxSend();
 }
@@ -567,7 +590,8 @@ void fxStart(int id) {
   bool was = fx.id;
   fx.id = id;
   fxDirty = true; fxDirtyAt = millis();
-  if (id && !was) fxReset();
+  if (id && id != was) { fxReset(); fxPhase = 0; }   // jeder Effekt beginnt von vorn, nicht mitten in einer dunklen Phase
+  fxLastFrame = 0;                                      // nächstes Bild sofort, nicht erst nach 40 ms
   if (!id && was) for (int i = 0; i < SLOTS; i++) if (P[i].used && P[i].attached) sendToPanel(i);   // zurück zu den festen Farben
   logf("[FX] %s\n", FX[fx.id].name);
   publishFx();
@@ -593,7 +617,7 @@ void applyFx(JsonVariantConst cmd) {
   if (cmd["effect"].is<const char*>()) id = fxFind(cmd["effect"].as<const char*>());
   else if (cmd["effect"].is<int>()) id = cmd["effect"].as<int>();
   if (id >= 0 && id != fx.id) fxStart(id);
-  else { fxDirty = true; fxDirtyAt = millis(); publishFx(); }
+  else { fxDirty = true; fxDirtyAt = millis(); fxLastFrame = 0; publishFx(); }
 }
 
 // ---------- Ausgabe an ein Panel ----------
@@ -933,7 +957,14 @@ void setupWeb() {
       char b[32]; snprintf(b, sizeof b, "%s\"%08X\":\"%02X%02X%02X%02X\"", first ? "" : ",", (unsigned)P[i].chip, OUT[i][0], OUT[i][1], OUT[i][2], OUT[i][3]);
       out += b; first = false;
     }
-    out += "}}";
+    out += "},\"j\":[";
+    first = true;
+    for (int i = 0; i < SLOTS; i++) {
+      if (!P[i].used || !P[i].attached || !P[i].joinAt || (int32_t)(millis() - P[i].joinAt) >= 0) continue;
+      char b[16]; snprintf(b, sizeof b, "%s\"%08X\"", first ? "" : ",", (unsigned)P[i].chip);
+      out += b; first = false;
+    }
+    out += "]}";
     server.send(200, "application/json", out);
   });
   server.on("/api/test", HTTP_POST, [] {
@@ -1066,6 +1097,7 @@ void saveWifi(const String& ss, const String& pw) {
 
 bool connectWifi(const String& ss, const String& pw, uint32_t timeout) {
   WiFi.mode(apMode ? WIFI_AP_STA : WIFI_STA);
+  WiFi.setSleep(false);            // ohne Funk-Sparmodus antwortet die App sofort
   WiFi.begin(ss.c_str(), pw.c_str());
   logf("[WLAN] verbinde mit '%s'", ss.c_str());
   uint32_t t0 = millis();
@@ -1219,6 +1251,7 @@ void loop() {
       Panel& p = P[i];
       if (p.used && p.attached && p.state == DARK && millis() - p.since > DETECT_MS) {
         p.state = p.hasColor ? ACTIVE : PULSE;
+        p.joinAt = (millis() + FX_JOIN_MS) | 1;
         logf("[SIM] %s eingegliedert: %s\n", hex(p.chip).c_str(), p.hasColor ? "alte Farbe" : "pulsiert blau");
         sendToPanel(i); publishState(i);
       }
