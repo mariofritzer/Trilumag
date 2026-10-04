@@ -2,7 +2,7 @@
 
 Die Versionsnummer im Webinstaller und in der App setzt sich aus der Version in der Firmware und der Nummer des automatischen Builds zusammen, zum Beispiel **0.5.11** = Version 0.5, Build 11. Bis Build 9 hat der Build die Nummer immer als 0.2.x ausgegeben, die tatsächlichen Stände stehen deshalb unten mit beiden Nummern.
 
-## Nächster Build
+## 0.6.15 · 4. Oktober 2026
 
 **Updates**
 - In der Versionsliste der App zeigt „Änderungen anzeigen“ zu jeder Version den vollständigen Abschnitt aus dem Versionsverlauf. Die App lädt ihn direkt von der Installer-Seite. Ohne Internet am Handy verweist sie auf GitHub.
