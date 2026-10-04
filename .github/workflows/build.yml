@@ -37,13 +37,13 @@ jobs:
           arduino-cli config add board_manager.additional_urls https://espressif.github.io/arduino-esp32/package_esp32_index.json
           arduino-cli core update-index
           arduino-cli core install "esp32:esp32@${ESP32_CORE}"
-          arduino-cli lib install "ArduinoJson@7.2.1" "PubSubClient@2.8"
+          arduino-cli lib install "ArduinoJson@7.2.1" "PubSubClient@2.8" "Adafruit NeoPixel@1.12.3"
 
       - name: Firmware kompilieren
         run: |
           set -euo pipefail
           pip install --quiet esptool
-          VERSION="0.1.${GITHUB_RUN_NUMBER}"
+          VERSION="0.2.${GITHUB_RUN_NUMBER}"
           sed -i "s/const char\* FW_VERSION = \"[^\"]*\";/const char* FW_VERSION = \"${VERSION}\";/" firmware/trilumag/trilumag.ino
           BOOT_APP0=$(find ~/.arduino15/packages/esp32/hardware/esp32 -name boot_app0.bin | head -n1)
 
@@ -73,6 +73,17 @@ jobs:
           cp installer/* site/
           sed -i "s/__VERSION__/${VERSION}/g" site/manifest.json site/index.html
           touch site/.nojekyll
+
+      - name: Panel-Firmware (CH32V003) bauen
+        run: |
+          set -euo pipefail
+          sudo apt-get update -q
+          sudo apt-get install -y -q gcc-riscv64-unknown-elf picolibc-riscv64-unknown-elf
+          git clone -q --depth 1 https://github.com/cnlohr/ch32fun.git ch32fun
+          make -C firmware/panel build CH32FUN="$PWD/ch32fun/ch32fun" NEWLIB=/usr/lib/picolibc/riscv64-unknown-elf/include
+          mkdir -p site/firmware/panel
+          cp firmware/panel/panel.bin firmware/panel/panel.hex site/firmware/panel/
+          ls -l site/firmware/panel
 
       - uses: actions/upload-pages-artifact@v3
         with:

@@ -74,8 +74,19 @@ details p{color:var(--muted);margin:8px 0 0}
   </div>
 
   <div class="card warn">
-    <h2>Simulation</h2>
-    <p>Diese Version läuft im Simulationsmodus: Die Panels werden in der App angeklipst, ganz ohne echte Hardware. So lassen sich App, Erkennung und Home Assistant schon testen, bevor die Panels gebaut sind.</p>
+    <h2>Simulation oder echte Panels</h2>
+    <p>Nach dem Installieren läuft Trilumag im Simulationsmodus: Die Panels werden in der App angeklipst, ganz ohne Hardware. Unter <strong>Einstellungen</strong> in der App stellst du auf <strong>Bus</strong> um, sobald echte Panels über RS-485 angeschlossen sind. Dort wählst du auch dein Board, damit die Pins stimmen.</p>
+  </div>
+
+  <div class="card">
+    <h2>Firmware für die Panels</h2>
+    <p class="meta" style="margin:0">Die Panels haben einen CH32V003 und werden einmalig mit dem WCH-LinkE programmiert (Pins SWIO, GND und 3V3).</p>
+    <div class="chips"><a class="chip" href="firmware/panel/panel.bin" download>panel.bin</a><a class="chip" href="firmware/panel/panel.hex" download>panel.hex</a><span class="chip">Version __VERSION__</span></div>
+    <ol>
+      <li><strong>Windows:</strong> Im <em>WCH-LinkUtility</em> als Chip <code>CH32V003</code> wählen, <code>panel.hex</code> laden und auf <strong>Program</strong> klicken.</li>
+      <li><strong>Linux, macOS, Windows:</strong> mit <code>minichlink</code> aus ch32fun: <code>minichlink -w panel.bin flash -b</code></li>
+      <li>Ein frisch programmiertes Panel bleibt dunkel. Das ist richtig, es wartet darauf, vom Hauptpanel gefunden zu werden.</li>
+    </ol>
   </div>
 
   <div class="card">

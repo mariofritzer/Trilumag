@@ -42,6 +42,12 @@ button:disabled{opacity:.4;cursor:default}
 label{display:flex;flex-direction:column;gap:6px;font-size:13px;color:var(--muted)}
 input[type=range]{width:100%;accent-color:var(--accent)}
 input[type=text],input[type=password],input:not([type]){width:100%;height:40px;border:1px solid var(--line);border-radius:8px;background:#0d0f13;color:var(--fg);padding:0 10px;font:15px system-ui,sans-serif}
+select{width:100%;height:40px;border:1px solid var(--line);border-radius:8px;background:#0d0f13;color:var(--fg);padding:0 8px;font:15px system-ui,sans-serif}
+.pins{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:10px}
+summary{cursor:pointer;list-style:none}
+summary::-webkit-details-marker{display:none}
+summary h2::after{content:" ▾"}
+details[open] summary h2::after{content:" ▴"}
 input[type=color]{width:100%;height:40px;border:1px solid var(--line);border-radius:8px;background:none;padding:2px}
 .row{display:flex;gap:8px;flex-wrap:wrap}
 .toast{position:fixed;left:50%;bottom:20px;transform:translateX(-50%);background:#232935;border:1px solid var(--line);padding:10px 14px;border-radius:10px;font-size:14px;opacity:0;transition:opacity .2s;pointer-events:none}
@@ -72,6 +78,32 @@ input[type=color]{width:100%;height:40px;border:1px solid var(--line);border-rad
     <label>Helligkeit <span id="bv">180</span><input type="range" id="bri" min="1" max="255" value="180"></label>
     <div class="row"><button id="onBtn">Ein / Aus</button><button id="allBtn">Für alle</button></div>
   </div>
+  <details class="tray" id="setBox">
+    <summary><h2 style="display:inline">Einstellungen</h2></summary>
+    <p class="empty" id="setInfo"></p>
+    <label>Betriebsart<select id="mode"><option value="sim">Simulation: Panels in der App anklipsen</option><option value="bus">Bus: echte Panels über RS-485</option></select></label>
+    <label>Board<select id="board"></select></label>
+    <div class="pins">
+      <label>RS-485 RX (RO)<select id="p_rx"></select></label>
+      <label>RS-485 TX (DI)<select id="p_tx"></select></label>
+      <label>RS-485 DE + /RE<select id="p_de"></select></label>
+      <label>LED-Daten<select id="p_led"></select></label>
+      <label>SNS rechts (Kante 2)<select id="p_snsR"></select></label>
+      <label>SNS links (Kante 3)<select id="p_snsL"></select></label>
+    </div>
+    <label>Farbreihenfolge der LEDs<select id="order"></select></label>
+    <div class="row"><span class="empty">Farbtest:</span><button data-t="0">Rot</button><button data-t="1">Grün</button><button data-t="2">Blau</button><button data-t="3">Weiß</button><button data-t="-1">Ende</button></div>
+    <p class="empty">Leuchtet bei „Rot“ etwas anderes als Rot, stimmt die Reihenfolge nicht. Dann eine andere wählen und speichern.</p>
+    <h2>Home Assistant (MQTT)</h2>
+    <div class="pins">
+      <label>Broker-Adresse<input id="m_host" placeholder="z. B. 192.168.1.10"></label>
+      <label>Port<input id="m_port" inputmode="numeric" value="1883"></label>
+      <label>Benutzer<input id="m_user" autocomplete="off"></label>
+      <label>Passwort<input id="m_pass" type="password" autocomplete="off" placeholder="unverändert"></label>
+    </div>
+    <div class="row"><button id="saveBtn" class="on">Speichern und neu starten</button></div>
+    <p class="empty" id="setErr"></p>
+  </details>
 </div>
 <div class="toast" id="toast"></div>
 <script>
@@ -133,9 +165,9 @@ function render(){
     const t=el('text',{x:0,y:H*.68,class:'lbl'});t.textContent=id.slice(4);s.append(t);
     d.append(s);tray.append(d);d.addEventListener('pointerdown',e=>startDrag(e,id,'tray'));
   });
-  $('newBtn').disabled=!st.sim;
+  $('newBtn').hidden=!st.sim;
   $('wifiBox').hidden=!st.ap;
-  $('hint').textContent=st.loose.length?'Panel aus der Ablage an eine freie Kante ziehen':'Panel antippen zum Einstellen, wegziehen zum Abklipsen';
+  $('hint').textContent=!st.sim?'Echte Panels: anklipsen, und sie erscheinen hier':st.loose.length?'Panel aus der Ablage an eine freie Kante ziehen':'Panel antippen zum Einstellen, wegziehen zum Abklipsen';
   updateCtl();
 }
 
@@ -213,6 +245,34 @@ $('scanBtn').addEventListener('click',async()=>{$('scanBtn').disabled=true;$('sc
 $('wifiBtn').addEventListener('click',async()=>{const ssid=$('ssid').value.trim();if(!ssid){toast('Bitte WLAN-Namen eingeben');return;}
   await fetch('/api/wifi',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({ssid,pass:$('pass').value})}).catch(()=>{});
   toast('Gespeichert. Trilumag startet neu und verbindet sich mit '+ssid);});
+// ----- Einstellungen -----
+let cfg=null;
+const PIN_KEYS=['rx','tx','de','led','snsR','snsL'];
+async function loadCfg(){
+  try{cfg=await (await fetch('/api/config')).json();}catch(e){return;}
+  $('setInfo').textContent=`${cfg.chip} · Firmware ${cfg.ver}`;
+  $('mode').value=cfg.mode;
+  const b=$('board');b.innerHTML='';
+  cfg.boards.forEach(x=>{const o=document.createElement('option');o.value=x.id;o.textContent=x.name;b.append(o);});
+  const c=document.createElement('option');c.value='custom';c.textContent='Eigene Belegung';b.append(c);
+  b.value=cfg.boards.some(x=>x.id===cfg.board)?cfg.board:'custom';
+  PIN_KEYS.forEach(k=>{const s=$('p_'+k);s.innerHTML='';cfg.validPins.forEach(p=>{const o=document.createElement('option');o.value=p;o.textContent='GPIO '+p;s.append(o);});s.value=cfg.pins[k];});
+  $('order').innerHTML='';cfg.orders.forEach(o=>{const e=document.createElement('option');e.value=o;e.textContent=o;$('order').append(e);});$('order').value=cfg.order;
+  $('m_host').value=cfg.mqtt.host;$('m_port').value=cfg.mqtt.port;$('m_user').value=cfg.mqtt.user;
+}
+$('board').addEventListener('change',()=>{const x=cfg.boards.find(b=>b.id===$('board').value);if(x)PIN_KEYS.forEach(k=>$('p_'+k).value=x.pins[k]);});
+PIN_KEYS.forEach(k=>$('p_'+k).addEventListener('change',()=>{$('board').value='custom';}));
+$('setBox').addEventListener('toggle',()=>{if($('setBox').open)loadCfg();});
+document.querySelectorAll('[data-t]').forEach(b=>b.addEventListener('click',()=>fetch('/api/test',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({ch:+b.dataset.t})})));
+$('saveBtn').addEventListener('click',async()=>{
+  const pins={};PIN_KEYS.forEach(k=>pins[k]=+$('p_'+k).value);
+  const uniq=new Set(Object.values(pins));if(uniq.size<6){$('setErr').textContent='Ein Pin ist doppelt belegt.';return;}
+  const body={mode:$('mode').value,board:$('board').value,pins,order:$('order').value,mqtt:{host:$('m_host').value.trim(),port:+$('m_port').value||1883,user:$('m_user').value.trim()}};
+  if($('m_pass').value)body.mqtt.pass=$('m_pass').value;
+  const r=await fetch('/api/config',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)}).catch(()=>null);
+  if(r&&!r.ok){const j=await r.json();$('setErr').textContent=j.error||'Speichern fehlgeschlagen';return;}
+  $('setErr').textContent='';toast('Gespeichert. Trilumag startet neu …');setTimeout(()=>location.reload(),7000);
+});
 window.addEventListener('resize',()=>{if(!drag)render();});
 poll();setInterval(poll,700);
 </script></body></html>)HTML";

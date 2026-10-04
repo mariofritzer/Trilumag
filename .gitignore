@@ -1,0 +1,9 @@
+firmware/panel/*.elf
+firmware/panel/*.bin
+firmware/panel/*.hex
+firmware/panel/*.lst
+firmware/panel/*.map
+firmware/panel/generated*.ld
+ch32fun/
+build/
+site/

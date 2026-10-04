@@ -6,13 +6,13 @@ Dreieckige RGBW-Lichtpanels zum Selberbauen, ähnlich wie Nanoleaf: Die Panels w
 
 ## Stand
 
-Version 0.1 läuft im **Simulationsmodus**: Die Panels werden in der App per Ziehen angeklipst. Damit lassen sich App, Erkennung, Drehung im Dreiecksraster und Home Assistant schon testen, bevor die Hardware gebaut ist.
+Ab Version 0.2 gibt es zwei Betriebsarten, umschaltbar in der App: **Simulation** (Panels werden in der App per Ziehen angeklipst) und **Bus** (echte Panels über RS-485). Das Protokoll steht in [docs/protokoll.md](docs/protokoll.md).
 
 | Teil | Stand |
 | --- | --- |
-| Firmware Hauptpanel (ESP32) | Simulation, Web-App, MQTT mit Home-Assistant-Discovery, WLAN per Improv |
-| Bus zu den Panels (RS-485) | in Arbeit, Steckbrett-Prototyp |
-| Firmware Panels (CH32V003) | geplant |
+| Firmware Hauptpanel (ESP32) | Simulation und echter Bus, Web-App, Pin-Einstellungen pro Board, MQTT mit Home-Assistant-Discovery, WLAN per Improv |
+| Bus zu den Panels (RS-485) | Protokoll v1 fertig, am PC mit echter Firmware simuliert und getestet, Steckbrett-Test folgt |
+| Firmware Panels (CH32V003) | Version 1: Erkennung, Farben, blau pulsieren bis zur ersten Farbe |
 | Platinen | Entwurf v0.1 |
 
 ## Aufbau
@@ -27,16 +27,20 @@ Version 0.1 läuft im **Simulationsmodus**: Die Panels werden in der App per Zie
 | Ordner | Inhalt |
 | --- | --- |
 | `firmware/trilumag` | Arduino-Sketch für das Hauptpanel |
+| `firmware/panel` | Firmware für die Panels (CH32V003, ch32fun) |
+| `docs` | Bus-Protokoll |
 | `installer` | Webinstaller-Seite (ESP Web Tools) |
 | `.github/workflows` | baut die Firmware für ESP32, ESP32-S3, ESP32-C3 und ESP32-C6 und veröffentlicht den Installer |
 
 ## Selbst kompilieren
 
-Arduino IDE mit dem Boardpaket **esp32** von Espressif, dazu die Bibliotheken **ArduinoJson** (ab 7) und **PubSubClient**. Bei ESP32-S3, ESP32-C3 und ESP32-C6 unter Werkzeuge „USB CDC On Boot“ auf „Enabled“ stellen.
+**Hauptpanel:** Arduino IDE mit dem Boardpaket **esp32** von Espressif, dazu die Bibliotheken **ArduinoJson** (ab 7), **PubSubClient** und **Adafruit NeoPixel**. Bei ESP32-S3, ESP32-C3 und ESP32-C6 unter Werkzeuge „USB CDC On Boot“ auf „Enabled“ stellen.
+
+**Panels:** [ch32fun](https://github.com/cnlohr/ch32fun) und eine RISC-V-Toolchain, dann `make -C firmware/panel CH32FUN=<pfad>/ch32fun/ch32fun`. Fertige Dateien gibt es auf der Installer-Seite.
 
 ## Home Assistant
 
-In `trilumag.ino` die Adresse des MQTT-Brokers eintragen. Jedes Panel erscheint dann automatisch als eigenes Licht, dazu ein Licht „Alle Panels“.
+In der App unter Einstellungen die Adresse des MQTT-Brokers eintragen. Jedes Panel erscheint dann automatisch als eigenes Licht, dazu ein Licht „Alle Panels“.
 
 ## API
 
