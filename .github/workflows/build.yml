@@ -68,6 +68,7 @@ jobs:
           build esp32   "esp32:esp32:esp32"                    esp32   0x1000
           build esp32s3 "esp32:esp32:esp32s3:CDCOnBoot=cdc"    esp32s3 0x0
           build esp32c3 "esp32:esp32:esp32c3:CDCOnBoot=cdc"    esp32c3 0x0
+          build esp32c6 "esp32:esp32:esp32c6:CDCOnBoot=cdc"    esp32c6 0x0
 
           cp installer/* site/
           sed -i "s/__VERSION__/${VERSION}/g" site/manifest.json site/index.html

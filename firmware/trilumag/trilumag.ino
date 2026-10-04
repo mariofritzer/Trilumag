@@ -1,7 +1,7 @@
 /*
   Trilumag – Firmware für das Hauptpanel, Version 0.1 (Simulationsmodus)
   ----------------------------------------------------------------------
-  Läuft auf jedem ESP32 (klassischer ESP32, ESP32-S3, ESP32-C3).
+  Läuft auf jedem ESP32 (klassischer ESP32, ESP32-S3, ESP32-C3, ESP32-C6).
   Am einfachsten über den Webinstaller: https://mariofritzer.github.io/Trilumag/
 
   Was sie kann:
@@ -16,7 +16,7 @@
   Selbst kompilieren mit der Arduino IDE:
    - Boardverwalter: "esp32" von Espressif
    - Bibliotheken: ArduinoJson (ab Version 7) und PubSubClient
-   - ESP32-S3/C3: "USB CDC On Boot" auf "Enabled" stellen
+   - ESP32-S3/C3/C6: "USB CDC On Boot" auf "Enabled" stellen
 */
 
 #include <WiFi.h>

@@ -28,11 +28,11 @@ Version 0.1 läuft im **Simulationsmodus**: Die Panels werden in der App per Zie
 | --- | --- |
 | `firmware/trilumag` | Arduino-Sketch für das Hauptpanel |
 | `installer` | Webinstaller-Seite (ESP Web Tools) |
-| `.github/workflows` | baut die Firmware für ESP32, ESP32-S3 und ESP32-C3 und veröffentlicht den Installer |
+| `.github/workflows` | baut die Firmware für ESP32, ESP32-S3, ESP32-C3 und ESP32-C6 und veröffentlicht den Installer |
 
 ## Selbst kompilieren
 
-Arduino IDE mit dem Boardpaket **esp32** von Espressif, dazu die Bibliotheken **ArduinoJson** (ab 7) und **PubSubClient**. Bei ESP32-S3 und ESP32-C3 unter Werkzeuge „USB CDC On Boot“ auf „Enabled“ stellen.
+Arduino IDE mit dem Boardpaket **esp32** von Espressif, dazu die Bibliotheken **ArduinoJson** (ab 7) und **PubSubClient**. Bei ESP32-S3, ESP32-C3 und ESP32-C6 unter Werkzeuge „USB CDC On Boot“ auf „Enabled“ stellen.
 
 ## Home Assistant
 

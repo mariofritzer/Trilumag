@@ -15,6 +15,10 @@
     {
       "chipFamily": "ESP32-C3",
       "parts": [{ "path": "firmware/esp32c3/trilumag.bin", "offset": 0 }]
+    },
+    {
+      "chipFamily": "ESP32-C6",
+      "parts": [{ "path": "firmware/esp32c6/trilumag.bin", "offset": 0 }]
     }
   ]
 }
