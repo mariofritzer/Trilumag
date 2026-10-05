@@ -108,6 +108,12 @@ jobs:
           EXTRA="--build-property build.partitions=trilumag_c6_zigbee --build-property upload.maximum_size=1966080"
           build esp32c6 "esp32:esp32:esp32c6:CDCOnBoot=cdc,PartitionScheme=min_spiffs,ZigbeeMode=zczr"    esp32c6 0x0
           EXTRA=""
+          # Prüfen, dass Zigbee wirklich drin ist und die Speicheraufteilung stimmt
+          C6=site/firmware/esp32c6
+          grep -q "zb_storage" "$C6/partitions.bin" || { echo "::error::C6: Speicheraufteilung ohne zb_storage"; exit 1; }
+          grep -q "zb_storage" "$C6/app.bin" || { echo "::error::C6: Zigbee fehlt in der Firmware"; exit 1; }
+          if grep -q "zb_storage" site/firmware/esp32s3/app.bin; then echo "::error::S3 enthält Zigbee"; exit 1; fi
+          echo "::notice::ESP32-C6 mit Zigbee: $(stat -c %s $C6/app.bin) von 1966080 Bytes"
 
           cp installer/* site/
           sed -i "s/__VERSION__/${VERSION}/g" site/manifest.json site/index.html
