@@ -44,6 +44,7 @@ jobs:
         run: python3 .github/scripts/check_certs.py
 
       - name: Panel-Firmware (CH32V003) und Bootloader bauen
+        timeout-minutes: 10      # hängt apt einmal, lieber abbrechen und neu starten
         run: |
           set -euo pipefail
           sudo apt-get update -q
