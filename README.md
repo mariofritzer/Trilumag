@@ -102,7 +102,7 @@ Unter Optionen → WLAN lässt sich der WLAN-Wächter ein- und ausschalten (Stan
 
 ## Panel tauschen
 
-In der App unter Wand das Panel antippen und „Tauschen“ wählen. Danach bleiben 5 Minuten Zeit: das alte Panel abklipsen und das neue an genau dieselbe Stelle setzen. Das neue übernimmt Farbe, Helligkeit und „Kanten einzeln“ des alten. Oben in der App läuft solange ein Hinweis mit der verbleibenden Zeit und „Abbrechen“.
+In der App unter Wand das Panel antippen und „Tauschen“ wählen. Danach bleiben 5 Minuten Zeit: das alte Panel abklipsen und das neue an genau dieselbe Stelle setzen. Das neue übernimmt Farbe, Helligkeit und „Kanten einzeln“ des alten. Solange läuft unten in der App ein kleines Fenster mit der Restzeit und ✕ zum Abbrechen. Panels, die hinter dem alten hingen, gehen beim Abklipsen kurz aus und melden sich über das neue wieder; in der Simulation landen sie dazwischen in der Ablage und kommen danach von selbst an ihren Platz zurück.
 
 ## Sprache
 

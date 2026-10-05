@@ -1739,6 +1739,7 @@ void reconcile() {
 const uint32_t SWAP_MS = 300000UL;
 int8_t swapSlot = -1; uint32_t swapUntil = 0;
 uint32_t swapDoneChip = 0, swapDoneAt = 0;
+bool swapKid[SLOTS];   // Simulation: Panels, die mit dem alten abgefallen sind, hängen danach wieder am neuen
 bool swapActive() { return swapSlot > 0 && P[swapSlot].used && (int32_t)(swapUntil - millis()) > 0; }
 void swapCheck(int i) {
   if (!swapActive() || i == swapSlot) return;
@@ -1749,6 +1750,13 @@ void swapCheck(int i) {
   colorsDirty = true; colorsDirtyAt = millis();
   diag("Panel %s übernimmt die Einstellungen von %s", hex(a.chip).substring(4).c_str(), hex(b.chip).substring(4).c_str());
   swapSlot = -1; swapDoneChip = a.chip; swapDoneAt = millis() | 1;
+  // Simulation: in echt hängen die Panels dahinter noch aneinander und melden sich über das neue wieder
+  if (!cfg.bus) for (int k = 1; k < SLOTS; k++) if (swapKid[k]) {
+    swapKid[k] = false;
+    if (!P[k].used || P[k].attached || findAt(P[k].x, P[k].y) >= 0) continue;
+    P[k].attached = true; P[k].state = DARK; P[k].since = millis();
+    publishAvail(k, true);
+  }
 }
 
 // Setzt Panel i an Kante "edge" von "parent"; "own" ist die eigene Kante, die den Kontakt hat
@@ -1782,10 +1790,12 @@ bool simAttach(int i, int parent, uint8_t edge) {
 
 void simDetach(int i) {
   if (i <= 0 || i >= SLOTS || !P[i].used || !P[i].attached) return;
+  bool before[SLOTS]; for (int k = 0; k < SLOTS; k++) before[k] = P[k].used && P[k].attached;
   P[i].attached = false; P[i].state = DARK;
   publishAvail(i, false);
   diag("Panel %s abgeklipst", hex(P[i].chip).substring(4).c_str());
   reconcile();
+  if (i == swapSlot && swapActive()) for (int k = 1; k < SLOTS; k++) swapKid[k] = k != i && before[k] && !P[k].attached;
   simChanged();
 }
 
@@ -2897,7 +2907,7 @@ const char* apiCall(const char* path, JsonDocument& d) {
     if (d["stop"] | false) { swapSlot = -1; return nullptr; }
     int i = findChip(parseHex(d["id"] | "0"));
     if (i <= 0 || !P[i].attached) return "Panel unbekannt";
-    swapSlot = i; swapUntil = millis() + SWAP_MS; swapDoneAt = 0;
+    swapSlot = i; swapUntil = millis() + SWAP_MS; swapDoneAt = 0; memset(swapKid, 0, sizeof swapKid);
     diag("Tausch von Panel %s gestartet: 5 Minuten Zeit", hex(P[i].chip).substring(4).c_str());
     return nullptr;
   }
