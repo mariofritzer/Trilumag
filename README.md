@@ -96,6 +96,18 @@ Unter Optionen → Mehrere Wände lassen sich Wände im selben WLAN zu einer Gru
 
 Trilumag zählt den Verbrauch mit, gemessen mit dem INA226 oder aus den Farben geschätzt, und zeigt ihn unter Optionen → Energie pro Tag, Monat und Jahr. Das Datum kommt per Internet (NTP, Zeitzone Österreich). In Home Assistant gibt es den Zähler „Energie“ (kWh) für das Energie-Dashboard.
 
+## WLAN-Wächter und Neustart-Grund
+
+Unter Optionen → WLAN lässt sich der WLAN-Wächter ein- und ausschalten (Standard: an). Ist das WLAN 3 Minuten weg, verbindet sich Trilumag neu; fehlt es nach 10 Minuten immer noch, startet es neu, außer jemand ist gerade im Setup-Netz. Hängt die Hauptschleife eine Minute, startet es ebenfalls neu. `trilumag.local` wird alle 30 Minuten neu angekündigt. Warum Trilumag zuletzt neu gestartet ist (Stromausfall, Update, Absturz, Wächter …) und wie oft es abgestürzt ist, steht unter Optionen → Info und im Ereignisprotokoll.
+
+## Panel tauschen
+
+Klipst man ein neues Panel genau dort an, wo vorher ein anderes saß (innerhalb von 5 Minuten), fragt die App, ob es Farbe, Helligkeit und „Kanten einzeln“ des alten übernehmen soll.
+
+## Sprache
+
+Die App ist auf Deutsch und Englisch. Sie richtet sich nach der Sprache des Browsers; unter Optionen → Name lässt sie sich fest einstellen. Die Namen in Home Assistant und die Versionshinweise bleiben deutsch.
+
 ## Philips Hue (nur ESP32-C6)
 
 Mit einem ESP32-C6 als Hauptpanel meldet sich Trilumag zusätzlich als Zigbee-3.0-Farblampe „Trilumag Wand“. Eine Hue Bridge (auch die Bridge Pro) nimmt sie wie eine Lampe eines anderen Herstellers auf: Ein/Aus, Helligkeit und Farbe der ganzen Wand, auch in Szenen, Routinen und mit Hue-Schaltern. Effekte und einzelne Panels bleiben in der Trilumag-App.
@@ -111,7 +123,7 @@ Mit einem ESP32-C6 als Hauptpanel meldet sich Trilumag zusätzlich als Zigbee-3.
 | --- | --- |
 | `GET /api/state` | alle Panels mit Position, Drehung und Farbe, dazu Ein/Aus, Gesamthelligkeit, Effekt, Effekte, Paletten und Presets |
 | `POST /api/set` | ein Panel: `{"id":"A3F2C1D0","state":"ON","brightness":180,"color":{"r":255,"g":0,"b":0,"w":0}}`, mehrere: `{"ids":[…],…}`, ganze Wand: `{"id":"alle","state":"ON","brightness":200,"color":{…}}` (hier ist `brightness` die Gesamthelligkeit) |
-| `POST /api/effect` | `{"effect":"welle","speed":50,"intensity":128,"palette":"ozean"}`, alle Felder optional, `"aus"` heißt Einfarbig |
+| `POST /api/effect` | `{"effect":"welle","speed":50,"intensity":128,"palette":"ozean","direction":90,"spin":0}`, alle Felder optional, `"aus"` heißt Einfarbig. Beim Farbverlauf (`"verlauf"`) setzt `"color2":{"r":0,"g":80,"b":255,"w":0}` die zweite Farbe |
 | `POST /api/presets` | `{"action":"save","name":"Abend"}`, `{"action":"load","id":0}`, `{"action":"delete","id":0}` |
 | `GET /api/live` | aktuelles Effektbild aller Panels als RRGGBBWW |
 | `GET /api/diag` | Bus-Diagnose: Zähler, Antwortzeiten pro Panel, Ereignisprotokoll |
@@ -121,6 +133,9 @@ Mit einem ESP32-C6 als Hauptpanel meldet sich Trilumag zusätzlich als Zigbee-3.
 | `POST /api/signal` | Signal: `{"color":"blau","blink":3,"ms":700}` |
 | `POST /api/progress` | Fortschritt: `{"value":40,"color":"grün"}`, `0` = aus |
 | `POST /api/identify` | Panel finden: `{"id":"…"}`, das Panel blinkt 3 s weiß |
+| `POST /api/favs` | Favoriten: `{"effect":"lava","on":true}` |
+| `POST /api/swap` | Panel tauschen: `{"id":"neues Panel","take":true}` übernimmt Farbe, Helligkeit und Kanten des Panels, das vorher an dieser Stelle war |
+| `POST /api/guard` | WLAN-Wächter: `{"on":true}` |
 | `POST /api/sleep` | Sleep-Timer: `{"min":30}`, `0` beendet ihn |
 | `POST /api/boot` | Nach Stromausfall: `{"mode":0}` wie vorher, `1` aus, `2` an, `3` mit `"preset"` |
 | `GET /api/energy` | Energieverbrauch: heute, Monat, Jahr, gesamt und Werte pro Tag, Monat und Jahr (Wh) |
