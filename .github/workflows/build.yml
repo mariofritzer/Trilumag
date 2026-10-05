@@ -74,7 +74,7 @@ jobs:
           build () {
             NAME="$1"; FQBN="$2"; CHIP="$3"; BOOT_OFFSET="$4"
             echo "::group::Baue ${NAME}"
-            if ! arduino-cli compile --fqbn "$FQBN" --build-path "build/${NAME}" --warnings default firmware/trilumag > "compile-${NAME}.log" 2>&1; then
+            if ! arduino-cli compile --fqbn "$FQBN" ${EXTRA:-} --build-path "build/${NAME}" --warnings default firmware/trilumag > "compile-${NAME}.log" 2>&1; then
               # Fehler als Anmerkungen ausgeben, damit sie auch ohne Log sichtbar sind
               grep -E "error|Error" "compile-${NAME}.log" | head -n 15 | while IFS= read -r l; do echo "::error::${NAME}: ${l}"; done
               cat "compile-${NAME}.log"; exit 1
@@ -102,7 +102,12 @@ jobs:
           build esp32   "esp32:esp32:esp32:PartitionScheme=min_spiffs"                    esp32   0x1000
           build esp32s3 "esp32:esp32:esp32s3:CDCOnBoot=cdc,PartitionScheme=min_spiffs"    esp32s3 0x0
           build esp32c3 "esp32:esp32:esp32c3:CDCOnBoot=cdc,PartitionScheme=min_spiffs"    esp32c3 0x0
-          build esp32c6 "esp32:esp32:esp32c6:CDCOnBoot=cdc,PartitionScheme=min_spiffs"    esp32c6 0x0
+          # Nur der C6 bekommt Zigbee (Hue): Router-Modus und eine Speicheraufteilung mit den Zigbee-Bereichen
+          CORE=$(ls -d ~/.arduino15/packages/esp32/hardware/esp32/*/ | head -n1)
+          cp firmware/trilumag/partitions_c6_zigbee.csv "${CORE}tools/partitions/trilumag_c6_zigbee.csv"
+          EXTRA="--build-property build.partitions=trilumag_c6_zigbee --build-property upload.maximum_size=1966080"
+          build esp32c6 "esp32:esp32:esp32c6:CDCOnBoot=cdc,PartitionScheme=min_spiffs,ZigbeeMode=zczr"    esp32c6 0x0
+          EXTRA=""
 
           cp installer/* site/
           sed -i "s/__VERSION__/${VERSION}/g" site/manifest.json site/index.html

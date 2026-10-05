@@ -354,6 +354,14 @@ nav.tabs button.on{color:var(--acc)}
       <div class="btnrow"><button class="btn pri" id="saveBtn">Speichern und neu starten</button></div>
       <p class="note" id="setErr"></p>
     </div>
+    <div class="card" id="zbCard" hidden>
+      <h3>Philips Hue (Zigbee)</h3>
+      <div class="wstat" id="zbStat"><div class="ic" id="zbIc">✓</div><div><b id="zbT">–</b><span id="zbS"></span></div></div>
+      <label class="tog"><input type="checkbox" id="zbOn"><span class="sw"></span>Mit der Hue Bridge verbinden</label>
+      <p class="note">Trilumag erscheint in der Hue-App als Farblampe „Trilumag Wand“. Hue steuert Ein/Aus, Helligkeit und Farbe der ganzen Wand, auch in Szenen, Routinen und mit Hue-Schaltern. Effekte und einzelne Panels bleiben hier in der App. Ein- und Ausschalten startet das Hauptpanel neu.</p>
+      <p class="note" id="zbHow">Koppeln: In der Hue-App unter Einstellungen → Lampen → „+“ → Suchen. Trilumag muss dabei laufen und nah genug an der Bridge oder einer Hue-Lampe sein.</p>
+      <div class="btnrow"><button class="btn" id="zbPair">Neu koppeln</button></div>
+    </div>
     <div class="card" id="diagCard">
       <h3>Bus-Diagnose</h3>
       <p class="note" id="diagSum">–</p>
@@ -561,7 +569,7 @@ function render(){
   if(document.activeElement!==$('master')){const p=pct(st.master);setRange('master',p);$('mastero').textContent=p+' %';}
   $('apBanner').hidden=!st.ap||tab==='opt';
   $('updBadge').hidden=!st.upd;
-  if(tab==='opt'){renderWifi();renderPower();renderPfw();renderTouch();}
+  if(tab==='opt'){renderWifi();renderPower();renderPfw();renderTouch();renderZb();}
   [...sel].forEach(id=>{if(!st.panels.some(p=>p.id===id))sel.delete(id);});     // abgeklipste Panels aus der Auswahl nehmen
   if(tab!=='wall'&&tab!=='opt'){drawWall($('mini'),false);
     $('miniHint').textContent=tab==='col'?(sel.size?`${sel.size} Panel${sel.size>1?'s':''} ausgewählt`:'Panels antippen, um nur diese einzufärben'):'';}
@@ -875,6 +883,24 @@ function renderPfw(){
 $('pfwAuto').addEventListener('change',async()=>{await api('/api/panelfw',{action:'auto',on:$('pfwAuto').checked});
   toast($('pfwAuto').checked?'Panels werden automatisch aktualisiert':'Panel-Updates nur noch per Knopf');});
 $('pfwAll').addEventListener('click',()=>api('/api/panelfw',{action:'all'}));
+
+// ---------- Philips Hue (Zigbee, nur ESP32-C6) ----------
+function renderZb(){
+  const z=st&&st.zb;$('zbCard').hidden=!z;if(!z)return;
+  if(document.activeElement!==$('zbOn'))$('zbOn').checked=z.on;
+  const ok=z.run&&z.join;
+  $('zbStat').classList.toggle('bad',z.on&&!ok);
+  $('zbIc').textContent=!z.on?'–':ok?'✓':'…';
+  $('zbT').textContent=!z.on?'Zigbee ist aus':z.err?'Zigbee läuft nicht':ok?'Mit der Hue Bridge verbunden':'Wartet auf die Hue Bridge';
+  $('zbS').textContent=!z.on?'Zum Koppeln mit Hue einschalten':z.err?z.err:ok?`Zigbee-Kanal ${z.ch}`:'Jetzt in der Hue-App nach neuen Lampen suchen';
+  $('zbHow').hidden=!z.on||ok;$('zbPair').hidden=!z.run;
+}
+$('zbOn').addEventListener('change',async()=>{const v=$('zbOn').checked;
+  const r=await api('/api/zigbee',{action:'on',value:v});if(r){toast(v?'Zigbee an, Trilumag startet neu …':'Zigbee aus, Trilumag startet neu …');setTimeout(()=>location.reload(),9000);}});
+$('zbPair').addEventListener('click',async()=>{const b=$('zbPair');
+  if(!b.dataset.ask){b.dataset.ask=1;b.textContent='Wirklich? Trilumag verlässt das Hue-Netz';setTimeout(()=>{delete b.dataset.ask;b.textContent='Neu koppeln';},4000);return;}
+  delete b.dataset.ask;b.textContent='Neu koppeln';
+  const r=await api('/api/zigbee',{action:'pair'});if(r){toast('Zigbee wird zurückgesetzt, Trilumag startet neu …');setTimeout(()=>location.reload(),9000);}});
 
 function ago(s){return s<60?`vor ${s} s`:s<3600?`vor ${Math.round(s/60)} min`:`vor ${Math.round(s/3600)} h`;}
 async function loadDiag(){try{diagData=await (await fetch('/api/diag')).json();renderDiag();if(tab==='wall')renderWall();}catch(e){}}

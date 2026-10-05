@@ -1,0 +1,11 @@
+# Speicheraufteilung für den ESP32-C6 mit Zigbee (Hue): wie "Minimal SPIFFS", nur mit den zwei Zigbee-Bereichen
+# am Ende von spiffs. Programmplätze und NVS liegen gleich, Online-Updates bleiben also möglich.
+# Name,     Type, SubType,  Offset,   Size
+nvs,        data, nvs,      0x9000,   0x5000,
+otadata,    data, ota,      0xe000,   0x2000,
+app0,       app,  ota_0,    0x10000,  0x1E0000,
+app1,       app,  ota_1,    0x1F0000, 0x1E0000,
+spiffs,     data, spiffs,   0x3D0000, 0x1B000,
+zb_storage, data, fat,      0x3EB000, 0x4000,
+zb_fct,     data, fat,      0x3EF000, 0x1000,
+coredump,   data, coredump, 0x3F0000, 0x10000,

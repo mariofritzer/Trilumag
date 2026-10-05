@@ -42,6 +42,7 @@
 #include "pins.h"
 #include "ws.h"
 #include "ota.h"
+#include "zigbee.h"     // Philips Hue über Zigbee, nur ESP32-C6
 #include "panel_fw.h"   // aktuelle Panel-Firmware für Updates über den Bus (erzeugt beim Build)
 #include <Wire.h>
 #include "esp_ota_ops.h"
@@ -134,6 +135,7 @@ struct Config {
   uint8_t touchSens = 5;    // Empfindlichkeit 1 bis 10
   uint8_t tapA1 = 1, tapA2 = 2;   // Aktion für einmal und doppelt antippen (TapAction)
   bool panelAuto = true;    // Panels mit älterer Firmware automatisch aktualisieren
+  bool zbOn = false;        // Zigbee für die Hue Bridge (nur ESP32-C6)
   String mqttHost;
   uint16_t mqttPort = 1883;
   String mqttUser, mqttPass;
@@ -1578,6 +1580,7 @@ void loadConfig() {
   if (cfg.tapA1 >= TA_COUNT) cfg.tapA1 = TA_PANEL;
   if (cfg.tapA2 >= TA_COUNT) cfg.tapA2 = TA_WALL;
   cfg.panelAuto = prefs.getBool("pAuto", true);
+  cfg.zbOn = HAS_ZIGBEE && prefs.getBool("zbOn", false);
 }
 
 String configJson() {
@@ -1638,6 +1641,11 @@ String stateJson(bool meta) {
   f["r"] = fx.r; f["g"] = fx.g; f["b"] = fx.b; f["w"] = fx.w; f["usesColor"] = fxUsesColor();
   d["master"] = master; d["on"] = masterOn;
   d["pfw"] = PANEL_FW_VERSION; d["pAuto"] = cfg.panelAuto;
+#if HAS_ZIGBEE
+  { JsonObject z = d["zb"].to<JsonObject>();            // nur beim ESP32-C6
+    z["on"] = cfg.zbOn; z["run"] = zb::started; z["join"] = zb::joined(); z["ch"] = zb::channel();
+    if (zb::problem.length()) z["err"] = zb::problem; }
+#endif
   if (meta) {                                    // feste Listen nur beim ersten Mal
     JsonArray fl = d["effects"].to<JsonArray>();
     for (uint8_t k = 0; k < FX_COUNT; k++) { JsonObject e = fl.add<JsonObject>(); e["id"] = FX[k].id; e["name"] = FX[k].name; e["color"] = FX[k].color; }
@@ -1866,7 +1874,7 @@ String backupJson() {
   c["i2cSda"] = cfg.i2cSda; c["i2cScl"] = cfg.i2cScl; c["shunt"] = cfg.shuntUo;
   JsonObject t = c["touch"].to<JsonObject>();
   t["on"] = cfg.touchOn; t["sens"] = cfg.touchSens; t["a1"] = cfg.tapA1; t["a2"] = cfg.tapA2;
-  c["pAuto"] = cfg.panelAuto;
+  c["pAuto"] = cfg.panelAuto; c["zbOn"] = cfg.zbOn;
   JsonObject cl = d["clips"].to<JsonObject>();
   for (int i = 1; i < SLOTS; i++) if (P[i].used && P[i].clips) cl[hex(P[i].chip)] = P[i].clips;
   d["master"] = master; d["on"] = masterOn;
@@ -1919,6 +1927,7 @@ const char* restoreBackup(JsonDocument& d) {
       prefs.putUChar("tA1", t["a1"] | (int)TA_PANEL); prefs.putUChar("tA2", t["a2"] | (int)TA_WALL);
     }
     prefs.putBool("pAuto", c["pAuto"] | true);
+    if (HAS_ZIGBEE) prefs.putBool("zbOn", c["zbOn"] | false);
   }
   for (JsonPair kv : d["clips"].as<JsonObject>()) prefs.putUInt(("n" + String(kv.key().c_str())).c_str(), kv.value().as<uint32_t>());
   FxCfg f;
@@ -1993,6 +2002,60 @@ void otaVerifyLoop() {
   if (prefs.getString("otaTry", "") == FW_VERSION) { otaNotice = "Update auf " + String(FW_VERSION) + " erfolgreich."; prefs.remove("otaTry"); }
   logf("[OTA] Version %s bewährt\n", FW_VERSION);
 }
+
+// ---------- Philips Hue über Zigbee (nur ESP32-C6) ----------
+uint32_t restartAt = 0, zbResetAt = 0;
+#if HAS_ZIGBEE
+void zbStart() {
+  if (!cfg.zbOn) return;
+  uint8_t tries = prefs.getUChar("zbBoot", 0);        // dreimal hintereinander beim Start hängen geblieben: Zigbee aus
+  if (tries >= 3) {
+    cfg.zbOn = false; prefs.putBool("zbOn", false); prefs.remove("zbBoot");
+    diag("Zigbee abgeschaltet: Das Hauptpanel ist damit dreimal nicht richtig gestartet");
+    return;
+  }
+  prefs.putUChar("zbBoot", tries + 1);
+  if (zb::begin()) diag("Zigbee läuft: in der Hue-App als „Trilumag Wand“ suchen");
+  else diag("Zigbee: %s", zb::problem.c_str());
+}
+
+void zbLoop() {
+  if (!zb::started) return;
+  static bool bootOk = false;
+  if (!bootOk && millis() > 60000) { bootOk = true; prefs.remove("zbBoot"); }
+  if (zb::pending) {                                    // Befehl von der Hue Bridge
+    bool on, hOn, hLv, hCol; uint8_t lv; uint16_t x, y;
+    portENTER_CRITICAL(&zb::mux);
+    on = zb::pOn; lv = zb::pLevel; x = zb::pX; y = zb::pY; hOn = zb::hasOn; hLv = zb::hasLevel; hCol = zb::hasColor;
+    zb::pending = zb::hasOn = zb::hasLevel = zb::hasColor = false;
+    portEXIT_CRITICAL(&zb::mux);
+    JsonDocument d;
+    if (hOn) d["state"] = on ? "ON" : "OFF";
+    if (hLv) d["brightness"] = lv < 1 ? 1 : lv;
+    if (hCol) {                                         // der weiße Anteil geht auf die weißen LEDs (RGBW)
+      uint8_t r, g, b; zb::xyToRgb(x, y, r, g, b);
+      uint8_t w = min(r, min(g, b));
+      d["color"]["r"] = r - w; d["color"]["g"] = g - w; d["color"]["b"] = b - w; d["color"]["w"] = w;
+    }
+    applyAll(d.as<JsonVariantConst>());
+    wsKick();
+  }
+  static uint32_t last = 0; static uint32_t lastSig = 0;
+  if (millis() - last < 1000) return;                   // eigene Änderungen (App, Home Assistant) einmal pro Sekunde melden
+  last = millis();
+  bool col = fxUsesColor();
+  uint8_t w = col ? fx.w : P[0].w;
+  uint8_t r = min(255, (col ? fx.r : P[0].r) + w), g = min(255, (col ? fx.g : P[0].g) + w), b = min(255, (col ? fx.b : P[0].b) + w);
+  if (!r && !g && !b) r = g = b = 255;
+  uint32_t sig = ((uint32_t)masterOn << 24) ^ ((uint32_t)master << 16) ^ ((uint32_t)r * 7919 + g * 104729 + b * 31);
+  if (sig == lastSig) return;
+  lastSig = sig;
+  zb::report(masterOn, master, r, g, b);
+}
+#else
+void zbStart() {}
+void zbLoop() {}
+#endif
 
 // ---------- Online-Updates ----------
 bool otaCheckNow = false;
@@ -2163,6 +2226,27 @@ const char* apiCall(const char* path, JsonDocument& d) {
     if (strcmp(a, "all") && strcmp(a, "one")) return "Unbekannte Aktion";
     return n ? nullptr : "Kein Panel braucht ein Update";
   }
+  // Hue / Zigbee (nur ESP32-C6): {"action":"on","value":true} startet neu, {"action":"pair"} koppelt neu
+  if (!strcmp(path, "/api/zigbee")) {
+    if (!HAS_ZIGBEE) return "Zigbee gibt es nur mit dem ESP32-C6";
+    const char* a = d["action"] | "";
+    if (!strcmp(a, "on")) {
+      bool v = d["value"] | false;
+      prefs.putBool("zbOn", v); prefs.remove("zbBoot");
+      diag("Zigbee %s, Hauptpanel startet neu", v ? "eingeschaltet" : "ausgeschaltet");
+      restartAt = millis() + 800;
+      return nullptr;
+    }
+#if HAS_ZIGBEE
+    if (!strcmp(a, "pair")) {
+      if (!zb::started) return "Zigbee ist nicht eingeschaltet";
+      diag("Zigbee wird zurückgesetzt und ist danach wieder koppelbar");
+      zbResetAt = millis() + 500;
+      return nullptr;
+    }
+#endif
+    return "Unbekannte Aktion";
+  }
   if (!strncmp(path, "/api/sim/", 9) && cfg.bus) return "nur in der Simulation";
   if (!strcmp(path, "/api/sim/tap")) {             // Antippen ausprobieren: {"id":"…","double":false}
     int i = findChip(parseHex(d["id"] | "0"));
@@ -2227,7 +2311,7 @@ void setupWeb() {
   });
   server.on("/api/state", HTTP_GET, replyState);
   // Befehle laufen über apiCall(), damit HTTP und WebSocket dasselbe tun
-  const char* cmds[] = {"/api/set", "/api/presets", "/api/effect", "/api/test", "/api/ota", "/api/light", "/api/diag", "/api/touch", "/api/panelfw",
+  const char* cmds[] = {"/api/set", "/api/presets", "/api/effect", "/api/test", "/api/ota", "/api/light", "/api/diag", "/api/touch", "/api/panelfw", "/api/zigbee",
                         "/api/sim/new", "/api/sim/attach", "/api/sim/detach", "/api/sim/tap"};
   for (const char* path : cmds) {
     server.on(path, HTTP_POST, [path] {
@@ -2578,6 +2662,7 @@ void setup() {
   if (ss.length()) wifiStart(ss, pw, 15000, false);   // nicht warten, Improv muss sofort antworten können
   else startSetupAp();
   mdnsStart();
+  zbStart();
 
   netClient.setTimeout(800);       // ist der Broker nicht erreichbar, nicht 3 s lang hängen
   mqtt.setSocketTimeout(2);
@@ -2620,4 +2705,9 @@ void loop() {
   if (colorsDirty && millis() - colorsDirtyAt > 5000) saveColors();
   if (simDirty && millis() - simDirtyAt > 1500) simSave();
   if (fxDirty && millis() - fxDirtyAt > 5000) fxSave();
+  zbLoop();
+  if (restartAt && (int32_t)(millis() - restartAt) >= 0) { fxSave(); saveColors(); ESP.restart(); }
+#if HAS_ZIGBEE
+  if (zbResetAt && (int32_t)(millis() - zbResetAt) >= 0) { zbResetAt = 0; prefs.remove("zbBoot"); zb::factoryReset(); }
+#endif
 }
