@@ -36,7 +36,7 @@ Ab Version 0.2 gibt es zwei Betriebsarten, umschaltbar in der App: **Simulation*
 
 ## Selbst kompilieren
 
-**Hauptpanel:** Arduino IDE mit dem Boardpaket **esp32** von Espressif, dazu die Bibliotheken **ArduinoJson** (ab 7), **PubSubClient** und **Adafruit NeoPixel**. Bei ESP32-S3, ESP32-C3 und ESP32-C6 unter Werkzeuge „USB CDC On Boot“ auf „Enabled“ stellen. Unter „Partition Scheme“ immer **Minimal SPIFFS (1.9MB APP with OTA)** wählen, sonst ist für Online-Updates kein Platz.
+**Hauptpanel:** Arduino IDE mit dem Boardpaket **esp32** von Espressif, dazu die Bibliotheken **ArduinoJson** (ab 7), **PubSubClient** und **Adafruit NeoPixel**. Bei ESP32-S3, ESP32-C3 und ESP32-C6 unter Werkzeuge „USB CDC On Boot“ auf „Enabled“ stellen. Unter „Partition Scheme“ immer **Minimal SPIFFS (1.9MB APP with OTA)** wählen, sonst ist für Online-Updates kein Platz. Für den **ESP32-C6 mit Hue** zusätzlich „Zigbee mode“ auf **Zigbee ZCZR (coordinator/router)** stellen und `partitions_c6_zigbee.csv` als `partitions.csv` in den Sketch-Ordner kopieren (nur für diesen Build, sonst gilt sie für alle Chips).
 
 **Panels:** [ch32fun](https://github.com/cnlohr/ch32fun) und eine RISC-V-Toolchain. Ein neues Panel wird einmal mit dem WCH-LinkE programmiert: `make -C firmware/panel flashall CH32FUN=<pfad>/ch32fun/ch32fun` schreibt Bootloader, Option-Byte und Firmware. Danach bekommt es neue Versionen über den Bus vom Hauptpanel (Optionen → Panel-Firmware). Fertige Dateien gibt es bei jedem Release (`trilumag-panel.bin`, `trilumag-panel-bootloader.bin`).
 
@@ -75,6 +75,15 @@ In der App unter Optionen „MQTT aktiv“ einschalten und die Adresse des Broke
 - **Schieberegler:** „Effekt-Tempo“ und „Effekt-Intensität“.
 - **Auswahlen:** „Palette“ und „Preset“.
 
+## Philips Hue (nur ESP32-C6)
+
+Mit einem ESP32-C6 als Hauptpanel meldet sich Trilumag zusätzlich als Zigbee-3.0-Farblampe „Trilumag Wand“. Eine Hue Bridge (auch die Bridge Pro) nimmt sie wie eine Lampe eines anderen Herstellers auf: Ein/Aus, Helligkeit und Farbe der ganzen Wand, auch in Szenen, Routinen und mit Hue-Schaltern. Effekte und einzelne Panels bleiben in der Trilumag-App.
+
+- Einschalten unter Optionen → Philips Hue, dann in der Hue-App unter Einstellungen → Lampen → „+“ nach neuen Lampen suchen.
+- Der C6 braucht dafür einmal die neue Speicheraufteilung mit den Zigbee-Bereichen: einmal mit dem Webinstaller flashen. Einstellungen und Wand bleiben erhalten.
+- WLAN und Zigbee teilen sich beim C6 eine Antenne. Hängt das Hauptpanel mit Zigbee dreimal beim Start, schaltet es Zigbee von selbst wieder aus.
+- Alle anderen Chips haben kein Zigbee, dort fehlt das Kästchen in der App.
+
 ## API
 
 | Aufruf | Zweck |
@@ -88,6 +97,7 @@ In der App unter Optionen „MQTT aktiv“ einschalten und die Adresse des Broke
 | `GET /api/backup`, `POST /api/restore` | Sicherung herunterladen und einspielen |
 | `POST /api/light` | Übergangszeit, Stromlimit und Stromsensor-Pins |
 | `POST /api/touch` | Antippen: an/aus, Empfindlichkeit 1–10, Aktion für einmal (`a1`) und doppelt (`a2`) |
+| `POST /api/zigbee` | Nur ESP32-C6: `{"action":"on","value":true}` (startet neu), `{"action":"pair"}` (neu koppeln) |
 | `POST /api/panelfw` | Panel-Firmware: `{"action":"all"}`, `{"action":"one","id":"…"}`, `{"action":"auto","on":true}` |
 | `/json`, `/json/state`, `/json/info`, `/presets.json` | WLED-kompatible Schnittstelle (eine Wand = ein Segment) |
 | `POST /api/sim/attach` | Simulation: Panel anklipsen |
