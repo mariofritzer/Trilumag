@@ -2,6 +2,29 @@
 
 Die Versionsnummer im Webinstaller und in der App setzt sich aus der Version in der Firmware und der Nummer des automatischen Builds zusammen, zum Beispiel **0.5.11** = Version 0.5, Build 11. Bis Build 9 hat der Build die Nummer immer als 0.2.x ausgegeben, die tatsächlichen Stände stehen deshalb unten mit beiden Nummern.
 
+## 0.7.34 · 5. Oktober 2026
+
+**7 neue Effekte (jetzt 16)**
+- Lauflicht, Spirale, Gewitter, Kerzenlicht, Disco, Komet und Lava.
+- Paletten, Tempo und Intensität wirken bei allen. Auch in Home Assistant und WLED-Programmen auswählbar.
+
+**Welle beim Antippen**
+- Tippst du ein Panel an, läuft ein heller Ring von dort über die Wand und verblasst. Er kommt zusätzlich zur eingestellten Aktion.
+- Lässt sich unter Optionen → Antippen abschalten.
+
+**Einschalt-Animation**
+- Beim Einschalten leuchten die Panels der Reihe nach vom Hauptpanel aus auf.
+- Unter Optionen → Licht wählbar: aus, langsam, mittel (Standard) oder schnell.
+
+**Ansicht drehen und spiegeln**
+- Unter Wand lässt sich die Ansicht in 30°-Schritten drehen oder spiegeln, damit sie zur echten Wand passt.
+- Die Einstellung gilt auch für die Effekte: Links und rechts, oben und unten passen dann zu deiner Wand.
+
+**Signal und Fortschritt (Home Assistant)**
+- Das neue Gerät „Signal“ lässt die Wand blinken, z. B. mit der Nachricht „blau 3“. Danach läuft alles weiter wie vorher, auch ein Effekt.
+- Die Zahl „Fortschritt“ (0 bis 100 %) füllt die Wand vom Hauptpanel aus. 0 % schaltet die Anzeige aus.
+- Unter Optionen lassen sich beide ausprobieren.
+
 ## 0.7.31 · 5. Oktober 2026
 
 **Name der Wand**
