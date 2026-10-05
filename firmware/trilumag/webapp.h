@@ -40,6 +40,11 @@ main{max-width:720px;margin:0 auto;padding:12px 14px;display:flex;flex-direction
 .card h3.fold::after{content:"";width:8px;height:8px;border-right:2px solid var(--muted);border-bottom:2px solid var(--muted);transform:rotate(45deg);margin:0 4px 4px 0;transition:transform .15s}
 .card.closed h3.fold::after{transform:rotate(-45deg);margin:4px 4px 0 0}
 .card.closed>:not(h3){display:none!important}
+.subf,.subb{display:flex;flex-direction:column;gap:12px}
+.subf h3.fold{justify-content:flex-start}
+.subf h3 small{margin-left:auto;margin-right:12px;text-transform:none;letter-spacing:0;font-weight:500;font-size:12px}
+.subf.closed .subb{display:none}
+.subf.closed h3.fold::after{transform:rotate(-45deg);margin:4px 4px 0 0}
 .wstat{display:flex;gap:12px;align-items:center;background:#13261a;border:1px solid #2c5a3a;border-radius:12px;padding:12px}
 .wstat.bad{background:#2b1a12;border-color:#5a3a2a}
 .wstat .ic{width:30px;height:30px;border-radius:50%;background:#2fbf65;display:grid;place-items:center;flex:none;color:#08130c;font-weight:800}
@@ -284,13 +289,17 @@ nav.tabs button.on{color:var(--acc)}
         <label class="f">mA pro Farbkanal und Segment<input id="lpwrCh" inputmode="numeric" placeholder="12"></label>
       </div>
       <p class="note">Wird es mehr, dimmt Trilumag alle Panels gleichmäßig. Ohne Sensor wird der Strom aus den Farben geschätzt.</p>
-      <h3 class="sub">Stromsensor INA226</h3>
-      <div class="pins">
-        <label class="f">SDA<select id="p_sda"></select></label>
-        <label class="f">SCL<select id="p_scl"></select></label>
-        <label class="f">Shunt (mΩ)<input id="p_shunt" inputmode="decimal" placeholder="5"></label>
+      <div class="subf closed" id="sensFold">
+        <h3 class="sub fold" id="sensHead" tabindex="0" role="button" aria-expanded="false">Stromsensor INA226<small id="sensBadge"></small></h3>
+        <div class="subb">
+          <div class="pins">
+            <label class="f">SDA<select id="p_sda"></select></label>
+            <label class="f">SCL<select id="p_scl"></select></label>
+            <label class="f">Shunt (mΩ)<input id="p_shunt" inputmode="decimal" placeholder="5"></label>
+          </div>
+          <p class="note" id="sensInfo"></p>
+        </div>
       </div>
-      <p class="note" id="sensInfo"></p>
     </div>
     <div class="card" id="touchCard">
       <h3>Antippen</h3>
@@ -366,8 +375,10 @@ nav.tabs button.on{color:var(--acc)}
       <h3>Bus-Diagnose</h3>
       <p class="note" id="diagSum">–</p>
       <div class="dtab"><table><thead><tr><th>Panel</th><th>Adr.</th><th>Antwort</th><th>verpasst</th><th>FW</th><th>Angekl.</th></tr></thead><tbody id="diagRows"></tbody></table></div>
-      <h3 class="sub">Ereignisse</h3>
-      <div class="dlog" id="diagLog"></div>
+      <div class="subf closed" id="logFold">
+        <h3 class="sub fold" tabindex="0" role="button" aria-expanded="false">Ereignisse<small id="logBadge"></small></h3>
+        <div class="subb"><div class="dlog" id="diagLog"></div></div>
+      </div>
       <div class="btnrow"><button class="btn" id="diagReset">Zähler zurücksetzen</button></div>
     </div>
     <div class="card" id="backupCard">
@@ -828,7 +839,13 @@ $('lpwrOn').addEventListener('change',sendPwr);
 $('lpwrMax').addEventListener('change',sendPwr);$('lpwrCh').addEventListener('change',sendPwr);
 
 let sensDef='';
-function renderSensor(sda,found){$('sensInfo').textContent=sensDef+(sda>=0?(found?'Sensor gefunden: Trilumag misst den echten Strom und regelt danach.':'Sensor nicht gefunden. Verkabelung prüfen (SDA, SCL, 3,3 V, GND), dann hier die Pins neu wählen.'):'Kein Sensor eingestellt. Der Strom wird aus den Farben geschätzt.');}
+// Unterbereiche (Stromsensor, Ereignisse) auf- und zuklappen: zu, bis man sie einmal öffnet
+[['sensFold','zu:sens'],['logFold','zu:log']].forEach(([id,key])=>{const f=$(id),h=f.querySelector('h3');
+  try{if(localStorage.getItem(key)==='0')f.classList.remove('closed');}catch(e){}
+  h.setAttribute('aria-expanded',!f.classList.contains('closed'));
+  const t=()=>{f.classList.toggle('closed');const open=!f.classList.contains('closed');h.setAttribute('aria-expanded',open);try{localStorage.setItem(key,open?'0':'1');}catch(e){}};
+  h.addEventListener('click',t);h.addEventListener('keydown',e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();t();}});});
+function renderSensor(sda,found){$('sensBadge').textContent=sda>=0?(found?'gefunden':'nicht gefunden'):'keiner';$('sensInfo').textContent=sensDef+(sda>=0?(found?'Sensor gefunden: Trilumag misst den echten Strom und regelt danach.':'Sensor nicht gefunden. Verkabelung prüfen (SDA, SCL, 3,3 V, GND), dann hier die Pins neu wählen.'):'Kein Sensor eingestellt. Der Strom wird aus den Farben geschätzt.');}
 async function sendSensor(){
   const sda=+$('p_sda').value,scl=+$('p_scl').value;
   if((sda<0)!==(scl<0)){$('sensInfo').textContent='Bitte beide Pins wählen oder bei beiden „kein Sensor“.';return;}
@@ -912,6 +929,7 @@ function renderDiag(){
   d.panels.forEach(p=>{const tr=document.createElement('tr');const pct=p.pings?Math.round(p.missed*1000/p.pings)/10:0;
     const cells=[p.id.slice(4),p.addr||'–',p.rtt?(p.rtt/1000).toFixed(2)+' ms':'–',p.pings?pct+' %':'–',p.fw||'–',(p.clips||0)+'×'];
     cells.forEach((c,i)=>{const td=document.createElement('td');td.textContent=c;if(i===3&&pct>=5)td.className=pct>=20?'bad':'warn';tr.append(td);});tb.append(tr);});
+  $('logBadge').textContent=d.log.length?d.log.length+(d.log.length===1?' Eintrag':' Einträge'):'keine';
   const lg=$('diagLog');lg.innerHTML='';
   if(!d.log.length){const x=document.createElement('p');x.className='note';x.textContent='Noch keine Ereignisse.';lg.append(x);}
   d.log.forEach(e=>{const r=document.createElement('div');const t=document.createElement('span');t.textContent=ago(e.ago);const m=document.createElement('p');m.style.margin='0';m.textContent=e.m;r.append(t,m);lg.append(r);});
