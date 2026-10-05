@@ -87,6 +87,33 @@ main{max-width:720px;margin:0 auto;padding:12px 14px;display:flex;flex-direction
 .edge1{fill:rgba(255,255,255,.75);pointer-events:none}
 /* Auswahl-Chips */
 .chips{display:flex;gap:8px;flex-wrap:wrap}
+.moon{width:40px;height:40px;flex:none;border-radius:50%;border:2px solid var(--line);background:var(--card);display:grid;place-items:center;cursor:pointer;position:relative;padding:0}
+.moon svg{width:18px;height:18px;fill:none;stroke:var(--muted);stroke-width:2;stroke-linejoin:round}
+.moon.on{border-color:var(--acc)}
+.moon.on svg{stroke:var(--acc);fill:var(--acc)}
+.moon small{position:absolute;bottom:-8px;left:50%;transform:translateX(-50%);background:var(--acc);color:#111;font:600 10px/1 system-ui,sans-serif;padding:2px 4px;border-radius:6px;white-space:nowrap}
+.pop{position:absolute;right:14px;top:62px;z-index:8;background:#232323;border:1px solid var(--line);border-radius:14px;padding:12px;display:flex;flex-direction:column;gap:10px;box-shadow:0 10px 30px rgba(0,0,0,.5);max-width:300px}
+.pop b{font-size:14px}
+.sw8{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.sw8 button{width:36px;height:36px;border-radius:50%;border:2px solid var(--line);cursor:pointer;padding:0;position:relative}
+.sw8 button.on{border-color:#fff;box-shadow:0 0 0 2px var(--acc)}
+.sw8 .off{background:#141414;color:var(--muted);font-size:18px}
+.sw8 label{width:36px;height:36px;border-radius:50%;border:2px dashed var(--line);display:grid;place-items:center;cursor:pointer;overflow:hidden;position:relative;color:var(--muted)}
+.sw8 label input{position:absolute;inset:0;opacity:0;cursor:pointer}
+.wall.paint svg{cursor:crosshair}
+.tri.find{animation:find .33s steps(2) infinite}
+@keyframes find{50%{stroke:#fff;stroke-width:6}}
+.estats{display:grid;grid-template-columns:repeat(4,1fr);gap:8px}
+.estats div{background:var(--card2);border-radius:10px;padding:8px;display:flex;flex-direction:column;min-width:0}
+.estats b{font-size:15px;white-space:nowrap}
+.estats span{font-size:11.5px;color:var(--muted)}
+@media(max-width:420px){.estats{grid-template-columns:repeat(2,1fr)}}
+#eChart{width:100%;height:150px;display:block}
+#eChart .bar{fill:var(--acc)}
+#eChart .bar.cur{fill:#9fb3ff}
+#eChart text{fill:var(--muted);font:10px ui-monospace,Menlo,monospace}
+#eChart line{stroke:#333;stroke-width:1}
+#eTip{font:12.5px ui-monospace,Menlo,monospace;color:var(--fg);min-height:18px}
 .chip{border:1px solid var(--line);background:var(--card2);border-radius:999px;padding:8px 14px;font-size:14px;cursor:pointer}
 .chip.on{background:var(--acc);border-color:var(--acc);color:var(--accfg);font-weight:600}
 /* Farbrad */
@@ -134,7 +161,7 @@ label.f{display:flex;flex-direction:column;gap:6px;font-size:13px;color:var(--mu
 .tog input:checked+.sw{background:var(--acc)}
 .tog input:checked+.sw::after{transform:translateX(18px)}
 .tog input:focus-visible+.sw{outline:2px solid var(--acc);outline-offset:2px}
-.pins.off,#tBox.off{opacity:.45}
+.pins.off,#tBox.off,label.f.off{opacity:.45}
 .nets{display:flex;flex-direction:column;border-radius:12px;overflow:hidden;background:var(--card2)}
 .nets:empty{display:none}
 .nets .row{gap:10px}
@@ -186,6 +213,12 @@ nav.tabs button.on{color:var(--acc)}
     <button class="pwr" id="pwr" aria-label="Wand ein/aus"><svg viewBox="0 0 24 24"><path d="M12 3v8"/><path d="M6.3 6.8a8 8 0 1 0 11.4 0"/></svg></button>
     <div class="bri"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="4.2"/><g stroke="#999" stroke-width="2" stroke-linecap="round"><path d="M12 2.5v2M12 19.5v2M2.5 12h2M19.5 12h2M5.3 5.3l1.4 1.4M17.3 17.3l1.4 1.4M5.3 18.7l1.4-1.4M17.3 6.7l1.4-1.4"/></g></svg>
       <input type="range" id="master" min="1" max="100" value="100" aria-label="Gesamthelligkeit in Prozent"><output id="mastero" class="pct">100 %</output></div>
+    <button class="moon" id="sleepBtn" aria-label="Sleep-Timer"><svg viewBox="0 0 24 24"><path d="M20 14.5A8 8 0 1 1 9.5 4a6.5 6.5 0 0 0 10.5 10.5z"/></svg><small id="sleepLeft" hidden></small></button>
+  </div>
+  <div class="pop" id="sleepPop" hidden>
+    <b>Sleep-Timer</b><span class="note" id="sleepInfo">Die Wand blendet langsam aus und geht dann aus.</span>
+    <div class="chips" id="sleepChips"><button class="chip" data-m="15">15 min</button><button class="chip" data-m="30">30 min</button><button class="chip" data-m="60">1 h</button><button class="chip" data-m="90">1,5 h</button><button class="chip" data-m="120">2 h</button></div>
+    <button class="btn" id="sleepOff" hidden>Timer beenden</button>
   </div>
   <div class="status"><b id="wallName">Trilumag</b><span id="status">verbinde …</span></div>
 </header>
@@ -234,12 +267,17 @@ nav.tabs button.on{color:var(--acc)}
       <div class="tray" id="tray"></div>
       <div class="btnrow"><button class="btn" id="newBtn">Neues Panel</button></div>
     </div>
-    <div class="wall"><svg id="big" aria-label="Wand mit Panels"></svg><div class="hint" id="bigHint"></div></div>
+    <div class="card" id="paintCard">
+      <h3>Malen</h3>
+      <label class="tog"><input type="checkbox" id="paintOn"><span class="sw"></span>Mit dem Finger über die Panels wischen</label>
+      <div class="sw8" id="swatches"></div>
+    </div>
+    <div class="wall" id="bigBox"><svg id="big" aria-label="Wand mit Panels"></svg><div class="hint" id="bigHint"></div></div>
     <div class="card" id="panelCard">
       <h3 id="pTitle">Panel</h3>
       <div class="kv" id="pInfo"></div>
       <div class="sl">Helligkeit<input type="range" id="pbri" min="1" max="100" value="71"><output id="pbrio">71 %</output></div>
-      <div class="btnrow"><button class="btn" id="pOn">Ein / Aus</button><button class="btn pri" id="pCol">Farbe wählen</button></div>
+      <div class="btnrow"><button class="btn" id="pOn">Ein / Aus</button><button class="btn pri" id="pCol">Farbe wählen</button><button class="btn" id="pFind">Finden</button></div>
       <div class="btnrow" id="pTapRow"><span class="note">Antippen ausprobieren:</span><button class="btn" id="pTap1">einmal</button><button class="btn" id="pTap2">doppelt</button></div>
       <label class="tog"><input type="checkbox" id="pEdges"><span class="sw"></span>Kanten einzeln</label>
       <p class="note">Effekte bekommen dann drei Farben pro Panel, eine je Kante. Feste Farben bleiben pro Panel.</p>
@@ -286,6 +324,11 @@ nav.tabs button.on{color:var(--acc)}
       <h3>Licht</h3>
       <div class="sl">Übergänge<input type="range" id="ltrans" min="0" max="50" value="7"><output id="ltranso">0,7 s</output></div>
       <p class="note">So lange blenden Farb-, Preset-, Effekt- und Ein/Aus-Wechsel weich über. 0 = sofort.</p>
+      <div class="pins">
+        <label class="f">Nach Stromausfall<select id="bootMode"><option value="0">wie vorher</option><option value="1">aus</option><option value="2">an</option><option value="3">Preset …</option></select></label>
+        <label class="f" id="bootPreBox" hidden>Preset<select id="bootPre"></select></label>
+      </div>
+      <p class="note">Gilt nur, wenn der Strom weg war. Nach Updates und Neustarts aus der App bleibt alles, wie es war.</p>
     </div>
     <div class="card" id="powerCard">
       <h3>Stromlimit</h3>
@@ -307,6 +350,15 @@ nav.tabs button.on{color:var(--acc)}
           <p class="note" id="sensInfo"></p>
         </div>
       </div>
+    </div>
+    <div class="card" id="energyCard">
+      <h3>Energie</h3>
+      <div class="estats"><div><b id="eToday">–</b><span>heute</span></div><div><b id="eMonth">–</b><span>diesen Monat</span></div><div><b id="eYear">–</b><span>dieses Jahr</span></div><div><b id="eTotal">–</b><span>gesamt</span></div></div>
+      <div class="chips" id="eTabs"><button class="chip on" data-r="days">Tage</button><button class="chip" data-r="months">Monate</button><button class="chip" data-r="years">Jahre</button></div>
+      <svg id="eChart" viewBox="0 0 340 150" role="img" aria-label="Energieverbrauch"></svg>
+      <div id="eTip"></div>
+      <p class="note" id="eNote"></p>
+      <div class="btnrow"><button class="btn" id="eReset">Zähler zurücksetzen</button></div>
     </div>
     <div class="card" id="touchCard">
       <h3>Antippen</h3>
@@ -370,6 +422,13 @@ nav.tabs button.on{color:var(--acc)}
       <div class="btnrow"><button class="btn pri" id="saveBtn">Speichern und neu starten</button></div>
       <p class="note" id="setErr"></p>
     </div>
+    <div class="card" id="syncCard">
+      <h3>Mehrere Wände</h3>
+      <label class="tog"><input type="checkbox" id="syncOn"><span class="sw"></span>Mit anderen Wänden im Gleichtakt</label>
+      <label class="f">Gruppe<select id="syncGrp"></select></label>
+      <div class="list" id="syncList"></div>
+      <p class="note">Alle Wände derselben Gruppe im selben WLAN teilen Ein/Aus, Helligkeit und Effekt mit allen Einstellungen, egal an welcher Wand du etwas änderst. Die Effekte laufen im selben Takt. Feste Farben einzelner Panels bleiben pro Wand.</p>
+    </div>
     <div class="card" id="zbCard" hidden>
       <h3>Philips Hue (Zigbee)</h3>
       <div class="wstat" id="zbStat"><div class="ic" id="zbIc">✓</div><div><b id="zbT">–</b><span id="zbS"></span></div></div>
@@ -382,7 +441,7 @@ nav.tabs button.on{color:var(--acc)}
     <div class="card" id="diagCard">
       <h3>Bus-Diagnose</h3>
       <p class="note" id="diagSum">–</p>
-      <div class="dtab"><table><thead><tr><th>Panel</th><th>Adr.</th><th>Antwort</th><th>verpasst</th><th>FW</th><th>Angekl.</th></tr></thead><tbody id="diagRows"></tbody></table></div>
+      <div class="dtab"><table><thead><tr><th>Panel</th><th>Adr.</th><th title="Antwortzeit">Antw.</th><th title="verpasste Antworten">verp.</th><th>FW</th><th title="wie oft angeklipst">Angekl.</th><th title="Leuchtdauer in Stunden">Std.</th></tr></thead><tbody id="diagRows"></tbody></table></div>
       <div class="subf closed" id="logFold">
         <h3 class="sub fold" tabindex="0" role="button" aria-expanded="false">Ereignisse<small id="logBadge"></small></h3>
         <div class="subb"><div class="dlog" id="diagLog"></div></div>
@@ -512,6 +571,7 @@ function drawWall(svg,big){
     const g=geom(p.x,p.y,p.up);const cls=['tri'];if(p.main)cls.push('main');
     if(big?focus===p.id:(tab==='col'&&sel.has(p.id)))cls.push('sel');
     if(tapUntil[p.id]>Date.now())cls.push('tap');
+    if(p.ident)cls.push('find');
     let fill=null;
     if(p.state===0)cls.push('dark');
     else if(fxOn()&&joining.includes(p.id))cls.push('pulse');
@@ -577,7 +637,7 @@ async function onUp(){
   const g=d.snap!=null?st.ghosts[d.snap]:null;drag=null;
   if(g){const r=await api('/api/sim/attach',{id:d.id,parent:g.parent,edge:g.edge});if(r){focus=d.id;toast('angeklipst, wird erkannt …');}}
   render();}
-$('big').addEventListener('pointerdown',e=>{const id=e.target.dataset&&e.target.dataset.id;if(!id)return;
+$('big').addEventListener('pointerdown',e=>{if(paintOn()){paintStart(e);return;}const id=e.target.dataset&&e.target.dataset.id;if(!id)return;
   const p=st.panels.find(q=>q.id===id);if(!p)return;if(p.main||!st.sim){focus=id;render();return;}startDrag(e,id,'wall');});
 
 // ---------- Darstellung ----------
@@ -585,12 +645,13 @@ function render(){
   if(!st)return;
   if(st.name){$('wallName').textContent=st.name;document.title=st.name;
     if(document.activeElement!==$('wname')&&!tSend.name)$('wname').value=st.name;}
+  renderSleep();
   $('status').textContent=`${st.panels.length}/${st.max} Panels · ${st.sim?'Simulation':'Bus'} · MQTT ${st.mqttSet?(st.mqtt?'verbunden':'getrennt'):'aus'} · ${wsOk?'live':'HTTP'}`;
   $('pwr').classList.toggle('on',st.on);
   if(document.activeElement!==$('master')){const p=pct(st.master);setRange('master',p);$('mastero').textContent=p+' %';}
   $('apBanner').hidden=!st.ap||tab==='opt';
   $('updBadge').hidden=!st.upd;
-  if(tab==='opt'){renderWifi();renderPower();renderPfw();renderTouch();renderZb();}
+  if(tab==='opt'){renderWifi();renderPower();renderPfw();renderTouch();renderZb();renderSync();renderBoot();}
   [...sel].forEach(id=>{if(!st.panels.some(p=>p.id===id))sel.delete(id);});     // abgeklipste Panels aus der Auswahl nehmen
   if(tab!=='wall'&&tab!=='opt'){drawWall($('mini'),false);
     $('miniHint').textContent=tab==='col'?(sel.size?`${sel.size} Panel${sel.size>1?'s':''} ausgewählt`:'Panels antippen, um nur diese einzufärben'):'';}
@@ -715,7 +776,7 @@ function renderWall(){
     $('pInfo').innerHTML='';[['Chip-ID',p.id],['Zustand',stx],...(()=>{const q=diagData&&diagData.panels.find(x=>x.id===p.id);if(!q||!diagData.bus||p.main)return[];const pct=q.pings?Math.round(q.missed*1000/q.pings)/10:0;
       return[['Bus',`Adresse ${q.addr} · Antwort ${(q.rtt/1000).toFixed(2)} ms · ${pct} % verpasst · Firmware ${q.fw}`]];})(),['Position',`${p.x} / ${p.y} · Spitze ${p.up?'oben':'unten'}`],['Hängt an',p.main?'–':par?(par.main?'Hauptpanel':'Panel '+par.id.slice(4)):'–'],['Farbe',rgbHex(p.r,p.g,p.b)+(p.w?' + Weiß '+p.w:'')],
       ...(p.main?[]:[['Angeklipst',(p.clips||0)===1?'einmal':(p.clips||0)+'-mal'],['Firmware',p.fw?p.fw+(p.upd===2?` · Update läuft ${p.pct||0} %`:p.fw<st.pfw?` · Update auf ${st.pfw} verfügbar`:''):'–'],
-        ['Antippen',!p.fw?'–':(p.caps&1)?'Sensor vorhanden':'kein Sensor']])]
+        ['Antippen',!p.fw?'–':(p.caps&1)?'Sensor vorhanden':'kein Sensor']]),['Leuchtdauer',fmtDur(p.lit||0)]]
       .forEach(([k,v])=>{const a=document.createElement('span');a.textContent=k;const b=document.createElement('span');b.textContent=v;$('pInfo').append(a,b);});
     if(document.activeElement!==$('pbri')){setRange('pbri',pct(p.bri));$('pbrio').textContent=pct(p.bri)+' %';}
     $('pOn').classList.toggle('pri',p.on);$('pOn').textContent=p.on?'Ein':'Aus';
@@ -771,7 +832,7 @@ $('pname').addEventListener('keydown',e=>{if(e.key==='Enter')$('psave').click();
 // ---------- Tab Optionen ----------
 let cfg=null;const PIN_KEYS=['rx','tx','de','led','snsR','snsL'];
 async function loadCfg(){
-  renderWifi();loadOta();loadDiag();
+  renderWifi();loadOta();loadDiag();loadEnergy();
   try{cfg=await (await fetch('/api/config')).json();}catch(e){return;}
   if(st&&(st.ap||!st.ssid)&&!$('netList').children.length)$('scanBtn').click();   // ohne WLAN gleich nach Netzen suchen
   $('mode').value=cfg.mode;
@@ -788,6 +849,7 @@ async function loadCfg(){
   $('p_shunt').value=((L.shunt||50)/10).toLocaleString('de-AT');
   sensDef=L.defSda>=0?`★ = Vorgabe für dein Board: SDA GPIO ${L.defSda}, SCL GPIO ${L.defScl}. `:'';
   renderSensor(L.sda,L.sensor);
+  renderBoot();
   if(cfg.touch){const T=cfg.touch;$('tOn').checked=T.on;setRange('tSens',T.sens);$('tSenso').textContent=T.sens;
     ['tA1','tA2'].forEach((k,n)=>{const s=$(k);s.innerHTML='';T.actions.forEach((a,i)=>{const o=document.createElement('option');o.value=i;o.textContent=a;s.append(o);});s.value=n?T.a2:T.a1;});
     renderTouch();}
@@ -938,6 +1000,104 @@ $('wname').addEventListener('input',()=>{const n=$('wname').value.trim();if(!n)r
   later('name',async()=>{if(await api('/api/name',{name:n}))toast('Name gespeichert');},700);});
 $('wname').addEventListener('blur',()=>{if(!$('wname').value.trim()&&st)$('wname').value=st.name;});
 
+// ---------- Dauer lesbar ----------
+function fmtDur(s){const h=Math.floor(s/3600),m=Math.floor(s%3600/60);return h>=100?h+' h':h?`${h} h ${m} min`:`${m} min`;}
+
+// ---------- Panel finden ----------
+$('pFind').addEventListener('click',()=>{if(!focus)return;api('/api/identify',{id:focus});toast('Das Panel blinkt jetzt 3 Sekunden weiß');});
+
+// ---------- Malen ----------
+const SW=[['#ff2a1a',[255,0,0,0]],['#ff7a1a',[255,90,0,0]],['#ffd21a',[255,190,0,0]],['#34d058',[0,255,40,0]],['#1ad8ff',[0,220,255,0]],['#2a5bff',[0,40,255,0]],
+  ['#9b3cff',[140,0,255,0]],['#ff3ca8',[255,0,140,0]],['#ffe6c0',[0,0,0,255]],['#ffffff',[255,255,255,255]]];
+let paintCol=SW[0][1],painted=null;
+function paintOn(){return $('paintOn').checked;}
+(()=>{const w=$('swatches');
+  SW.forEach(([hx,c],k)=>{const b=document.createElement('button');b.style.background=hx;b.title=k===8?'Warmweiß':k===9?'Kaltweiß':hx;b.setAttribute('aria-label',b.title);
+    if(!k)b.classList.add('on');b.addEventListener('click',()=>{paintCol=c;mark(b);});w.append(b);});
+  const off=document.createElement('button');off.className='off';off.textContent='×';off.title='Aus';off.setAttribute('aria-label','Aus');
+  off.addEventListener('click',()=>{paintCol=null;mark(off);});w.append(off);
+  const l=document.createElement('label');l.title='Eigene Farbe';l.innerHTML='＋<input type="color" value="#ff9a3c" aria-label="Eigene Farbe">';
+  l.querySelector('input').addEventListener('input',e=>{const v=e.target.value;paintCol=[parseInt(v.slice(1,3),16),parseInt(v.slice(3,5),16),parseInt(v.slice(5,7),16),0];l.style.background=v;mark(l);});w.append(l);
+  function mark(el){w.querySelectorAll('.on').forEach(x=>x.classList.remove('on'));el.classList.add('on');}})();
+$('paintOn').addEventListener('change',()=>{$('bigBox').classList.toggle('paint',paintOn());focus=null;render();
+  if(paintOn())toast('Farbe wählen und über die Panels wischen');});
+function paintAt(x,y){const el=document.elementFromPoint(x,y);const id=el&&el.dataset&&el.dataset.id;if(!id||painted.has(id))return;painted.add(id);
+  const p=st.panels.find(q=>q.id===id);if(!p)return;
+  if(paintCol){if(st.fx.id!=='aus'){st.fx.id='aus';live={};}Object.assign(p,{r:paintCol[0],g:paintCol[1],b:paintCol[2],w:paintCol[3],on:true,state:2});
+    api('/api/set',{id,state:'ON',color:{r:paintCol[0],g:paintCol[1],b:paintCol[2],w:paintCol[3]}});}
+  else{p.on=false;api('/api/set',{id,state:'OFF'});}
+  drawWall($('big'),true);}
+function paintStart(e){e.preventDefault();painted=new Set();const svg=$('big');svg.setPointerCapture(e.pointerId);paintAt(e.clientX,e.clientY);
+  const mv=ev=>paintAt(ev.clientX,ev.clientY);
+  const up=()=>{svg.removeEventListener('pointermove',mv);svg.removeEventListener('pointerup',up);svg.removeEventListener('pointercancel',up);painted=null;};
+  svg.addEventListener('pointermove',mv);svg.addEventListener('pointerup',up);svg.addEventListener('pointercancel',up);}
+
+// ---------- Sleep-Timer ----------
+function renderSleep(){const s=st&&st.sleep;$('sleepBtn').classList.toggle('on',!!s);$('sleepLeft').hidden=!s;
+  if(s){const m=Math.ceil(s/60);$('sleepLeft').textContent=m>=60?Math.floor(m/60)+':'+String(m%60).padStart(2,'0'):m+'′';}
+  $('sleepOff').hidden=!s;$('sleepInfo').textContent=s?`Die Wand geht in ${fmtDur(s)} aus. Neu wählen oder beenden:`:'Die Wand blendet langsam aus und geht dann aus.';}
+$('sleepBtn').addEventListener('click',e=>{e.stopPropagation();$('sleepPop').hidden=!$('sleepPop').hidden;});
+document.addEventListener('click',e=>{if(!$('sleepPop').hidden&&!$('sleepPop').contains(e.target))$('sleepPop').hidden=true;});
+$('sleepChips').querySelectorAll('button').forEach(b=>b.addEventListener('click',async()=>{const m=+b.dataset.m;$('sleepPop').hidden=true;
+  if(await api('/api/sleep',{min:m}))toast(`Die Wand geht in ${m>=60?(m/60).toLocaleString('de-AT')+' h':m+' min'} aus`);}));
+$('sleepOff').addEventListener('click',async()=>{$('sleepPop').hidden=true;if(await api('/api/sleep',{min:0}))toast('Sleep-Timer beendet');});
+
+// ---------- Nach Stromausfall ----------
+function renderBoot(){if(!cfg||!cfg.boot||!st)return;
+  const sel=$('bootPre');if(document.activeElement!==sel){sel.innerHTML='';st.presets.forEach(p=>{const o=document.createElement('option');o.value=p.id;o.textContent=p.name;sel.append(o);});
+    if(cfg.boot.preset>=0)sel.value=cfg.boot.preset;}
+  if(document.activeElement!==$('bootMode'))$('bootMode').value=cfg.boot.mode;
+  $('bootPreBox').hidden=$('bootMode').value!=='3';}
+async function saveBoot(){const m=+$('bootMode').value;$('bootPreBox').hidden=m!==3;
+  if(m===3&&!st.presets.length){toast('Zuerst unter Presets eins speichern');$('bootMode').value=cfg.boot.mode;$('bootPreBox').hidden=cfg.boot.mode!==3;return;}
+  const body={mode:m};if(m===3)body.preset=+($('bootPre').value||st.presets[0].id);
+  if(await api('/api/boot',body)){cfg.boot.mode=m;if(m===3)cfg.boot.preset=body.preset;toast('Gespeichert');}}
+$('bootMode').addEventListener('change',saveBoot);$('bootPre').addEventListener('change',saveBoot);
+
+// ---------- Energie ----------
+let enData=null,enRange='days';
+function fmtWh(wh){return wh>=1000?(wh/1000).toLocaleString('de-AT',{maximumFractionDigits:wh>=100000?0:2})+' kWh':wh.toLocaleString('de-AT',{maximumFractionDigits:wh<10?1:0})+' Wh';}
+async function loadEnergy(){try{enData=await (await fetch('/api/energy')).json();renderEnergy();}catch(e){}}
+function keyLabel(k,r,long){const s=String(k);const M=['Jän','Feb','Mär','Apr','Mai','Jun','Jul','Aug','Sep','Okt','Nov','Dez'];
+  if(r==='days')return long?`${+s.slice(6)}. ${M[+s.slice(4,6)-1]} ${s.slice(0,4)}`:String(+s.slice(6));
+  if(r==='months')return long?`${M[+s.slice(4)-1]} ${s.slice(0,4)}`:M[+s.slice(4)-1];return s;}
+function renderEnergy(){const d=enData;if(!d)return;
+  $('eToday').textContent=d.time?fmtWh(d.today):'–';$('eMonth').textContent=d.time?fmtWh(d.month):'–';$('eYear').textContent=d.time?fmtWh(d.year):'–';$('eTotal').textContent=fmtWh(d.total);
+  $('eNote').textContent=(d.meas?'Gemessen mit dem Stromsensor':'Geschätzt aus den Farben (ohne Stromsensor)')+` · gerade ${d.w.toLocaleString('de-AT')} W`+(d.time?'':' · Datum noch unbekannt (kein Internet?), gezählt wird trotzdem');
+  const rows=(d[enRange]||[]).slice().reverse();         // älteste links
+  const svg=$('eChart'),W=340,H=150,top=10,bot=20,left=4;svg.innerHTML='';$('eTip').textContent='';
+  if(!rows.length){svg.innerHTML='<text x="170" y="75" text-anchor="middle">Noch keine Werte</text>';return;}
+  const max=Math.max(...rows.map(r=>r[1]),1),n=enRange==='days'?31:enRange==='months'?24:10,bw=(W-left)/n;
+  const ns='http://www.w3.org/2000/svg';const mk=(t,a)=>{const e=document.createElementNS(ns,t);for(const k in a)e.setAttribute(k,a[k]);return e;};
+  svg.append(mk('line',{x1:0,x2:W,y1:H-bot+.5,y2:H-bot+.5}));
+  rows.forEach((r,i)=>{const x=left+(n-rows.length+i)*bw,h=Math.max(r[1]>0?2:0,(H-top-bot)*r[1]/max);
+    const b=mk('path',{class:'bar'+(i===rows.length-1?' cur':''),d:`M${x+1} ${H-bot}V${H-bot-h+Math.min(4,h)}q0 -${Math.min(4,h)} ${Math.min(4,h)} -${Math.min(4,h)}H${x+bw-1-Math.min(4,h)}q${Math.min(4,h)} 0 ${Math.min(4,h)} ${Math.min(4,h)}V${H-bot}Z`});
+    const hit=mk('rect',{x:x,y:top,width:bw,height:H-top,fill:'transparent'});
+    const tip=()=>{$('eTip').textContent=`${keyLabel(r[0],enRange,true)}: ${fmtWh(r[1])}`;};
+    hit.addEventListener('pointerenter',tip);hit.addEventListener('click',tip);
+    svg.append(b,hit);
+    const every=enRange==='days'?5:enRange==='months'?3:1;
+    if((rows.length-1-i)%every===0){const t=mk('text',{x:x+bw/2,y:H-6,'text-anchor':'middle'});t.textContent=keyLabel(r[0],enRange,false);svg.append(t);}});
+  const mt=mk('text',{x:W-2,y:top+2,'text-anchor':'end'});mt.textContent='max '+fmtWh(max);svg.append(mt);}
+$('eTabs').querySelectorAll('button').forEach(b=>b.addEventListener('click',()=>{enRange=b.dataset.r;$('eTabs').querySelectorAll('button').forEach(x=>x.classList.toggle('on',x===b));renderEnergy();}));
+$('eReset').addEventListener('click',async()=>{const b=$('eReset');
+  if(!b.dataset.ask){b.dataset.ask=1;b.textContent='Wirklich alle Werte löschen?';setTimeout(()=>{delete b.dataset.ask;b.textContent='Zähler zurücksetzen';},4000);return;}
+  delete b.dataset.ask;b.textContent='Zähler zurücksetzen';if(await api('/api/energy',{action:'reset'})){toast('Energiezähler zurückgesetzt');loadEnergy();}});
+setInterval(()=>{if(!document.hidden&&tab==='opt'&&!$('energyCard').classList.contains('closed'))loadEnergy();},10000);
+
+// ---------- Mehrere Wände ----------
+(()=>{const s=$('syncGrp');for(let g=1;g<=9;g++){const o=document.createElement('option');o.value=g;o.textContent='Gruppe '+g;s.append(o);}})();
+function renderSync(){const y=st&&st.sync;if(!y)return;
+  if(document.activeElement!==$('syncOn'))$('syncOn').checked=y.on;if(document.activeElement!==$('syncGrp'))$('syncGrp').value=y.group;
+  const l=$('syncList');l.innerHTML='';
+  const rows=y.on?[[st.name+' (diese Wand)',y.lead?'gibt den Takt vor':'',true],...y.walls.map(w=>[w.name,w.ip+(w.group!==y.group?` · Gruppe ${w.group}, läuft nicht mit`:''),w.group===y.group])]:[];
+  if(y.on&&!y.walls.length)rows.push(['Noch keine andere Wand gefunden','Sie muss im selben WLAN sein und den Gleichtakt eingeschaltet haben',false]);
+  rows.forEach(([a,b,ok])=>{const r=document.createElement('div');r.className='prow';const t=document.createElement('div');t.className='top';
+    const n=document.createElement('span');n.textContent=a;const m=document.createElement('small');m.textContent=b;if(!ok)n.style.color='var(--muted)';t.append(n,m);r.append(t);l.append(r);});
+  l.hidden=!rows.length;$('syncGrp').closest('label').classList.toggle('off',!y.on);}
+$('syncOn').addEventListener('change',async()=>{const v=$('syncOn').checked;if(await api('/api/sync',{on:v,group:+$('syncGrp').value}))toast(v?'Gleichtakt an: andere Wände der Gruppe laufen mit':'Gleichtakt aus');});
+$('syncGrp').addEventListener('change',()=>api('/api/sync',{group:+$('syncGrp').value}));
+
 function ago(s){return s<60?`vor ${s} s`:s<3600?`vor ${Math.round(s/60)} min`:`vor ${Math.round(s/3600)} h`;}
 async function loadDiag(){try{diagData=await (await fetch('/api/diag')).json();renderDiag();if(tab==='wall')renderWall();}catch(e){}}
 function renderDiag(){
@@ -946,7 +1106,7 @@ function renderDiag(){
     'Simulation: Antwortzeiten und Fehler gibt es erst im Busbetrieb. Das Ereignisprotokoll läuft trotzdem.';
   const tb=$('diagRows');tb.innerHTML='';
   d.panels.forEach(p=>{const tr=document.createElement('tr');const pct=p.pings?Math.round(p.missed*1000/p.pings)/10:0;
-    const cells=[p.id.slice(4),p.addr||'–',p.rtt?(p.rtt/1000).toFixed(2)+' ms':'–',p.pings?pct+' %':'–',p.fw||'–',(p.clips||0)+'×'];
+    const cells=[p.id.slice(4),p.addr||'–',p.rtt?(p.rtt/1000).toFixed(2)+' ms':'–',p.pings?pct+' %':'–',p.fw||'–',(p.clips||0)+'×',p.lit!=null?(p.lit/3600).toLocaleString('de-AT',{minimumFractionDigits:1,maximumFractionDigits:1}):'–'];
     cells.forEach((c,i)=>{const td=document.createElement('td');td.textContent=c;if(i===3&&pct>=5)td.className=pct>=20?'bad':'warn';tr.append(td);});tb.append(tr);});
   $('logBadge').textContent=d.log.length?d.log.length+(d.log.length===1?' Eintrag':' Einträge'):'keine';
   const lg=$('diagLog');lg.innerHTML='';

@@ -45,6 +45,9 @@
 #include "zigbee.h"     // Philips Hue über Zigbee, nur ESP32-C6
 #include "panel_fw.h"   // aktuelle Panel-Firmware für Updates über den Bus (erzeugt beim Build)
 #include <Wire.h>
+#include <WiFiUdp.h>
+#include <time.h>
+#include "esp_system.h"
 #include "esp_ota_ops.h"
 #include "esp_timer.h"
 
@@ -110,6 +113,8 @@ struct Panel {
   uint8_t caps = 0;                 // vom Panel gemeldet: 1 = Touch-Sensor, 2 = Bootloader
   uint8_t touchSeq = 0; bool touchKnown = false;
   uint8_t upd = 0, updPct = 0, updFails = 0;   // Panel-Update: 0 nichts, 1 wartet, 2 läuft, 3 fehlgeschlagen
+  uint32_t identUntil = 0;          // Panel finden: blinkt bis hierher weiß
+  uint32_t litSec = 0, litSaved = 0;   // Betriebsstunden: so lange hat das Panel insgesamt geleuchtet (s)
   bool edges = false;               // Kanten einzeln: Effekte bekommen drei Farben pro Panel
   uint8_t state = DARK;
   uint32_t since = 0;
@@ -137,6 +142,10 @@ struct Config {
   bool panelAuto = true;    // Panels mit älterer Firmware automatisch aktualisieren
   bool zbOn = false;        // Zigbee für die Hue Bridge (nur ESP32-C6)
   String name = "Trilumag"; // Name der Wand: App, Home Assistant, WLED-Programme
+  uint8_t bootMode = 0;     // nach Stromausfall: 0 wie vorher, 1 aus, 2 an, 3 Preset
+  int8_t bootPreset = -1;
+  bool syncOn = false;      // mit anderen Wänden im selben WLAN im Gleichtakt
+  uint8_t syncGroup = 1;    // nur Wände derselben Gruppe (1 bis 9) laufen zusammen
   String mqttHost;
   uint16_t mqttPort = 1883;
   String mqttUser, mqttPass;
@@ -421,6 +430,9 @@ uint32_t busQuietUntil = 15000;
 namespace pupd { bool busy(uint32_t chip); void loop(); }
 void touchEvent(int i, uint8_t kind);
 void wsKick();
+void litLoad(int i);
+extern uint32_t sleepEnd; uint32_t sleepLeft();
+namespace wallsync { void json(JsonObject o); extern uint32_t lastSig; }
 
 // Neues Panel gefunden: Nachbarn orten, Adresse vergeben, Farbe oder Pulsieren
 void busHandleNew(uint32_t chip, uint8_t mask) {
@@ -431,7 +443,7 @@ void busHandleNew(uint32_t chip, uint8_t mask) {
     for (int k = 1; k < SLOTS; k++) if (!P[k].used) { i = k; break; }
     if (i < 0) { logf("[BUS] kein Platz mehr für %s\n", hex(chip).c_str()); return; }
     P[i] = Panel(); P[i].used = true; P[i].chip = chip;
-    loadColor(i); clipsLoad(i);
+    loadColor(i); clipsLoad(i); litLoad(i);
   }
   if (countAttached() >= MAX_ATTACHED) { logf("[BUS] Höchstzahl erreicht, %s wird ignoriert\n", hex(chip).c_str()); return; }
 
@@ -865,6 +877,7 @@ uint32_t transStart = 0, transDur = 0, lastKeep = 0;
 bool transOn = false;
 bool outForce = true, testMode = false;
 float powerScale = 1, measScale = 1;
+float sleepScale = 1;                     // Sleep-Timer: blendet zum Ende hin aus
 uint32_t estMa = 0;                       // geschätzter Strom aller LEDs und Panels in mA (bei 24 V)
 const uint8_t SEG_PER_PANEL = 3;          // LED-Segmente pro Panel (eins pro Kante)
 const uint16_t IDLE_PANEL_MA = 12, IDLE_MAIN_MA = 25;
@@ -912,9 +925,16 @@ void computeTargets() {
     float avail = (float)cfg.pwrMax - idle;
     powerScale = avail <= 0 ? 0 : fminf(1, avail / led);
   }
-  float sc = powerScale * measScale;
+  float sc = powerScale * measScale * sleepScale;
   estMa = idle + (uint32_t)(led * sc);
   if (sc < 0.999f) for (int i = 0; i < SLOTS; i++) if (!isPulse[i]) for (int e = 0; e < 3; e++) for (int c = 0; c < 4; c++) TGT[i][e][c] = (uint8_t)(TGT[i][e][c] * sc);
+  // Panel finden: blinkt dreimal pro Sekunde weiß, auch wenn die Wand aus ist
+  for (int i = 0; i < SLOTS; i++) {
+    if (!P[i].identUntil) continue;
+    if ((int32_t)(now - P[i].identUntil) >= 0 || !P[i].attached) { P[i].identUntil = 0; continue; }
+    bool lit = (P[i].identUntil - now) % 333 > 166;
+    for (int e = 0; e < 3; e++) { TGT[i][e][0] = TGT[i][e][1] = TGT[i][e][2] = lit ? 90 : 0; TGT[i][e][3] = lit ? 200 : 0; }
+  }
 }
 
 // FRAME: eine Farbe pro Panel; FRAME3: drei Farben pro Panel (ab Panel-Firmware 2).
@@ -987,6 +1007,14 @@ void outLoop() {
   sendOutput(outForce || keep);
   outForce = false;
 }
+
+// ---------- Energieverbrauch (gemessen oder geschätzt) ----------
+// Wh pro Tag (31), Monat (24) und Jahr (10), dazu gesamt. Datum per NTP, Zeitzone Österreich.
+struct EBin { uint32_t key; float wh; };
+struct EnergyLog { double total; EBin days[31]; EBin months[24]; EBin years[10]; };
+EnergyLog en;
+double enPending = 0;                     // Wh, solange die Uhrzeit noch unbekannt ist
+bool enDirty = false;
 
 // ---------- Stromsensor INA226 (optional, I²C) ----------
 namespace ina {
@@ -1185,6 +1213,11 @@ void publishExtras() {
     t["state_topic"] = "trilumag/touch"; t["icon"] = "mdi:gesture-tap";
     JsonArray et = t["event_types"].to<JsonArray>(); et.add("einmal"); et.add("doppelt");
     haDevice(t); haPublish("event", "touch", t); }
+  { JsonDocument t;                                 // Zähler für das Energie-Dashboard
+    t["name"] = "Energie"; t["unique_id"] = "trilumag_energie_" + hex(P[0].chip);
+    t["state_topic"] = "trilumag/energie/state"; t["device_class"] = "energy"; t["unit_of_measurement"] = "kWh";
+    t["state_class"] = "total_increasing"; t["suggested_display_precision"] = 2;
+    haDevice(t); haPublish("sensor", "energie", t); }
   // Strom und Leistung (gemessen mit INA226, sonst geschätzt)
   const char* keys[3] = {"strom", "leistung", "spannung"};
   const char* names[3] = {"Strom", "Leistung", "Spannung"};
@@ -1209,6 +1242,8 @@ void publishPower() {
   float v = ina::ok ? ina::volts : 24.0f;
   char b[96]; snprintf(b, sizeof b, "{\"a\":%.2f,\"w\":%.1f,\"v\":%.2f}", a, a * v, v);
   mqtt.publish("trilumag/strom/state", b, true);
+  snprintf(b, sizeof b, "%.3f", en.total / 1000.0);
+  mqtt.publish("trilumag/energie/state", b, true);
 }
 
 // Zustand von "Alle Panels", Tempo, Intensität, Palette und Preset
@@ -1382,6 +1417,8 @@ void applyCommand(int i, JsonVariantConst cmd) {
   publishState(i);
 }
 
+void sleepCancel();
+extern bool sleepFiring;
 // Die ganze Wand (App oben, Home Assistant "Alle Panels"), wie bei WLED:
 // state = Ein/Aus der Wand, brightness = Gesamthelligkeit, color = Effektfarbe bzw. Farbe aller Panels
 void applyAll(JsonVariantConst cmd) {
@@ -1390,6 +1427,7 @@ void applyAll(JsonVariantConst cmd) {
   bool wake = false;
   if (!strcmp(st, "OFF") && masterOn) { masterOn = false; wake = true; }
   if (!strcmp(st, "ON") && !masterOn) { masterOn = true; wake = true; }
+  if (*st && !sleepFiring) sleepCancel();          // Ein/Aus von Hand beendet den Sleep-Timer
   if (cmd["brightness"].is<int>()) { master = constrain(cmd["brightness"].as<int>(), 1, 255); wake = true; }
   if (!cmd["effect"].isNull() || !cmd["speed"].isNull() || !cmd["palette"].isNull() || !cmd["intensity"].isNull()) {
     JsonDocument d; d.set(cmd); d.remove("color"); d.remove("brightness");
@@ -1517,7 +1555,7 @@ int simNewPanel() {
   for (int i = 1; i < SLOTS; i++) if (!P[i].used) {
     P[i] = Panel(); P[i].used = true;
     do { P[i].chip = esp_random(); } while (P[i].chip == 0 || findChip(P[i].chip) != i);
-    clipsLoad(i);
+    clipsLoad(i); litLoad(i);
     simChanged();
     return i;
   }
@@ -1548,7 +1586,7 @@ bool simLoad() {
     P[i] = Panel(); P[i].used = true; P[i].chip = r[k].chip;
     P[i].x = r[k].x; P[i].y = r[k].y; P[i].rot = r[k].rot % 3; P[i].attached = r[k].attached;
     P[i].state = DARK; P[i].since = millis();                    // wie echte Panels: kurz dunkel, dann erkannt
-    loadColor(i); clipsLoad(i);
+    loadColor(i); clipsLoad(i); litLoad(i);
   }
   reconcile();                                                   // Nachbarn und Abstände neu berechnen
   logf("[SIM] gespeicherte Wand mit %d Panels geladen\n", countAttached() - 1);
@@ -1583,6 +1621,10 @@ void loadConfig() {
   cfg.panelAuto = prefs.getBool("pAuto", true);
   cfg.zbOn = HAS_ZIGBEE && prefs.getBool("zbOn", false);
   cfg.name = prefs.getString("name", "Trilumag");
+  cfg.bootMode = prefs.getUChar("bootMode", 0); if (cfg.bootMode > 3) cfg.bootMode = 0;
+  cfg.bootPreset = (int8_t)prefs.getChar("bootPre", -1);
+  cfg.syncOn = prefs.getBool("syncOn", false);
+  cfg.syncGroup = constrain((int)prefs.getUChar("syncGrp", 1), 1, 9);
   if (!cfg.name.length()) cfg.name = "Trilumag";
 }
 
@@ -1614,6 +1656,7 @@ String configJson() {
   for (const char* o : ORDERS) os.add(o);
   JsonObject m = d["mqtt"].to<JsonObject>();
   m["on"] = cfg.mqttOn; m["host"] = cfg.mqttHost; m["port"] = cfg.mqttPort; m["user"] = cfg.mqttUser; m["hasPass"] = cfg.mqttPass.length() > 0;
+  JsonObject bo = d["boot"].to<JsonObject>(); bo["mode"] = cfg.bootMode; bo["preset"] = cfg.bootPreset;
   JsonObject t = d["touch"].to<JsonObject>();
   t["on"] = cfg.touchOn; t["sens"] = cfg.touchSens; t["a1"] = cfg.tapA1; t["a2"] = cfg.tapA2;
   JsonArray tn = t["actions"].to<JsonArray>();
@@ -1626,6 +1669,7 @@ String stateJson(bool meta) {
   JsonDocument d;
   d["sim"] = !cfg.bus;
   d["name"] = cfg.name;
+  if (sleepEnd) d["sleep"] = (sleepLeft() + 999) / 1000;
   d["max"] = MAX_ATTACHED;
   d["mqtt"] = mqtt.connected();
   d["mqttSet"] = cfg.mqttOn && cfg.mqttHost.length() > 0;
@@ -1645,6 +1689,7 @@ String stateJson(bool meta) {
   f["r"] = fx.r; f["g"] = fx.g; f["b"] = fx.b; f["w"] = fx.w; f["usesColor"] = fxUsesColor();
   d["master"] = master; d["on"] = masterOn;
   d["pfw"] = PANEL_FW_VERSION; d["pAuto"] = cfg.panelAuto;
+  wallsync::json(d["sync"].to<JsonObject>());
   { JsonObject z = d["zb"].to<JsonObject>();            // Hue/Zigbee: nur der ESP32-C6 kann es, die App zeigt es sonst ausgegraut
     z["avail"] = (bool)HAS_ZIGBEE;
 #if HAS_ZIGBEE
@@ -1676,7 +1721,8 @@ String stateJson(bool meta) {
     o["x"] = p.x; o["y"] = p.y; o["up"] = isUp(p.x, p.y); o["rot"] = p.rot;
     o["parent"] = p.parent >= 0 ? hex(P[p.parent].chip) : String();
     o["state"] = p.state; o["on"] = p.on; o["edges"] = p.edges; o["fw"] = p.fw;
-    o["clips"] = p.clips; o["caps"] = p.caps;
+    o["clips"] = p.clips; o["caps"] = p.caps; o["lit"] = p.litSec;
+    if (p.identUntil) o["ident"] = true;
     if (p.upd) { o["upd"] = p.upd; o["pct"] = p.updPct; }
     o["r"] = p.r; o["g"] = p.g; o["b"] = p.b; o["w"] = p.w; o["bri"] = p.bri;
   }
@@ -1856,7 +1902,7 @@ String diagJson() {
     JsonObject o = pa.add<JsonObject>();
     o["id"] = hex(p.chip); o["addr"] = p.addr; o["pings"] = p.pings; o["missed"] = p.missed;
     o["rtt"] = p.rtt; o["rttMax"] = p.rttMax; o["fw"] = p.fw; o["att"] = p.attaches; o["depth"] = p.depth;
-    o["clips"] = p.clips; o["caps"] = p.caps;
+    o["clips"] = p.clips; o["caps"] = p.caps; o["lit"] = p.litSec;
   }
   JsonArray lg = d["log"].to<JsonArray>();
   for (uint8_t k = 0; k < diagCount; k++) {                  // neueste zuerst
@@ -1882,6 +1928,12 @@ String backupJson() {
   JsonObject t = c["touch"].to<JsonObject>();
   t["on"] = cfg.touchOn; t["sens"] = cfg.touchSens; t["a1"] = cfg.tapA1; t["a2"] = cfg.tapA2;
   c["pAuto"] = cfg.panelAuto; c["zbOn"] = cfg.zbOn; c["name"] = cfg.name;
+  c["bootMode"] = cfg.bootMode; c["bootPre"] = cfg.bootPreset; c["syncOn"] = cfg.syncOn; c["syncGrp"] = cfg.syncGroup;
+  JsonObject lh = d["lit"].to<JsonObject>();
+  for (int i = 0; i < SLOTS; i++) if (P[i].used && P[i].litSec) lh[hex(P[i].chip)] = P[i].litSec;
+  { JsonObject eo = d["energy"].to<JsonObject>(); eo["total"] = en.total;
+    const char* nm[3] = {"days", "months", "years"}; EBin* ar[3] = {en.days, en.months, en.years}; uint8_t ns[3] = {31, 24, 10};
+    for (int k = 0; k < 3; k++) { JsonArray a = eo[nm[k]].to<JsonArray>(); for (uint8_t j = 0; j < ns[k]; j++) if (ar[k][j].key) { JsonArray e = a.add<JsonArray>(); e.add(ar[k][j].key); e.add(ar[k][j].wh); } } }
   JsonObject cl = d["clips"].to<JsonObject>();
   for (int i = 1; i < SLOTS; i++) if (P[i].used && P[i].clips) cl[hex(P[i].chip)] = P[i].clips;
   d["master"] = master; d["on"] = masterOn;
@@ -1936,8 +1988,17 @@ const char* restoreBackup(JsonDocument& d) {
     prefs.putBool("pAuto", c["pAuto"] | true);
     if (HAS_ZIGBEE) prefs.putBool("zbOn", c["zbOn"] | false);
     if (c["name"].is<const char*>() && strlen(c["name"]) > 0) prefs.putString("name", (const char*)c["name"]);
+    prefs.putUChar("bootMode", c["bootMode"] | 0); prefs.putChar("bootPre", c["bootPre"] | -1);
+    prefs.putBool("syncOn", c["syncOn"] | false); prefs.putUChar("syncGrp", c["syncGrp"] | 1);
   }
   for (JsonPair kv : d["clips"].as<JsonObject>()) prefs.putUInt(("n" + String(kv.key().c_str())).c_str(), kv.value().as<uint32_t>());
+  for (JsonPair kv : d["lit"].as<JsonObject>()) prefs.putUInt(("h" + String(kv.key().c_str())).c_str(), kv.value().as<uint32_t>());
+  if (!d["energy"].isNull()) {
+    EnergyLog e; memset(&e, 0, sizeof e); JsonObject eo = d["energy"]; e.total = eo["total"] | 0.0;
+    const char* nm[3] = {"days", "months", "years"}; EBin* ar[3] = {e.days, e.months, e.years}; uint8_t ns[3] = {31, 24, 10};
+    for (int k = 0; k < 3; k++) { uint8_t j = 0; for (JsonArray x : eo[nm[k]].as<JsonArray>()) { if (j >= ns[k]) break; ar[k][j].key = x[0]; ar[k][j].wh = x[1]; j++; } }
+    prefs.putBytes("energy", &e, sizeof e);
+  }
   FxCfg f;
   JsonObject fo = d["fx"];
   if (!fo.isNull()) {
@@ -2010,6 +2071,228 @@ void otaVerifyLoop() {
   if (prefs.getString("otaTry", "") == FW_VERSION) { otaNotice = "Update auf " + String(FW_VERSION) + " erfolgreich."; prefs.remove("otaTry"); }
   logf("[OTA] Version %s bewährt\n", FW_VERSION);
 }
+
+// ---------- Panel finden ----------
+void identify(int i) { if (i >= 0 && i < SLOTS && P[i].used && P[i].attached) { P[i].identUntil = (millis() + 3000) | 1; fxLastFrame = 0; } }
+
+// ---------- Sleep-Timer ----------
+extern bool sleepFiring;
+// Nach der eingestellten Zeit geht die Wand aus. In den letzten Minuten blendet sie langsam aus
+// (höchstens 5 Minuten, bei kurzen Timern die Hälfte der Zeit). Ein/Aus von Hand bricht den Timer ab.
+uint32_t sleepEnd = 0, sleepFade = 0;
+bool sleepFiring = false;
+void sleepSet(uint16_t min) {
+  sleepScale = 1;
+  if (!min) { sleepEnd = 0; return; }
+  uint32_t dur = (uint32_t)min * 60000UL;
+  sleepEnd = (millis() + dur) | 1;
+  sleepFade = dur / 2 < 300000UL ? dur / 2 : 300000UL;
+  if (!masterOn) { JsonDocument d; d["state"] = "ON"; sleepFiring = true; applyAll(d.as<JsonVariantConst>()); sleepFiring = false; }
+}
+void sleepCancel() { if (sleepEnd) { sleepEnd = 0; sleepScale = 1; } }
+uint32_t sleepLeft() { return sleepEnd ? (uint32_t)((int32_t)(sleepEnd - millis()) > 0 ? sleepEnd - millis() : 0) : 0; }
+void sleepLoop() {
+  if (!sleepEnd) return;
+  uint32_t left = sleepLeft();
+  if (!left || !masterOn) {
+    bool fire = !left && masterOn;
+    sleepEnd = 0; sleepScale = 1;
+    if (fire) { JsonDocument d; d["state"] = "OFF"; sleepFiring = true; applyAll(d.as<JsonVariantConst>()); sleepFiring = false; diag("Sleep-Timer: Wand aus"); }
+    return;
+  }
+  sleepScale = left < sleepFade ? (float)left / sleepFade : 1;
+  sleepScale *= sleepScale;                          // wirkt fürs Auge gleichmäßiger
+}
+
+// ---------- Nach Stromausfall ----------
+// Nur nach echtem Stromausfall (nicht nach Update oder Neustart aus der App), sonst bleibt alles wie vorher.
+void bootApply() {
+  esp_reset_reason_t why = esp_reset_reason();
+  if (why != ESP_RST_POWERON && why != ESP_RST_BROWNOUT) return;
+  switch (cfg.bootMode) {
+  case 1: masterOn = false; break;
+  case 2: masterOn = true; break;
+  case 3: if (cfg.bootPreset >= 0 && presetNames[cfg.bootPreset].length()) presetLoad(cfg.bootPreset); else masterOn = true; break;
+  default: return;
+  }
+  logf("[START] nach Stromausfall: %s\n", cfg.bootMode == 1 ? "aus" : cfg.bootMode == 2 ? "an" : "Preset");
+}
+
+// ---------- Betriebsstunden pro Panel ----------
+String litKey(uint32_t chip) { return "h" + hex(chip); }
+void litLoad(int i) { P[i].litSec = P[i].litSaved = prefs.getUInt(litKey(P[i].chip).c_str(), 0); }
+void litLoop() {
+  static uint32_t last = 0, lastSave = 0;
+  uint32_t now = millis();
+  if (now - last < 1000) return;
+  last += 1000; if (now - last > 5000) last = now;
+  for (int i = 0; i < SLOTS; i++) {
+    if (!P[i].used || !P[i].attached) continue;
+    bool lit = false;
+    for (int e = 0; e < 3 && !lit; e++) for (int c = 0; c < 4; c++) if (CUR[i][e][c]) { lit = true; break; }
+    if (lit) P[i].litSec++;
+  }
+  if (now - lastSave < 600000UL) return;            // alle 10 Minuten speichern (schont den Flash)
+  lastSave = now;
+  for (int i = 0; i < SLOTS; i++) if (P[i].used && P[i].litSec != P[i].litSaved) { prefs.putUInt(litKey(P[i].chip).c_str(), P[i].litSec); P[i].litSaved = P[i].litSec; }
+}
+
+// ---------- Energieverbrauch ----------
+bool timeOk() { return time(nullptr) > 1700000000; }
+void enLoad() { if (prefs.getBytes("energy", &en, sizeof en) != sizeof en) memset(&en, 0, sizeof en); }
+void enSave() { prefs.putBytes("energy", &en, sizeof en); enDirty = false; }
+// Wh in die Liste mit diesem Schlüssel buchen; neuer Zeitraum rückt vorne ein, der älteste fällt raus
+void enAdd(EBin* a, uint8_t n, uint32_t key, double wh) {
+  if (a[0].key != key) { memmove(a + 1, a, (n - 1) * sizeof(EBin)); a[0].key = key; a[0].wh = 0; }
+  a[0].wh += wh;
+}
+void enBook(double wh) {
+  en.total += wh; enDirty = true;
+  if (!timeOk()) { enPending += wh; return; }
+  wh += enPending; enPending = 0;
+  time_t t = time(nullptr); struct tm lt; localtime_r(&t, &lt);
+  uint32_t y = lt.tm_year + 1900, m = lt.tm_mon + 1, d = lt.tm_mday;
+  enAdd(en.days, 31, y * 10000 + m * 100 + d, wh);
+  enAdd(en.months, 24, y * 100 + m, wh);
+  enAdd(en.years, 10, y, wh);
+}
+float enWatts() { return ina::ok ? ina::volts * ina::amps : estMa * 24.0f / 1000.0f; }
+void enLoop() {
+  static uint32_t last = 0, lastSave = 0; static uint32_t lastDay = 0;
+  uint32_t now = millis();
+  if (!last) { last = now; lastSave = now; return; }
+  if (now - last < 1000) return;
+  double h = (now - last) / 3600000.0; last = now;
+  enBook(enWatts() * h);
+  uint32_t day = en.days[0].key;
+  if (enDirty && (now - lastSave > 600000UL || (lastDay && day != lastDay))) { enSave(); lastSave = now; }
+  lastDay = day;
+}
+String energyJson() {
+  JsonDocument d;
+  d["time"] = timeOk(); d["w"] = roundf(enWatts() * 10) / 10; d["meas"] = ina::ok;
+  d["total"] = en.total;
+  time_t t = time(nullptr); struct tm lt; localtime_r(&t, &lt);
+  uint32_t y = lt.tm_year + 1900, m = lt.tm_mon + 1, dd = lt.tm_mday;
+  d["today"] = timeOk() && en.days[0].key == y * 10000 + m * 100 + dd ? en.days[0].wh : 0;
+  d["month"] = timeOk() && en.months[0].key == y * 100 + m ? en.months[0].wh : 0;
+  d["year"] = timeOk() && en.years[0].key == y ? en.years[0].wh : 0;
+  const char* names[3] = {"days", "months", "years"};
+  EBin* arr[3] = {en.days, en.months, en.years}; uint8_t ns[3] = {31, 24, 10};
+  for (int k = 0; k < 3; k++) {
+    JsonArray a = d[names[k]].to<JsonArray>();
+    for (uint8_t j = 0; j < ns[k]; j++) if (arr[k][j].key) { JsonArray e = a.add<JsonArray>(); e.add(arr[k][j].key); e.add(roundf(arr[k][j].wh * 10) / 10); }
+  }
+  String out; serializeJson(d, out); return out;
+}
+
+// ---------- Mehrere Wände im Gleichtakt ----------
+// Alle Wände einer Gruppe im selben WLAN teilen Ein/Aus, Helligkeit und Effekt mit allen Einstellungen.
+// Die letzte Änderung gilt (fortlaufende Nummer), egal an welcher Wand sie gemacht wurde. Den Takt der
+// Effekte gibt die Wand mit der kleinsten Chip-ID vor, die anderen gleichen ihre Phase langsam an.
+namespace wallsync {
+const uint16_t PORT = 21330;
+struct __attribute__((packed)) Pkt {
+  char magic[4]; uint8_t ver, group, on, master, fx, speed, inten, pal, r, g, b, w;
+  uint32_t chip, seq; float phase; char name[24];
+};
+struct Peer { uint32_t chip = 0, seen = 0; String name, ip; uint8_t group = 0; };
+const uint8_t MAXP = 8;
+Peer peers[MAXP];
+WiFiUDP udp;
+bool started = false, applying = false;
+uint32_t seq = 0, lastSig = 0, lastBeat = 0;
+
+uint32_t sig() {
+  return ((uint32_t)masterOn << 31) ^ ((uint32_t)master << 23) ^ ((uint32_t)fx.id << 17) ^ ((uint32_t)fx.speed << 10) ^ ((uint32_t)fx.inten * 2654435761u) ^
+         ((uint32_t)fx.pal << 3) ^ ((uint32_t)fx.r * 40503u + fx.g * 52711u + fx.b * 17u + fx.w * 7u);
+}
+bool timeMaster() {                                  // kleinste Chip-ID der Gruppe gibt den Takt vor
+  for (const Peer& p : peers) if (p.chip && millis() - p.seen < 5000 && p.group == cfg.syncGroup && p.chip < P[0].chip) return false;
+  return true;
+}
+void send() {
+  if (!started) return;
+  Pkt k; memset(&k, 0, sizeof k);
+  memcpy(k.magic, "TLSY", 4); k.ver = 1; k.group = cfg.syncGroup;
+  k.on = masterOn; k.master = master; k.fx = fx.id; k.speed = fx.speed; k.inten = fx.inten; k.pal = fx.pal;
+  k.r = fx.r; k.g = fx.g; k.b = fx.b; k.w = fx.w; k.chip = P[0].chip; k.seq = seq; k.phase = fxPhase;
+  strncpy(k.name, cfg.name.c_str(), sizeof k.name - 1);
+  udp.beginPacket(IPAddress(255, 255, 255, 255), PORT);
+  udp.write((const uint8_t*)&k, sizeof k);
+  udp.endPacket();
+}
+void begin() {
+  if (started || !cfg.syncOn || !wlanOk) return;
+  started = udp.begin(PORT);
+  if (started) { lastSig = sig(); send(); diag("Gleichtakt mit anderen Wänden an (Gruppe %u)", cfg.syncGroup); }
+}
+void stop() { if (started) { udp.stop(); started = false; } for (Peer& p : peers) p = Peer(); }
+
+bool differs(const Pkt& k) {
+  return k.on != masterOn || k.master != master || k.fx != fx.id || k.speed != fx.speed || k.inten != fx.inten || k.pal != fx.pal ||
+         k.r != fx.r || k.g != fx.g || k.b != fx.b || k.w != fx.w;
+}
+// Zustand einer anderen Wand übernehmen, ohne ihn selbst wieder zu senden
+void adopt(const Pkt& k) {
+  applying = true;
+  bool look = k.on != masterOn || k.master != master;
+  masterOn = k.on; master = k.master;
+  fx.speed = k.speed; fx.inten = k.inten; fx.pal = k.pal < PAL_COUNT ? k.pal : 0; fx.r = k.r; fx.g = k.g; fx.b = k.b; fx.w = k.w;
+  if (k.fx < FX_COUNT && k.fx != fx.id) fxStart(k.fx);
+  else { fxDirty = true; fxDirtyAt = millis(); fxLastFrame = 0; publishFx(); }
+  if (look) resendAll();
+  curPreset = -1;
+  lastSig = sig();
+  applying = false;
+  wsKick();
+}
+
+void loop() {
+  if (!cfg.syncOn) { if (started) stop(); return; }
+  if (!started) { begin(); return; }
+  uint32_t now = millis();
+  int n;
+  while ((n = udp.parsePacket()) > 0) {
+    Pkt k;
+    if (n != (int)sizeof k) { udp.flush(); continue; }
+    udp.read((uint8_t*)&k, sizeof k);
+    if (memcmp(k.magic, "TLSY", 4) || k.ver != 1 || k.chip == P[0].chip) continue;
+    int slot = -1, old = 0;
+    for (int i = 0; i < MAXP; i++) { if (peers[i].chip == k.chip) { slot = i; break; } if (peers[i].seen < peers[old].seen) old = i; }
+    if (slot < 0) { slot = old; if (peers[slot].chip == 0 || now - peers[slot].seen > 30000) diag("Wand „%.*s“ gefunden (Gruppe %u)", 24, k.name, k.group); }
+    Peer& pe = peers[slot];
+    pe.chip = k.chip; pe.seen = now; pe.group = k.group; pe.ip = udp.remoteIP().toString();
+    char nm[25]; memcpy(nm, k.name, 24); nm[24] = 0; pe.name = nm;
+    if (k.group != cfg.syncGroup) continue;
+    // neuere Änderung übernehmen; bei gleicher Nummer gewinnt die kleinere Chip-ID
+    if (k.seq > seq || (k.seq == seq && k.chip < P[0].chip && differs(k))) { seq = k.seq; if (differs(k)) adopt(k); }
+    // Takt: der Taktgeber hat die kleinste Chip-ID
+    if (k.chip < P[0].chip && k.fx == fx.id && fx.id) {
+      bool master_ = true;
+      for (const Peer& p : peers) if (p.chip && p.chip < k.chip && now - p.seen < 5000 && p.group == cfg.syncGroup) master_ = false;
+      if (master_) {
+        float d = k.phase - fxPhase;
+        if (fabsf(d) > 2) fxPhase = k.phase; else fxPhase += d * 0.3f;   // springen oder sanft nachziehen
+      }
+    }
+  }
+  uint32_t s = sig();
+  if (s != lastSig && !applying) {                    // hier geändert (App, Home Assistant, Antippen …): allen sagen
+    lastSig = s; seq++; send(); lastBeat = now;
+  }
+  if (now - lastBeat > 1000) { lastBeat = now; send(); }   // Lebenszeichen mit Takt und Zustand
+}
+
+void json(JsonObject o) {
+  o["on"] = cfg.syncOn; o["group"] = cfg.syncGroup; o["run"] = started; o["lead"] = started && timeMaster();
+  JsonArray a = o["walls"].to<JsonArray>();
+  for (const Peer& p : peers) {
+    if (!p.chip || millis() - p.seen > 10000) continue;
+    JsonObject w = a.add<JsonObject>(); w["name"] = p.name; w["ip"] = p.ip; w["group"] = p.group;
+  }
+}
+}  // namespace wallsync
 
 // ---------- Philips Hue über Zigbee (nur ESP32-C6) ----------
 uint32_t restartAt = 0, zbResetAt = 0;
@@ -2234,6 +2517,43 @@ const char* apiCall(const char* path, JsonDocument& d) {
     if (strcmp(a, "all") && strcmp(a, "one")) return "Unbekannte Aktion";
     return n ? nullptr : "Kein Panel braucht ein Update";
   }
+  // Panel finden: {"id":"…"} blinkt 3 s weiß
+  if (!strcmp(path, "/api/identify")) {
+    int i = findChip(parseHex(d["id"] | "0"));
+    if (i < 0 || !P[i].attached) return "Panel unbekannt";
+    identify(i);
+    return nullptr;
+  }
+  // Sleep-Timer: {"min":30}, 0 = abbrechen
+  if (!strcmp(path, "/api/sleep")) {
+    int m = d["min"] | -1;
+    if (m < 0 || m > 720) return "Zeit ungültig";
+    sleepSet(m);
+    if (m) diag("Sleep-Timer: Wand geht in %d min aus", m);
+    return nullptr;
+  }
+  // Nach Stromausfall: {"mode":0..3,"preset":2}
+  if (!strcmp(path, "/api/boot")) {
+    int m = d["mode"] | -1;
+    if (m < 0 || m > 3) return "Unbekannte Einstellung";
+    if (m == 3) { int k = d["preset"] | -1; if (k < 0 || k >= PRESET_MAX || !presetNames[k].length()) return "Bitte ein Preset wählen"; cfg.bootPreset = k; prefs.putChar("bootPre", k); }
+    cfg.bootMode = m; prefs.putUChar("bootMode", m);
+    return nullptr;
+  }
+  // Energie: {"action":"reset"} setzt alle Zähler zurück
+  if (!strcmp(path, "/api/energy")) {
+    if (strcmp(d["action"] | "", "reset")) return "Unbekannte Aktion";
+    memset(&en, 0, sizeof en); enPending = 0; enSave();
+    diag("Energiezähler zurückgesetzt");
+    return nullptr;
+  }
+  // Gleichtakt: {"on":true,"group":1}
+  if (!strcmp(path, "/api/sync")) {
+    if (d["group"].is<int>()) { cfg.syncGroup = constrain(d["group"].as<int>(), 1, 9); prefs.putUChar("syncGrp", cfg.syncGroup); }
+    if (d["on"].is<bool>()) { cfg.syncOn = d["on"]; prefs.putBool("syncOn", cfg.syncOn); if (!cfg.syncOn) diag("Gleichtakt mit anderen Wänden aus"); }
+    wallsync::lastSig = 0;                               // gleich mit dem eigenen Zustand melden
+    return nullptr;
+  }
   // Name der Wand: {"name":"Wohnzimmer"}
   if (!strcmp(path, "/api/name")) {
     String n = d["name"] | "";
@@ -2334,8 +2654,9 @@ void setupWeb() {
     server.send(200, "text/html; charset=utf-8", h);
   });
   server.on("/api/state", HTTP_GET, replyState);
+  server.on("/api/energy", HTTP_GET, [] { server.send(200, "application/json", energyJson()); });
   // Befehle laufen über apiCall(), damit HTTP und WebSocket dasselbe tun
-  const char* cmds[] = {"/api/set", "/api/presets", "/api/effect", "/api/test", "/api/ota", "/api/light", "/api/diag", "/api/touch", "/api/panelfw", "/api/zigbee", "/api/name",
+  const char* cmds[] = {"/api/set", "/api/presets", "/api/effect", "/api/test", "/api/ota", "/api/light", "/api/diag", "/api/touch", "/api/panelfw", "/api/zigbee", "/api/name", "/api/identify", "/api/sleep", "/api/boot", "/api/energy", "/api/sync",
                         "/api/sim/new", "/api/sim/attach", "/api/sim/detach", "/api/sim/tap"};
   for (const char* path : cmds) {
     server.on(path, HTTP_POST, [path] {
@@ -2547,6 +2868,7 @@ void wifiConnected() {
   if (wSaveLate) { saveWifi(wSsid, wPass); wSaveLate = false; }
   if (apMode) { WiFi.softAPdisconnect(true); WiFi.mode(WIFI_STA); apMode = false; }
   mdnsStart();
+  configTzTime("CET-1CEST,M3.5.0,M10.5.0/3", "pool.ntp.org", "time.google.com");   // Uhrzeit für den Energieverbrauch
   logf("[WLAN] verbunden. App: http://%s  oder  http://%s.local\n", WiFi.localIP().toString().c_str(), HOSTNAME);
   // Webinstaller Bescheid geben, auch wenn die Verbindung erst nach seiner Wartezeit kam
   Stream* outs[2] = {&Serial, nullptr};
@@ -2674,6 +2996,9 @@ void setup() {
   otaBootCheck();
   fxLoad();
   presetsLoad();
+  bootApply();                                      // nach Stromausfall: aus, an oder Preset (Einstellung)
+  enLoad();
+  litLoad(0);
   ina::begin();
   if (fx.id) logf("[FX] Effekt %s läuft weiter\n", FX[fx.id].name);
 
@@ -2730,7 +3055,11 @@ void loop() {
   if (simDirty && millis() - simDirtyAt > 1500) simSave();
   if (fxDirty && millis() - fxDirtyAt > 5000) fxSave();
   zbLoop();
-  if (restartAt && (int32_t)(millis() - restartAt) >= 0) { fxSave(); saveColors(); ESP.restart(); }
+  sleepLoop();
+  litLoop();
+  enLoop();
+  wallsync::loop();
+  if (restartAt && (int32_t)(millis() - restartAt) >= 0) { fxSave(); saveColors(); enSave(); ESP.restart(); }
 #if HAS_ZIGBEE
   if (zbResetAt && (int32_t)(millis() - zbResetAt) >= 0) { zbResetAt = 0; prefs.remove("zbBoot"); zb::factoryReset(); }
 #endif
