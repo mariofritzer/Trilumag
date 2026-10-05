@@ -75,6 +75,14 @@ In der App unter Optionen „MQTT aktiv“ einschalten und die Adresse des Broke
 - **Schieberegler:** „Effekt-Tempo“ und „Effekt-Intensität“.
 - **Auswahlen:** „Palette“ und „Preset“.
 
+## Mehrere Wände
+
+Unter Optionen → Mehrere Wände lassen sich Wände im selben WLAN zu einer Gruppe (1 bis 9) verbinden. Sie teilen Ein/Aus, Helligkeit und Effekt mit allen Einstellungen, egal an welcher Wand man etwas ändert. Den Takt der Effekte gibt die Wand mit der kleinsten Chip-ID vor. Feste Farben einzelner Panels bleiben pro Wand.
+
+## Energie
+
+Trilumag zählt den Verbrauch mit, gemessen mit dem INA226 oder aus den Farben geschätzt, und zeigt ihn unter Optionen → Energie pro Tag, Monat und Jahr. Das Datum kommt per Internet (NTP, Zeitzone Österreich). In Home Assistant gibt es den Zähler „Energie“ (kWh) für das Energie-Dashboard.
+
 ## Philips Hue (nur ESP32-C6)
 
 Mit einem ESP32-C6 als Hauptpanel meldet sich Trilumag zusätzlich als Zigbee-3.0-Farblampe „Trilumag Wand“. Eine Hue Bridge (auch die Bridge Pro) nimmt sie wie eine Lampe eines anderen Herstellers auf: Ein/Aus, Helligkeit und Farbe der ganzen Wand, auch in Szenen, Routinen und mit Hue-Schaltern. Effekte und einzelne Panels bleiben in der Trilumag-App.
@@ -97,6 +105,11 @@ Mit einem ESP32-C6 als Hauptpanel meldet sich Trilumag zusätzlich als Zigbee-3.
 | `GET /api/backup`, `POST /api/restore` | Sicherung herunterladen und einspielen |
 | `POST /api/light` | Übergangszeit, Stromlimit und Stromsensor-Pins |
 | `POST /api/touch` | Antippen: an/aus, Empfindlichkeit 1–10, Aktion für einmal (`a1`) und doppelt (`a2`) |
+| `POST /api/identify` | Panel finden: `{"id":"…"}`, das Panel blinkt 3 s weiß |
+| `POST /api/sleep` | Sleep-Timer: `{"min":30}`, `0` beendet ihn |
+| `POST /api/boot` | Nach Stromausfall: `{"mode":0}` wie vorher, `1` aus, `2` an, `3` mit `"preset"` |
+| `GET /api/energy` | Energieverbrauch: heute, Monat, Jahr, gesamt und Werte pro Tag, Monat und Jahr (Wh) |
+| `POST /api/sync` | Mehrere Wände im Gleichtakt: `{"on":true,"group":1}` (UDP-Port 21330 im WLAN) |
 | `POST /api/zigbee` | Nur ESP32-C6: `{"action":"on","value":true}` (startet neu), `{"action":"pair"}` (neu koppeln) |
 | `POST /api/panelfw` | Panel-Firmware: `{"action":"all"}`, `{"action":"one","id":"…"}`, `{"action":"auto","on":true}` |
 | `/json`, `/json/state`, `/json/info`, `/presets.json` | WLED-kompatible Schnittstelle (eine Wand = ein Segment) |
