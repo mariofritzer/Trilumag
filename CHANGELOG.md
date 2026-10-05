@@ -2,6 +2,21 @@
 
 Die Versionsnummer im Webinstaller und in der App setzt sich aus der Version in der Firmware und der Nummer des automatischen Builds zusammen, zum Beispiel **0.5.11** = Version 0.5, Build 11. Bis Build 9 hat der Build die Nummer immer als 0.2.x ausgegeben, die tatsächlichen Stände stehen deshalb unten mit beiden Nummern.
 
+## 0.7.26 · 5. Oktober 2026
+
+**Philips Hue (nur ESP32-C6)**
+- Mit einem ESP32-C6 als Hauptpanel meldet sich Trilumag zusätzlich als Zigbee-Farblampe „Trilumag Wand“. Eine Hue Bridge, auch die Bridge Pro, nimmt sie wie eine Lampe eines anderen Herstellers auf.
+- Hue steuert Ein/Aus, Helligkeit und Farbe der ganzen Wand, auch in Szenen, Routinen und mit Hue-Schaltern. Weißtöne gehen auf die weißen LEDs.
+- Änderungen aus der App oder Home Assistant sieht die Hue-App nach etwa einer Sekunde.
+- Unter Optionen gibt es das Kästchen „Philips Hue (Zigbee)“. Dort schaltest du Zigbee ein und koppelst neu. Gesucht wird in der Hue-App unter Einstellungen → Lampen → „+“.
+- Der C6 braucht dafür einmal die neue Speicheraufteilung: einmal mit dem Webinstaller flashen, Einstellungen und Wand bleiben erhalten.
+- Startet das Hauptpanel mit Zigbee dreimal nicht richtig, schaltet es Zigbee von selbst wieder aus.
+- Alle anderen Chips haben kein Zigbee.
+
+**App**
+- Unter Stromlimit lässt sich der Bereich „Stromsensor INA226“ auf- und zuklappen. Zugeklappt zeigt er an, ob der Sensor gefunden wurde.
+- In der Bus-Diagnose lassen sich die Ereignisse auf- und zuklappen. Zugeklappt steht die Zahl der Einträge daneben.
+
 ## 0.7.23 · 4. Oktober 2026
 
 **Antippen**
