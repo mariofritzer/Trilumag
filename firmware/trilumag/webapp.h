@@ -40,6 +40,8 @@ main{max-width:720px;margin:0 auto;padding:12px 14px;display:flex;flex-direction
 .card h3.fold::after{content:"";width:8px;height:8px;border-right:2px solid var(--muted);border-bottom:2px solid var(--muted);transform:rotate(45deg);margin:0 4px 4px 0;transition:transform .15s}
 .card.closed h3.fold::after{transform:rotate(-45deg);margin:4px 4px 0 0}
 .card.closed>:not(h3){display:none!important}
+#zbCard.na .wstat,#zbCard.na .tog,#zbCard.na>.note:not(#zbNa){opacity:.45}
+#zbCard.na .tog{pointer-events:none}
 .subf,.subb{display:flex;flex-direction:column;gap:12px}
 .subf h3.fold{justify-content:flex-start}
 .subf h3 small{margin-left:auto;margin-right:12px;text-transform:none;letter-spacing:0;font-weight:500;font-size:12px}
@@ -368,6 +370,7 @@ nav.tabs button.on{color:var(--acc)}
       <div class="wstat" id="zbStat"><div class="ic" id="zbIc">✓</div><div><b id="zbT">–</b><span id="zbS"></span></div></div>
       <label class="tog"><input type="checkbox" id="zbOn"><span class="sw"></span>Mit der Hue Bridge verbinden</label>
       <p class="note">Trilumag erscheint in der Hue-App als Farblampe „Trilumag Wand“. Hue steuert Ein/Aus, Helligkeit und Farbe der ganzen Wand, auch in Szenen, Routinen und mit Hue-Schaltern. Effekte und einzelne Panels bleiben hier in der App. Ein- und Ausschalten startet das Hauptpanel neu.</p>
+      <p class="note" id="zbNa" hidden>Zigbee braucht einen eigenen Funkteil, den nur der ESP32-C6 hat. Mit einem C6 als Hauptpanel lässt sich das hier einschalten.</p>
       <p class="note" id="zbHow">Koppeln: In der Hue-App unter Einstellungen → Lampen → „+“ → Suchen. Trilumag muss dabei laufen und nah genug an der Bridge oder einer Hue-Lampe sein.</p>
       <div class="btnrow"><button class="btn" id="zbPair">Neu koppeln</button></div>
     </div>
@@ -904,6 +907,10 @@ $('pfwAll').addEventListener('click',()=>api('/api/panelfw',{action:'all'}));
 // ---------- Philips Hue (Zigbee, nur ESP32-C6) ----------
 function renderZb(){
   const z=st&&st.zb;$('zbCard').hidden=!z;if(!z)return;
+  const na=z.avail===false;                             // anderer Chip als ESP32-C6: sichtbar, aber ausgegraut
+  $('zbCard').classList.toggle('na',na);$('zbOn').disabled=na;$('zbNa').hidden=!na;
+  if(na){$('zbOn').checked=false;$('zbStat').classList.add('bad');$('zbIc').textContent='–';$('zbT').textContent='Nur mit ESP32-C6';
+    $('zbS').textContent=`Dein Hauptpanel hat einen ${st.chip||'anderen Chip'} ohne Zigbee-Funk`;$('zbHow').hidden=true;$('zbPair').hidden=true;return;}
   if(document.activeElement!==$('zbOn'))$('zbOn').checked=z.on;
   const ok=z.run&&z.join;
   $('zbStat').classList.toggle('bad',z.on&&!ok);

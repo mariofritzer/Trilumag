@@ -1641,11 +1641,13 @@ String stateJson(bool meta) {
   f["r"] = fx.r; f["g"] = fx.g; f["b"] = fx.b; f["w"] = fx.w; f["usesColor"] = fxUsesColor();
   d["master"] = master; d["on"] = masterOn;
   d["pfw"] = PANEL_FW_VERSION; d["pAuto"] = cfg.panelAuto;
+  { JsonObject z = d["zb"].to<JsonObject>();            // Hue/Zigbee: nur der ESP32-C6 kann es, die App zeigt es sonst ausgegraut
+    z["avail"] = (bool)HAS_ZIGBEE;
 #if HAS_ZIGBEE
-  { JsonObject z = d["zb"].to<JsonObject>();            // nur beim ESP32-C6
     z["on"] = cfg.zbOn; z["run"] = zb::started; z["join"] = zb::joined(); z["ch"] = zb::channel();
-    if (zb::problem.length()) z["err"] = zb::problem; }
+    if (zb::problem.length()) z["err"] = zb::problem;
 #endif
+  }
   if (meta) {                                    // feste Listen nur beim ersten Mal
     JsonArray fl = d["effects"].to<JsonArray>();
     for (uint8_t k = 0; k < FX_COUNT; k++) { JsonObject e = fl.add<JsonObject>(); e["id"] = FX[k].id; e["name"] = FX[k].name; e["color"] = FX[k].color; }
