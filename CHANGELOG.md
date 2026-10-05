@@ -2,6 +2,11 @@
 
 Die Versionsnummer im Webinstaller und in der App setzt sich aus der Version in der Firmware und der Nummer des automatischen Builds zusammen, zum Beispiel **0.5.11** = Version 0.5, Build 11. Bis Build 9 hat der Build die Nummer immer als 0.2.x ausgegeben, die tatsächlichen Stände stehen deshalb unten mit beiden Nummern.
 
+## 0.7.27 · 5. Oktober 2026
+
+**App**
+- Das Kästchen „Philips Hue (Zigbee)“ steht jetzt bei jedem Chip unter Optionen. Ohne ESP32-C6 ist es ausgegraut, mit dem Hinweis „Nur mit ESP32-C6“.
+
 ## 0.7.26 · 5. Oktober 2026
 
 **Philips Hue (nur ESP32-C6)**
