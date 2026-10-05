@@ -25,7 +25,7 @@ button{font:inherit;color:inherit}
 .bri svg{width:20px;height:20px;flex:none;fill:var(--muted)}
 .pct{flex:none;width:46px;text-align:right;font:13px ui-monospace,Menlo,monospace;color:var(--fg)}
 .status{max-width:720px;margin:4px auto 0;font:11.5px ui-monospace,Menlo,monospace;color:var(--muted);display:flex;justify-content:space-between;gap:8px}
-.status b{color:var(--fg);font-weight:600;font-family:system-ui,sans-serif;letter-spacing:.02em}
+.status b{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:45%;color:var(--fg);font-weight:600;font-family:system-ui,sans-serif;letter-spacing:.02em}
 /* Regler */
 input[type=range]{-webkit-appearance:none;appearance:none;width:100%;height:28px;background:transparent;margin:0}
 input[type=range]::-webkit-slider-runnable-track{height:8px;border-radius:4px;background:linear-gradient(90deg,var(--acc) var(--p,50%),#3a3a3a var(--p,50%))}
@@ -187,7 +187,7 @@ nav.tabs button.on{color:var(--acc)}
     <div class="bri"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="4.2"/><g stroke="#999" stroke-width="2" stroke-linecap="round"><path d="M12 2.5v2M12 19.5v2M2.5 12h2M19.5 12h2M5.3 5.3l1.4 1.4M17.3 17.3l1.4 1.4M5.3 18.7l1.4-1.4M17.3 6.7l1.4-1.4"/></g></svg>
       <input type="range" id="master" min="1" max="100" value="100" aria-label="Gesamthelligkeit in Prozent"><output id="mastero" class="pct">100 %</output></div>
   </div>
-  <div class="status"><b>Trilumag</b><span id="status">verbinde …</span></div>
+  <div class="status"><b id="wallName">Trilumag</b><span id="status">verbinde …</span></div>
 </header>
 
 <main>
@@ -268,6 +268,11 @@ nav.tabs button.on{color:var(--acc)}
 
   <!-- Optionen -->
   <section id="t-opt" class="tab" hidden>
+    <div class="card" id="nameCard">
+      <h3>Name</h3>
+      <label class="f">Name der Wand<input id="wname" maxlength="32" placeholder="z. B. Wohnzimmer" autocomplete="off"></label>
+      <p class="note">Steht oben in der App, in Home Assistant und in WLED-Programmen. Die Adresse bleibt trilumag.local.</p>
+    </div>
     <div class="card" id="wifiCard">
       <h3>WLAN</h3>
       <div class="wstat" id="wifiStat"><div class="ic" id="wifiIc">✓</div><div><b id="wifiT"></b><span id="wifiS"></span></div></div>
@@ -578,6 +583,8 @@ $('big').addEventListener('pointerdown',e=>{const id=e.target.dataset&&e.target.
 // ---------- Darstellung ----------
 function render(){
   if(!st)return;
+  if(st.name){$('wallName').textContent=st.name;document.title=st.name;
+    if(document.activeElement!==$('wname')&&!tSend.name)$('wname').value=st.name;}
   $('status').textContent=`${st.panels.length}/${st.max} Panels · ${st.sim?'Simulation':'Bus'} · MQTT ${st.mqttSet?(st.mqtt?'verbunden':'getrennt'):'aus'} · ${wsOk?'live':'HTTP'}`;
   $('pwr').classList.toggle('on',st.on);
   if(document.activeElement!==$('master')){const p=pct(st.master);setRange('master',p);$('mastero').textContent=p+' %';}
@@ -925,6 +932,11 @@ $('zbPair').addEventListener('click',async()=>{const b=$('zbPair');
   if(!b.dataset.ask){b.dataset.ask=1;b.textContent='Wirklich? Trilumag verlässt das Hue-Netz';setTimeout(()=>{delete b.dataset.ask;b.textContent='Neu koppeln';},4000);return;}
   delete b.dataset.ask;b.textContent='Neu koppeln';
   const r=await api('/api/zigbee',{action:'pair'});if(r){toast('Zigbee wird zurückgesetzt, Trilumag startet neu …');setTimeout(()=>location.reload(),9000);}});
+
+// ---------- Name der Wand ----------
+$('wname').addEventListener('input',()=>{const n=$('wname').value.trim();if(!n)return;$('wallName').textContent=n;document.title=n;
+  later('name',async()=>{if(await api('/api/name',{name:n}))toast('Name gespeichert');},700);});
+$('wname').addEventListener('blur',()=>{if(!$('wname').value.trim()&&st)$('wname').value=st.name;});
 
 function ago(s){return s<60?`vor ${s} s`:s<3600?`vor ${Math.round(s/60)} min`:`vor ${Math.round(s/3600)} h`;}
 async function loadDiag(){try{diagData=await (await fetch('/api/diag')).json();renderDiag();if(tab==='wall')renderWall();}catch(e){}}

@@ -136,6 +136,7 @@ struct Config {
   uint8_t tapA1 = 1, tapA2 = 2;   // Aktion für einmal und doppelt antippen (TapAction)
   bool panelAuto = true;    // Panels mit älterer Firmware automatisch aktualisieren
   bool zbOn = false;        // Zigbee für die Hue Bridge (nur ESP32-C6)
+  String name = "Trilumag"; // Name der Wand: App, Home Assistant, WLED-Programme
   String mqttHost;
   uint16_t mqttPort = 1883;
   String mqttUser, mqttPass;
@@ -1115,7 +1116,7 @@ void publishDiscovery(int i) {
   d["availability_mode"] = "all";
   JsonObject dev = d["device"].to<JsonObject>();
   dev["identifiers"].to<JsonArray>().add("trilumag_" + hex(P[0].chip));
-  dev["name"] = "Trilumag";
+  dev["name"] = cfg.name;
   dev["manufacturer"] = "DIY";
   dev["model"] = "Panel v0.1";
   dev["sw_version"] = FW_VERSION;
@@ -1138,7 +1139,7 @@ void publishAllLight() {
   d["availability_topic"] = "trilumag/bridge/avail";
   JsonObject dev = d["device"].to<JsonObject>();
   dev["identifiers"].to<JsonArray>().add("trilumag_" + hex(P[0].chip));
-  dev["name"] = "Trilumag";
+  dev["name"] = cfg.name;
   char buf[900]; size_t n = serializeJson(d, buf, sizeof buf);
   mqtt.publish(("homeassistant/light/trilumag_alle_" + hex(P[0].chip) + "/config").c_str(), (const uint8_t*)buf, n, true);
 
@@ -1150,7 +1151,7 @@ void haDevice(JsonDocument& d) {
   d["availability_topic"] = "trilumag/bridge/avail";
   JsonObject dev = d["device"].to<JsonObject>();
   dev["identifiers"].to<JsonArray>().add("trilumag_" + hex(P[0].chip));
-  dev["name"] = "Trilumag";
+  dev["name"] = cfg.name;
 }
 void haPublish(const char* comp, const char* key, JsonDocument& d) {
   char buf[900]; size_t n = serializeJson(d, buf, sizeof buf);
@@ -1581,6 +1582,8 @@ void loadConfig() {
   if (cfg.tapA2 >= TA_COUNT) cfg.tapA2 = TA_WALL;
   cfg.panelAuto = prefs.getBool("pAuto", true);
   cfg.zbOn = HAS_ZIGBEE && prefs.getBool("zbOn", false);
+  cfg.name = prefs.getString("name", "Trilumag");
+  if (!cfg.name.length()) cfg.name = "Trilumag";
 }
 
 String configJson() {
@@ -1622,6 +1625,7 @@ String configJson() {
 String stateJson(bool meta) {
   JsonDocument d;
   d["sim"] = !cfg.bus;
+  d["name"] = cfg.name;
   d["max"] = MAX_ATTACHED;
   d["mqtt"] = mqtt.connected();
   d["mqttSet"] = cfg.mqttOn && cfg.mqttHost.length() > 0;
@@ -1754,6 +1758,7 @@ String macPlain() { uint8_t m[6]; WiFi.macAddress(m); char b[13]; snprintf(b, si
 void mdnsStart() {
   MDNS.end();
   MDNS.begin(HOSTNAME);
+  MDNS.setInstanceName(cfg.name.c_str());          // so heißt die Wand in Geräte-Listen; die Adresse bleibt trilumag.local
   MDNS.addService("http", "tcp", 80);
   MDNS.addService("wled", "tcp", 80);
   MDNS.addServiceTxt("wled", "tcp", "mac", macPlain().c_str());
@@ -1763,7 +1768,7 @@ int ledCount() { return countAttached() * SEG_PER_PANEL; }
 
 void wledInfo(JsonObject in) {
   in["ver"] = "0.15.0"; in["vid"] = 2410000;
-  in["brand"] = "WLED"; in["product"] = "Trilumag"; in["name"] = "Trilumag";
+  in["brand"] = "WLED"; in["product"] = "Trilumag"; in["name"] = cfg.name;
   in["release"] = String("Trilumag ") + FW_VERSION; in["repo"] = "mariofritzer/Trilumag";
   in["arch"] = "esp32"; in["core"] = "3.0.7"; in["freeheap"] = ESP.getFreeHeap(); in["uptime"] = millis() / 1000;
   in["mac"] = macPlain(); in["ip"] = WiFi.localIP().toString();
@@ -1876,7 +1881,7 @@ String backupJson() {
   c["i2cSda"] = cfg.i2cSda; c["i2cScl"] = cfg.i2cScl; c["shunt"] = cfg.shuntUo;
   JsonObject t = c["touch"].to<JsonObject>();
   t["on"] = cfg.touchOn; t["sens"] = cfg.touchSens; t["a1"] = cfg.tapA1; t["a2"] = cfg.tapA2;
-  c["pAuto"] = cfg.panelAuto; c["zbOn"] = cfg.zbOn;
+  c["pAuto"] = cfg.panelAuto; c["zbOn"] = cfg.zbOn; c["name"] = cfg.name;
   JsonObject cl = d["clips"].to<JsonObject>();
   for (int i = 1; i < SLOTS; i++) if (P[i].used && P[i].clips) cl[hex(P[i].chip)] = P[i].clips;
   d["master"] = master; d["on"] = masterOn;
@@ -1930,6 +1935,7 @@ const char* restoreBackup(JsonDocument& d) {
     }
     prefs.putBool("pAuto", c["pAuto"] | true);
     if (HAS_ZIGBEE) prefs.putBool("zbOn", c["zbOn"] | false);
+    if (c["name"].is<const char*>() && strlen(c["name"]) > 0) prefs.putString("name", (const char*)c["name"]);
   }
   for (JsonPair kv : d["clips"].as<JsonObject>()) prefs.putUInt(("n" + String(kv.key().c_str())).c_str(), kv.value().as<uint32_t>());
   FxCfg f;
@@ -2228,6 +2234,22 @@ const char* apiCall(const char* path, JsonDocument& d) {
     if (strcmp(a, "all") && strcmp(a, "one")) return "Unbekannte Aktion";
     return n ? nullptr : "Kein Panel braucht ein Update";
   }
+  // Name der Wand: {"name":"Wohnzimmer"}
+  if (!strcmp(path, "/api/name")) {
+    String n = d["name"] | "";
+    n.trim();
+    if (!n.length()) return "Bitte einen Namen eingeben";
+    if (n.length() > 32) n = n.substring(0, 32);
+    if (n == cfg.name) return nullptr;
+    cfg.name = n; prefs.putString("name", n);
+    MDNS.setInstanceName(n.c_str());
+    diag("Die Wand heißt jetzt „%s“", n.c_str());
+    if (mqtt.connected()) {                            // Gerätename in Home Assistant nachziehen
+      publishAllLight();
+      for (int i = 0; i < SLOTS; i++) if (P[i].used) publishDiscovery(i);
+    }
+    return nullptr;
+  }
   // Hue / Zigbee (nur ESP32-C6): {"action":"on","value":true} startet neu, {"action":"pair"} koppelt neu
   if (!strcmp(path, "/api/zigbee")) {
     if (!HAS_ZIGBEE) return "Zigbee gibt es nur mit dem ESP32-C6";
@@ -2313,7 +2335,7 @@ void setupWeb() {
   });
   server.on("/api/state", HTTP_GET, replyState);
   // Befehle laufen über apiCall(), damit HTTP und WebSocket dasselbe tun
-  const char* cmds[] = {"/api/set", "/api/presets", "/api/effect", "/api/test", "/api/ota", "/api/light", "/api/diag", "/api/touch", "/api/panelfw", "/api/zigbee",
+  const char* cmds[] = {"/api/set", "/api/presets", "/api/effect", "/api/test", "/api/ota", "/api/light", "/api/diag", "/api/touch", "/api/panelfw", "/api/zigbee", "/api/name",
                         "/api/sim/new", "/api/sim/attach", "/api/sim/detach", "/api/sim/tap"};
   for (const char* path : cmds) {
     server.on(path, HTTP_POST, [path] {
