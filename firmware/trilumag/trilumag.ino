@@ -37,7 +37,7 @@
 #include <Adafruit_NeoPixel.h>
 #include <stdarg.h>
 #include <math.h>
-#include "webapp.h"
+#include "webapp_gz.h"                  // die App (Quelle: webapp.h), gepackt
 #include "improv.h"
 #include "pins.h"
 #include "ws.h"
@@ -3019,7 +3019,11 @@ int scanWifi() {
 
 void setupWeb() {
   // Die App direkt aus dem Flash schicken, ohne sie erst in den Arbeitsspeicher zu kopieren (sie ist rund 70 KB groß)
-  server.on("/", HTTP_GET, [] { server.send_P(200, "text/html; charset=utf-8", INDEX_HTML, sizeof(INDEX_HTML) - 1); });
+  server.on("/", HTTP_GET, [] {
+    server.sendHeader("Content-Encoding", "gzip");
+    server.sendHeader("Cache-Control", "no-cache");
+    server.send_P(200, "text/html; charset=utf-8", (const char*)WEBAPP_GZ, WEBAPP_GZ_LEN);
+  });
   // Notfall-Seite für Updates: klein, funktioniert auch, wenn die App selbst nicht lädt
   server.on("/update", HTTP_GET, [] {
     String h = String("<!doctype html><meta charset=utf-8><meta name=viewport content='width=device-width,initial-scale=1'><title>Trilumag Update</title>"

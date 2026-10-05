@@ -58,6 +58,8 @@ jobs:
           [ "$BL" -le 1920 ] || { echo "::error::Bootloader zu groß: $BL Bytes (höchstens 1920)"; exit 1; }
           # Das Hauptpanel trägt die Panel-Firmware für Updates über den Bus in sich
           python3 .github/scripts/panel_fw_header.py firmware/panel/panel.bin firmware/panel/panel.c firmware/trilumag/panel_fw.h
+          # Die Web-App wird gepackt ausgeliefert
+          python3 .github/scripts/webapp_gz.py
           mkdir -p site/firmware/panel
           cp firmware/panel/panel.bin firmware/panel/panel.hex site/firmware/panel/
           cp firmware/panel/bootloader/bootloader.bin site/firmware/panel/
