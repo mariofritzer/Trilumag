@@ -2,6 +2,40 @@
 
 Die Versionsnummer im Webinstaller und in der App setzt sich aus der Version in der Firmware und der Nummer des automatischen Builds zusammen, zum Beispiel **0.5.11** = Version 0.5, Build 11. Bis Build 9 hat der Build die Nummer immer als 0.2.x ausgegeben, die tatsächlichen Stände stehen deshalb unten mit beiden Nummern.
 
+## 0.7.31 · 5. Oktober 2026
+
+**Name der Wand**
+- Unter Optionen → Name bekommt die Wand einen eigenen Namen. Er steht oben in der App, im Browser-Tab, in Home Assistant und in WLED-Programmen.
+- Die Adresse bleibt trilumag.local.
+
+**Panel finden**
+- Unter Wand gibt es beim angetippten Panel den Knopf „Finden“. Das echte Panel blinkt dann 3 Sekunden weiß, auch wenn die Wand aus ist, und in der App blinkt es mit.
+
+**Malen**
+- Unter Wand gibt es das neue Kästchen „Malen“: eine Farbe wählen und mit dem Finger über die Panels wischen.
+- Zur Wahl stehen 8 Farben, Warmweiß, Kaltweiß, „Aus“ und eine eigene Farbe.
+
+**Sleep-Timer**
+- Oben neben der Helligkeit sitzt ein Mond-Knopf mit 15 min bis 2 h. Die Wand blendet am Ende langsam aus (höchstens 5 Minuten) und geht dann aus.
+- Am Mond steht die Restzeit. Ein- oder Ausschalten von Hand beendet den Timer.
+
+**Nach Stromausfall**
+- Unter Optionen → Licht lässt sich wählen: wie vorher, aus, an oder ein bestimmtes Preset.
+- Das gilt nur nach echtem Stromausfall. Nach Updates und Neustarts aus der App bleibt alles, wie es war.
+
+**Energie**
+- Neues Kästchen unter Optionen mit dem Verbrauch von heute, diesem Monat, diesem Jahr und gesamt, dazu ein Balkendiagramm nach Tagen, Monaten oder Jahren.
+- Gemessen wird mit dem INA226, ohne Sensor wird der Verbrauch geschätzt. Das Datum kommt per Internet (NTP), Zeitzone Österreich.
+- In Home Assistant gibt es den Zähler „Energie“ (kWh) für das Energie-Dashboard.
+
+**Betriebsstunden**
+- Jedes Panel zählt, wie lange es schon geleuchtet hat.
+- Das steht als „Leuchtdauer“ beim Panel unter Wand und als Spalte „Std.“ in der Bus-Diagnose.
+
+**Mehrere Wände im Gleichtakt**
+- Wände im selben WLAN lassen sich zu einer Gruppe (1 bis 9) verbinden. Sie teilen Ein/Aus, Helligkeit und Effekt, egal an welcher Wand man etwas ändert.
+- Die Effekte laufen im selben Takt. Gefundene Wände erscheinen mit ihrem Namen in der Liste.
+
 ## 0.7.27 · 5. Oktober 2026
 
 **App**
