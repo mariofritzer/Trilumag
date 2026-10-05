@@ -433,13 +433,6 @@ nav.tabs button.on{color:var(--acc)}
       <div class="btnrow"><button class="btn pri" id="saveBtn">Speichern und neu starten</button></div>
       <p class="note" id="setErr"></p>
     </div>
-    <div class="card" id="syncCard">
-      <h3>Mehrere Wände</h3>
-      <label class="tog"><input type="checkbox" id="syncOn"><span class="sw"></span>Mit anderen Wänden im Gleichtakt</label>
-      <label class="f">Gruppe<select id="syncGrp"></select></label>
-      <div class="list" id="syncList"></div>
-      <p class="note">Alle Wände derselben Gruppe im selben WLAN teilen Ein/Aus, Helligkeit und Effekt mit allen Einstellungen, egal an welcher Wand du etwas änderst. Die Effekte laufen im selben Takt. Feste Farben einzelner Panels bleiben pro Wand.</p>
-    </div>
     <div class="card" id="zbCard" hidden>
       <h3>Philips Hue (Zigbee)</h3>
       <div class="wstat" id="zbStat"><div class="ic" id="zbIc">✓</div><div><b id="zbT">–</b><span id="zbS"></span></div></div>
@@ -448,6 +441,13 @@ nav.tabs button.on{color:var(--acc)}
       <p class="note" id="zbNa" hidden>Zigbee braucht einen eigenen Funkteil, den nur der ESP32-C6 hat. Mit einem C6 als Hauptpanel lässt sich das hier einschalten.</p>
       <p class="note" id="zbHow">Koppeln: In der Hue-App unter Einstellungen → Lampen → „+“ → Suchen. Trilumag muss dabei laufen und nah genug an der Bridge oder einer Hue-Lampe sein.</p>
       <div class="btnrow"><button class="btn" id="zbPair">Neu koppeln</button></div>
+    </div>
+    <div class="card" id="syncCard">
+      <h3>Mehrere Wände</h3>
+      <label class="tog"><input type="checkbox" id="syncOn"><span class="sw"></span>Mit anderen Wänden im Gleichtakt</label>
+      <label class="f">Gruppe<select id="syncGrp"></select></label>
+      <div class="list" id="syncList"></div>
+      <p class="note">Alle Wände derselben Gruppe im selben WLAN teilen Ein/Aus, Helligkeit und Effekt mit allen Einstellungen, egal an welcher Wand du etwas änderst. Die Effekte laufen im selben Takt. Feste Farben einzelner Panels bleiben pro Wand.</p>
     </div>
     <div class="card" id="diagCard">
       <h3>Bus-Diagnose</h3>
