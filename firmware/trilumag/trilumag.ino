@@ -732,11 +732,21 @@ const uint32_t FX_FRAME_MS = 40;
 float fxPhase = 0, fxA[SLOTS * 3], fxB[SLOTS * 3], fxT[SLOTS * 3];   // Zustand pro Punkt (Panel oder Kante)
 float fxFlash = 0, fxFlashX = 0, fxFlashY = 0;      // Gewitter: aktueller Blitz
 int fxHead = 0; float fxStep = 0; int fxBeat = -1;  // Komet: Kopf; Disco: Takt
+uint16_t fxDir = 0;            // Richtung der Effekte in Grad (Lauflicht, Wellen, Lava …)
+uint8_t fxSpin = 0;            // Richtung dreht sich: 0 nein, 1 langsam, 2 schnell
+float fxSpinAng = 0;
+float fxAng = 0;               // aktueller Winkel (Richtung + Drehung), pro Bild berechnet
 // Wandansicht: so hängt die Wand wirklich (Drehung, Spiegelung). Effekte laufen danach links/rechts, oben/unten.
 void viewXY(float x, float y, float& rx, float& ry) {
   float a = cfg.viewRot * 0.01745329f, c = cosf(a), s = sinf(a);
   rx = x * c - y * s; ry = x * s + y * c;
   if (cfg.viewMir) rx = -rx;
+}
+// wie die Wand hängt, dann um die Effekt-Richtung gedreht: u läuft immer "in Effektrichtung"
+void effXY(float x, float y, float& rx, float& ry) {
+  float vx, vy; viewXY(x, y, vx, vy);
+  float a = fxAng * 0.01745329f, c = cosf(a), s = sinf(a);
+  rx = vx * c + vy * s; ry = -vx * s + vy * c;
 }
 uint32_t fxLast = 0, fxDirtyAt = 0, fxLastFrame = 0;
 bool fxDirty = false;
@@ -814,9 +824,11 @@ void fxCompute() {
   fxPhase += dt * rate;
   if (fxPhase > 100000) fxPhase = 0;
 
+  if (fxSpin) { fxSpinAng += dt * (fxSpin == 1 ? 6 : 30); if (fxSpinAng >= 360) fxSpinAng -= 360; }
+  fxAng = fxDir + fxSpinAng;
   float minX = 1e9, maxX = -1e9, minY = 1e9, maxY = -1e9;
   for (int i = 0; i < SLOTS; i++) if (P[i].used && P[i].attached) {
-    float rx, ry; viewXY(P[i].x * 0.5f, P[i].y * 0.866f, rx, ry);
+    float rx, ry; effXY(P[i].x * 0.5f, P[i].y * 0.866f, rx, ry);
     minX = fminf(minX, rx); maxX = fmaxf(maxX, rx); minY = fminf(minY, ry); maxY = fmaxf(maxY, ry);
   }
   float spanX = fmaxf(1.0f, maxX - minX);
@@ -826,7 +838,7 @@ void fxCompute() {
   fxFlash = fmaxf(0, fxFlash - dt * rate * 5);
   if (fx.id == 11 && frand() < dt * rate * (0.12f + 0.6f * fx.inten / 255.0f)) {
     int n = 0, pick = 0; for (int i = 0; i < SLOTS; i++) if (P[i].used && P[i].attached && frand() * (++n) < 1) pick = i;
-    viewXY(P[pick].x * 0.5f, P[pick].y * 0.866f, fxFlashX, fxFlashY); fxFlash = 0.7f + 0.3f * frand();
+    effXY(P[pick].x * 0.5f, P[pick].y * 0.866f, fxFlashX, fxFlashY); fxFlash = 0.7f + 0.3f * frand();
   }
   // Komet: der Kopf wandert zu einem Nachbarn weiter
   if (fx.id == 14) {
@@ -862,7 +874,7 @@ void fxCompute() {
       }
       float c[4] = {0, 0, 0, 0};
       int s = i * 3 + e;                                       // eigener Zufallszustand pro Punkt
-      float rx, ry; viewXY(p.x * 0.5f + dx, p.y * 0.866f + dy, rx, ry);
+      float rx, ry; effXY(p.x * 0.5f + dx, p.y * 0.866f + dy, rx, ry);
       float u = (rx - minX) / spanX;                            // 0 links … 1 rechts (so wie die Wand hängt)
       float v = ry;
       float depth = p.depth + dd;
@@ -976,8 +988,11 @@ const uint16_t ON_STEP[4] = {0, 420, 210, 90}, ON_FADE[4] = {0, 600, 350, 180}; 
 uint32_t sigAt = 0; uint8_t sigCol[4] = {0, 0, 255, 0}, sigBlinks = 3; uint16_t sigMs = 700;
 // Fortschritt: die Wand füllt sich vom Hauptpanel aus (0 = aus)
 float progVal = 0; uint8_t progCol[4] = {0, 255, 40, 0};
+// Zeit seit t in ms; nie negativ (t wird mit "| 1" gesetzt und kann daher 1 ms in der Zukunft liegen)
+uint32_t since(uint32_t t, uint32_t now) { int32_t d = (int32_t)(now - t); return d < 0 ? 0 : (uint32_t)d; }
 bool overlayActive() {
   uint32_t now = millis();
+  if (transOn) return true;                          // weiche Übergänge auch in der App zeigen
   for (const Ripple& r : ripples) if (r.t0 && now - r.t0 < 4000) return true;
   return (onAnimAt && now - onAnimAt < 6000) || sigAt || progVal > 0;
 }
@@ -1041,7 +1056,7 @@ void computeTargets() {
   }
   // Signal: Farbe an, normales Bild, Farbe an … (auch bei ausgeschalteter Wand)
   if (sigAt) {
-    uint32_t ph = (now - sigAt) / (sigMs / 2);
+    uint32_t ph = since(sigAt, now) / (sigMs / 2);
     if (ph >= (uint32_t)sigBlinks * 2) sigAt = 0;
     else if (ph % 2 == 0) for (int i = 0; i < SLOTS; i++) {
       if (!P[i].used || !P[i].attached) continue;
@@ -1053,7 +1068,7 @@ void computeTargets() {
   if (masterOn && !lastMasterOn && cfg.onAnim) { onAnimAt = now | 1; transOn = false; }
   lastMasterOn = masterOn;
   if (onAnimAt) {
-    uint32_t t = now - onAnimAt; bool done = true;
+    uint32_t t = since(onAnimAt, now); bool done = true;
     for (int i = 0; i < SLOTS; i++) {
       if (!P[i].used || !P[i].attached || isPulse[i]) continue;
       int32_t local = (int32_t)t - (int32_t)P[i].depth * ON_STEP[cfg.onAnim];
@@ -1065,7 +1080,7 @@ void computeTargets() {
   // Wellen beim Antippen: heller Ring, der sich ausbreitet und dabei verblasst
   for (Ripple& r : ripples) {
     if (!r.t0) continue;
-    float t = (now - r.t0) / 1000.0f, rad = t * RIPPLE_SPEED;
+    float t = since(r.t0, now) / 1000.0f, rad = t * RIPPLE_SPEED;
     if (t > 3.5f) { r.t0 = 0; continue; }
     float fade = 1 - t / 3.5f;
     for (int i = 0; i < SLOTS; i++) {
@@ -1237,6 +1252,8 @@ void fxStart(int id) {
 
 void fxSave() {
   prefs.putBytes("fx2", &fx, sizeof fx);
+  if (prefs.getUShort("fxDir", 0) != fxDir) prefs.putUShort("fxDir", fxDir);
+  if (prefs.getUChar("fxSpin", 0) != fxSpin) prefs.putUChar("fxSpin", fxSpin);
   if (prefs.getUChar("master", 255) != master) prefs.putUChar("master", master);
   if (prefs.getBool("mOn", true) != masterOn) prefs.putBool("mOn", masterOn);
   fxDirty = false;
@@ -1245,6 +1262,7 @@ void fxLoad() {
   FxCfg f;
   if (prefs.getBytes("fx2", &f, sizeof f) == sizeof f && f.id < FX_COUNT && f.pal < PAL_COUNT) fx = f;
   master = prefs.getUChar("master", 255); masterOn = prefs.getBool("mOn", true);
+  fxDir = prefs.getUShort("fxDir", 0) % 360; fxSpin = prefs.getUChar("fxSpin", 0) % 3;
   fxReset();
 }
 
@@ -1254,6 +1272,8 @@ void applyFx(JsonVariantConst cmd) {
   curPreset = -1;
   if (cmd["speed"].is<int>()) fx.speed = constrain(cmd["speed"].as<int>(), 1, 100);
   if (cmd["intensity"].is<int>()) fx.inten = constrain(cmd["intensity"].as<int>(), 0, 255);
+  if (cmd["direction"].is<int>()) fxDir = ((cmd["direction"].as<int>() % 360) + 360) % 360;
+  if (cmd["spin"].is<int>()) { fxSpin = constrain(cmd["spin"].as<int>(), 0, 2); if (!fxSpin) fxSpinAng = 0; }
   if (cmd["brightness"].is<int>()) { master = constrain(cmd["brightness"].as<int>(), 1, 255); resendAll(); }
   if (cmd["palette"].is<const char*>()) { int p = palFind(cmd["palette"].as<const char*>()); if (p >= 0) fx.pal = p; }
   else if (cmd["palette"].is<int>()) fx.pal = constrain(cmd["palette"].as<int>(), 0, PAL_COUNT - 1);
@@ -1490,7 +1510,7 @@ int presetSave(int slot, const char* name) {
   d["n"] = name;
   d["m"] = master; d["on"] = masterOn;
   JsonArray f = d["fx"].to<JsonArray>();
-  f.add(fx.id); f.add(fx.speed); f.add(fx.pal); f.add(fx.inten); f.add(fx.r); f.add(fx.g); f.add(fx.b); f.add(fx.w);
+  f.add(fx.id); f.add(fx.speed); f.add(fx.pal); f.add(fx.inten); f.add(fx.r); f.add(fx.g); f.add(fx.b); f.add(fx.w); f.add(fxDir); f.add(fxSpin);
   JsonObject c = d["c"].to<JsonObject>();
   for (int i = 0; i < SLOTS; i++) {
     const Panel& p = P[i];
@@ -1533,6 +1553,7 @@ bool presetLoad(int k) {
   if (f.size() >= 8) {
     fx.speed = f[1]; fx.pal = (uint8_t)f[2] < PAL_COUNT ? (uint8_t)f[2] : 0; fx.inten = f[3];
     fx.r = f[4]; fx.g = f[5]; fx.b = f[6]; fx.w = f[7];
+    if (f.size() >= 10) { fxDir = (uint16_t)f[8] % 360; fxSpin = (uint8_t)f[9] % 3; }
     uint8_t id = f[0];
     if (id < FX_COUNT && id != fx.id) fxStart(id);
   }
@@ -1602,7 +1623,7 @@ void applyAll(JsonVariantConst cmd) {
   if (!strcmp(st, "ON") && !masterOn) { masterOn = true; wake = true; }
   if (*st && !sleepFiring) sleepCancel();          // Ein/Aus von Hand beendet den Sleep-Timer
   if (cmd["brightness"].is<int>()) { master = constrain(cmd["brightness"].as<int>(), 1, 255); wake = true; }
-  if (!cmd["effect"].isNull() || !cmd["speed"].isNull() || !cmd["palette"].isNull() || !cmd["intensity"].isNull()) {
+  if (!cmd["effect"].isNull() || !cmd["speed"].isNull() || !cmd["palette"].isNull() || !cmd["intensity"].isNull() || !cmd["direction"].isNull() || !cmd["spin"].isNull()) {
     JsonDocument d; d.set(cmd); d.remove("color"); d.remove("brightness");
     applyFx(d.as<JsonVariantConst>());
   }
@@ -1864,7 +1885,7 @@ String stateJson(bool meta) {
   d["ver"] = FW_VERSION;
   d["chip"] = CHIP_FAMILY;
   JsonObject f = d["fx"].to<JsonObject>();
-  f["id"] = FX[fx.id].id; f["speed"] = fx.speed; f["inten"] = fx.inten; f["pal"] = PALS[fx.pal].id;
+  f["id"] = FX[fx.id].id; f["speed"] = fx.speed; f["inten"] = fx.inten; f["pal"] = PALS[fx.pal].id; f["dir"] = fxDir; f["spin"] = fxSpin;
   f["r"] = fx.r; f["g"] = fx.g; f["b"] = fx.b; f["w"] = fx.w; f["usesColor"] = fxUsesColor();
   d["master"] = master; d["on"] = masterOn;
   d["pfw"] = PANEL_FW_VERSION; d["pAuto"] = cfg.panelAuto;
@@ -2420,8 +2441,8 @@ String energyJson() {
 namespace wallsync {
 const uint16_t PORT = 21330;
 struct __attribute__((packed)) Pkt {
-  char magic[4]; uint8_t ver, group, on, master, fx, speed, inten, pal, r, g, b, w;
-  uint32_t chip, seq; float phase; char name[24];
+  char magic[4]; uint8_t ver, group, on, master, fx, speed, inten, pal, r, g, b, w, spin;
+  uint16_t dir; uint32_t chip, seq; float phase; char name[24];
 };
 struct Peer { uint32_t chip = 0, seen = 0; String name, ip; uint8_t group = 0; };
 const uint8_t MAXP = 8;
@@ -2432,7 +2453,7 @@ uint32_t seq = 0, lastSig = 0, lastBeat = 0;
 
 uint32_t sig() {
   return ((uint32_t)masterOn << 31) ^ ((uint32_t)master << 23) ^ ((uint32_t)fx.id << 17) ^ ((uint32_t)fx.speed << 10) ^ ((uint32_t)fx.inten * 2654435761u) ^
-         ((uint32_t)fx.pal << 3) ^ ((uint32_t)fx.r * 40503u + fx.g * 52711u + fx.b * 17u + fx.w * 7u);
+         ((uint32_t)fx.pal << 3) ^ ((uint32_t)fx.r * 40503u + fx.g * 52711u + fx.b * 17u + fx.w * 7u) ^ ((uint32_t)fxDir * 977u) ^ ((uint32_t)fxSpin << 29);
 }
 bool timeMaster() {                                  // kleinste Chip-ID der Gruppe gibt den Takt vor
   for (const Peer& p : peers) if (p.chip && millis() - p.seen < 5000 && p.group == cfg.syncGroup && p.chip < P[0].chip) return false;
@@ -2441,7 +2462,7 @@ bool timeMaster() {                                  // kleinste Chip-ID der Gru
 void send() {
   if (!started) return;
   Pkt k; memset(&k, 0, sizeof k);
-  memcpy(k.magic, "TLSY", 4); k.ver = 1; k.group = cfg.syncGroup;
+  memcpy(k.magic, "TLSY", 4); k.ver = 2; k.dir = fxDir; k.spin = fxSpin; k.group = cfg.syncGroup;
   k.on = masterOn; k.master = master; k.fx = fx.id; k.speed = fx.speed; k.inten = fx.inten; k.pal = fx.pal;
   k.r = fx.r; k.g = fx.g; k.b = fx.b; k.w = fx.w; k.chip = P[0].chip; k.seq = seq; k.phase = fxPhase;
   strncpy(k.name, cfg.name.c_str(), sizeof k.name - 1);
@@ -2458,7 +2479,7 @@ void stop() { if (started) { udp.stop(); started = false; } for (Peer& p : peers
 
 bool differs(const Pkt& k) {
   return k.on != masterOn || k.master != master || k.fx != fx.id || k.speed != fx.speed || k.inten != fx.inten || k.pal != fx.pal ||
-         k.r != fx.r || k.g != fx.g || k.b != fx.b || k.w != fx.w;
+         k.r != fx.r || k.g != fx.g || k.b != fx.b || k.w != fx.w || k.dir != fxDir || k.spin != fxSpin;
 }
 // Zustand einer anderen Wand übernehmen, ohne ihn selbst wieder zu senden
 void adopt(const Pkt& k) {
@@ -2466,6 +2487,7 @@ void adopt(const Pkt& k) {
   bool look = k.on != masterOn || k.master != master;
   masterOn = k.on; master = k.master;
   fx.speed = k.speed; fx.inten = k.inten; fx.pal = k.pal < PAL_COUNT ? k.pal : 0; fx.r = k.r; fx.g = k.g; fx.b = k.b; fx.w = k.w;
+  fxDir = k.dir % 360; fxSpin = k.spin % 3;
   if (k.fx < FX_COUNT && k.fx != fx.id) fxStart(k.fx);
   else { fxDirty = true; fxDirtyAt = millis(); fxLastFrame = 0; publishFx(); }
   if (look) resendAll();
@@ -2484,7 +2506,7 @@ void loop() {
     Pkt k;
     if (n != (int)sizeof k) { udp.flush(); continue; }
     udp.read((uint8_t*)&k, sizeof k);
-    if (memcmp(k.magic, "TLSY", 4) || k.ver != 1 || k.chip == P[0].chip) continue;
+    if (memcmp(k.magic, "TLSY", 4) || k.ver != 2 || k.chip == P[0].chip) continue;
     int slot = -1, old = 0;
     for (int i = 0; i < MAXP; i++) { if (peers[i].chip == k.chip) { slot = i; break; } if (peers[i].seen < peers[old].seen) old = i; }
     if (slot < 0) { slot = old; if (peers[slot].chip == 0 || now - peers[slot].seen > 30000) diag("Wand „%.*s“ gefunden (Gruppe %u)", 24, k.name, k.group); }

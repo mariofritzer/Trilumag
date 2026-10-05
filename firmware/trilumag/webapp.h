@@ -87,6 +87,8 @@ main{max-width:720px;margin:0 auto;padding:12px 14px;display:flex;flex-direction
 .edge1{fill:rgba(255,255,255,.75);pointer-events:none}
 /* Auswahl-Chips */
 .chips{display:flex;gap:8px;flex-wrap:wrap}
+#fdiro{width:64px;white-space:nowrap}
+#fspin .note{width:100%}
 .moon{width:40px;height:40px;flex:none;border-radius:50%;border:2px solid var(--line);background:var(--card);display:grid;place-items:center;cursor:pointer;position:relative;padding:0}
 .moon svg{width:18px;height:18px;fill:none;stroke:var(--muted);stroke-width:2;stroke-linejoin:round}
 .moon.on{border-color:var(--acc)}
@@ -247,6 +249,8 @@ nav.tabs button.on{color:var(--acc)}
       <h3>Tempo und Intensität</h3>
       <div class="sl">Tempo<input type="range" id="fspeed" min="1" max="100" value="50"><output id="fspeedo">50</output></div>
       <div class="sl">Intensität<input type="range" id="finten" min="0" max="255" value="128"><output id="finteno">128</output></div>
+      <div class="sl">Richtung<input type="range" id="fdir" min="0" max="345" step="15" value="0"><output id="fdiro">0°</output></div>
+      <div class="chips" id="fspin"><span class="note">Richtung dreht sich:</span><button class="chip on" data-s="0">nein</button><button class="chip" data-s="1">langsam</button><button class="chip" data-s="2">schnell</button></div>
       <p class="note" id="fxNote"></p>
     </div>
     <div class="card">
@@ -756,7 +760,9 @@ function renderFx(){
   $('palList').querySelectorAll('.row').forEach(r=>{r.classList.toggle('on',r.dataset.pal===st.fx.pal);
     r.querySelector('.grad').style.background=palGrad(st.palettes.find(p=>p.id===r.dataset.pal));});
   setRange('fspeed',st.fx.speed);setRange('finten',st.fx.inten);
-  $('fxNote').textContent=fxOn()?(st.fx.usesColor?'Die Effektfarbe stellst du im Tab Farben ein.':''):'Einfarbig: jedes Panel leuchtet in seiner eigenen Farbe. Tempo, Intensität und Palette wirken erst mit einem Effekt.';
+  if(document.activeElement!==$('fdir')&&!tSend.fdir){setRange('fdir',st.fx.dir||0);$('fdiro').textContent=dirText(st.fx.dir||0);}
+  $('fspin').querySelectorAll('button').forEach(b=>b.classList.toggle('on',+b.dataset.s===(st.fx.spin||0)));
+  $('fxNote').textContent=fxOn()?(st.fx.usesColor?'Die Effektfarbe stellst du im Tab Farben ein. ':'')+'Die Richtung wirkt bei Effekten, die über die Wand laufen, etwa Regenbogenwelle, Lauflicht, Polarlicht, Lava und Spirale.':'Einfarbig: jedes Panel leuchtet in seiner eigenen Farbe. Tempo, Intensität und Palette wirken erst mit einem Effekt.';
 }
 async function setFx(body){
   if(body.effect){st.fx.id=body.effect;live={};joining=[];}
@@ -765,6 +771,9 @@ async function setFx(body){
   const r=await api('/api/effect',body);if(r){render();pollLive();}}
 $('fxq').addEventListener('input',renderFx);
 $('fspeed').addEventListener('input',()=>{$('fspeedo').textContent=$('fspeed').value;later('fx',()=>api('/api/effect',{speed:+$('fspeed').value}));});
+function dirText(d){return d+'° '+['→','↘','↓','↙','←','↖','↑','↗'][Math.round(d/45)%8];}
+$('fdir').addEventListener('input',()=>{const d=+$('fdir').value;$('fdiro').textContent=dirText(d);later('fdir',()=>api('/api/effect',{direction:d}));});
+$('fspin').querySelectorAll('button').forEach(b=>b.addEventListener('click',()=>{st.fx.spin=+b.dataset.s;renderFx();api('/api/effect',{spin:+b.dataset.s});}));
 $('finten').addEventListener('input',()=>{$('finteno').textContent=$('finten').value;later('fx',()=>api('/api/effect',{intensity:+$('finten').value}));});
 
 // ---------- Kopfzeile ----------
