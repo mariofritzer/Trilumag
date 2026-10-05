@@ -102,7 +102,7 @@ Unter Optionen → WLAN lässt sich der WLAN-Wächter ein- und ausschalten (Stan
 
 ## Panel tauschen
 
-Klipst man ein neues Panel genau dort an, wo vorher ein anderes saß (innerhalb von 5 Minuten), fragt die App, ob es Farbe, Helligkeit und „Kanten einzeln“ des alten übernehmen soll.
+In der App unter Wand das Panel antippen und „Tauschen“ wählen. Danach bleiben 5 Minuten Zeit: das alte Panel abklipsen und das neue an genau dieselbe Stelle setzen. Das neue übernimmt Farbe, Helligkeit und „Kanten einzeln“ des alten. Oben in der App läuft solange ein Hinweis mit der verbleibenden Zeit und „Abbrechen“.
 
 ## Sprache
 
@@ -134,7 +134,7 @@ Mit einem ESP32-C6 als Hauptpanel meldet sich Trilumag zusätzlich als Zigbee-3.
 | `POST /api/progress` | Fortschritt: `{"value":40,"color":"grün"}`, `0` = aus |
 | `POST /api/identify` | Panel finden: `{"id":"…"}`, das Panel blinkt 3 s weiß |
 | `POST /api/favs` | Favoriten: `{"effect":"lava","on":true}` |
-| `POST /api/swap` | Panel tauschen: `{"id":"neues Panel","take":true}` übernimmt Farbe, Helligkeit und Kanten des Panels, das vorher an dieser Stelle war |
+| `POST /api/swap` | Panel tauschen: `{"id":"altes Panel"}` startet, danach 5 Minuten Zeit; `{"stop":true}` bricht ab |
 | `POST /api/guard` | WLAN-Wächter: `{"on":true}` |
 | `POST /api/sleep` | Sleep-Timer: `{"min":30}`, `0` beendet ihn |
 | `POST /api/boot` | Nach Stromausfall: `{"mode":0}` wie vorher, `1` aus, `2` an, `3` mit `"preset"` |

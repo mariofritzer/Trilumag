@@ -115,7 +115,6 @@ struct Panel {
   uint8_t touchSeq = 0; bool touchKnown = false;
   uint8_t upd = 0, updPct = 0, updFails = 0;   // Panel-Update: 0 nichts, 1 wartet, 2 läuft, 3 fehlgeschlagen
   uint32_t identUntil = 0;          // Panel finden: blinkt bis hierher weiß
-  int8_t swapFrom = -1; uint32_t swapUntil = 0;   // neu an der Stelle eines abgeklipsten Panels: Einstellungen übernehmen?
   uint32_t litSec = 0, litSaved = 0;   // Betriebsstunden: so lange hat das Panel insgesamt geleuchtet (s)
   bool edges = false;               // Kanten einzeln: Effekte bekommen drei Farben pro Panel
   uint8_t state = DARK;
@@ -1735,6 +1734,23 @@ void reconcile() {
   }
 }
 
+// Panel tauschen: in der App gestartet, dann 5 Minuten Zeit, das alte Panel abzuklipsen und ein neues an dieselbe
+// Stelle zu setzen. Das neue übernimmt Farbe, Helligkeit und "Kanten einzeln".
+const uint32_t SWAP_MS = 300000UL;
+int8_t swapSlot = -1; uint32_t swapUntil = 0;
+uint32_t swapDoneChip = 0, swapDoneAt = 0;
+bool swapActive() { return swapSlot > 0 && P[swapSlot].used && (int32_t)(swapUntil - millis()) > 0; }
+void swapCheck(int i) {
+  if (!swapActive() || i == swapSlot) return;
+  const Panel& b = P[swapSlot]; Panel& a = P[i];
+  if (b.attached || b.x != a.x || b.y != a.y) return;
+  a.r = b.r; a.g = b.g; a.b = b.b; a.w = b.w; a.bri = b.bri; a.on = b.on; a.hasColor = b.hasColor;
+  a.edges = b.edges; prefs.putBool(("e" + hex(a.chip)).c_str(), a.edges);
+  colorsDirty = true; colorsDirtyAt = millis();
+  diag("Panel %s übernimmt die Einstellungen von %s", hex(a.chip).substring(4).c_str(), hex(b.chip).substring(4).c_str());
+  swapSlot = -1; swapDoneChip = a.chip; swapDoneAt = millis() | 1;
+}
+
 // Setzt Panel i an Kante "edge" von "parent"; "own" ist die eigene Kante, die den Kontakt hat
 bool placePanel(int i, int parent, uint8_t edge, uint8_t own) {
   if (i <= 0 || i >= SLOTS || !P[i].used || P[i].attached) return false;
@@ -1748,10 +1764,7 @@ bool placePanel(int i, int parent, uint8_t edge, uint8_t own) {
   for (uint8_t m = 0; m < 3; m++) if (list[m] == back) k = m;
   P[i].x = nx; P[i].y = ny; P[i].rot = (k - own + 3) % 3;
   P[i].attached = true; P[i].since = millis();
-  // sitzt das neue Panel genau dort, wo vorher ein anderes war? Dann fragt die App, ob es dessen Einstellungen übernehmen soll
-  P[i].swapFrom = -1;
-  if (!P[i].hasColor) for (int j = 1; j < SLOTS; j++)
-    if (j != i && P[j].used && !P[j].attached && P[j].x == nx && P[j].y == ny && (P[j].hasColor || P[j].edges)) { P[i].swapFrom = j; P[i].swapUntil = (millis() + 300000UL) | 1; break; }
+  swapCheck(i);
   reconcile();
   return true;
 }
@@ -1921,6 +1934,8 @@ String stateJson(bool meta) {
   { JsonObject c2 = f["c2"].to<JsonObject>(); c2["r"] = fxC2[0]; c2["g"] = fxC2[1]; c2["b"] = fxC2[2]; c2["w"] = fxC2[3]; }
   f["r"] = fx.r; f["g"] = fx.g; f["b"] = fx.b; f["w"] = fx.w; f["usesColor"] = fxUsesColor();
   d["master"] = master; d["on"] = masterOn;
+  if (swapActive()) { JsonObject w = d["swap"].to<JsonObject>(); w["id"] = hex(P[swapSlot].chip); w["left"] = (swapUntil - millis() + 999) / 1000; w["off"] = !P[swapSlot].attached; }
+  if (swapDoneAt && millis() - swapDoneAt < 15000) d["swapped"] = hex(swapDoneChip);
   d["pfw"] = PANEL_FW_VERSION; d["pAuto"] = cfg.panelAuto;
   { JsonArray fv = d["favs"].to<JsonArray>(); for (uint8_t k = 0; k < FX_COUNT; k++) if (fxFavs & (1u << k)) fv.add(FX[k].id); }
   wallsync::json(d["sync"].to<JsonObject>());
@@ -1957,7 +1972,6 @@ String stateJson(bool meta) {
     o["state"] = p.state; o["on"] = p.on; o["edges"] = p.edges; o["fw"] = p.fw;
     o["clips"] = p.clips; o["caps"] = p.caps; o["lit"] = p.litSec;
     if (p.identUntil) o["ident"] = true;
-    if (p.swapFrom >= 0 && (int32_t)(p.swapUntil - millis()) > 0 && P[p.swapFrom].used && !P[p.swapFrom].attached) o["swap"] = hex(P[p.swapFrom].chip);
     if (p.upd) { o["upd"] = p.upd; o["pct"] = p.updPct; }
     o["r"] = p.r; o["g"] = p.g; o["b"] = p.b; o["w"] = p.w; o["bri"] = p.bri;
   }
@@ -2878,19 +2892,13 @@ const char* apiCall(const char* path, JsonDocument& d) {
     prefs.putUInt("favs", fxFavs);
     return nullptr;
   }
-  // Panel tauschen: {"id":"neu","take":true} übernimmt Farbe, Helligkeit und Kanten des alten Panels an dieser Stelle
+  // Panel tauschen: {"id":"altes Panel"} startet, {"stop":true} bricht ab
   if (!strcmp(path, "/api/swap")) {
+    if (d["stop"] | false) { swapSlot = -1; return nullptr; }
     int i = findChip(parseHex(d["id"] | "0"));
-    if (i < 0 || P[i].swapFrom < 0) return "Nichts zu übernehmen";
-    int j = P[i].swapFrom; P[i].swapFrom = -1;
-    if (!(d["take"] | false)) return nullptr;
-    Panel& a = P[i]; const Panel& b = P[j];
-    a.r = b.r; a.g = b.g; a.b = b.b; a.w = b.w; a.bri = b.bri; a.on = b.on; a.hasColor = b.hasColor;
-    if (a.state != DARK) a.state = ACTIVE;
-    a.edges = b.edges;
-    if (a.edges) prefs.putBool(("e" + hex(a.chip)).c_str(), true);
-    colorsDirty = true; colorsDirtyAt = millis(); sendToPanel(i); publishState(i);
-    diag("Panel %s übernimmt die Einstellungen von %s", hex(a.chip).substring(4).c_str(), hex(b.chip).substring(4).c_str());
+    if (i <= 0 || !P[i].attached) return "Panel unbekannt";
+    swapSlot = i; swapUntil = millis() + SWAP_MS; swapDoneAt = 0;
+    diag("Tausch von Panel %s gestartet: 5 Minuten Zeit", hex(P[i].chip).substring(4).c_str());
     return nullptr;
   }
   // Wächter: {"on":true}
