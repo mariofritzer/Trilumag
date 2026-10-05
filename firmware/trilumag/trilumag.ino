@@ -146,6 +146,10 @@ struct Config {
   uint8_t bootMode = 0;     // nach Stromausfall: 0 wie vorher, 1 aus, 2 an, 3 Preset
   int8_t bootPreset = -1;
   bool syncOn = false;      // mit anderen Wänden im selben WLAN im Gleichtakt
+  uint8_t onAnim = 2;       // Einschalt-Animation: 0 aus, 1 langsam, 2 mittel, 3 schnell
+  bool touchWave = true;    // Welle über die Wand beim Antippen
+  uint16_t viewRot = 0;     // so hängt die Wand: Drehung in Grad (Vielfache von 30), wirkt in App und Effekten
+  bool viewMir = false;
   uint8_t syncGroup = 1;    // nur Wände derselben Gruppe (1 bis 9) laufen zusammen
   String mqttHost;
   uint16_t mqttPort = 1883;
@@ -693,6 +697,13 @@ const FxDef FX[] = {
   {"ausbreiten",  "Ausbreiten",      true},
   {"feuer",       "Feuer",           false},
   {"polarlicht",  "Polarlicht",      false},
+  {"lauflicht",   "Lauflicht",       true},
+  {"spirale",     "Spirale",         false},
+  {"gewitter",    "Gewitter",        false},
+  {"kerzen",      "Kerzenlicht",     false},
+  {"disco",       "Disco",           false},
+  {"komet",       "Komet",           true},
+  {"lava",        "Lava",            false},
 };
 const uint8_t FX_COUNT = sizeof(FX) / sizeof(FX[0]);
 
@@ -719,6 +730,14 @@ bool fxUsesColor() { return fx.id && (fx.pal == 2 || (fx.pal == 0 && FX[fx.id].c
 const uint32_t FX_FRAME_MS = 40;
 
 float fxPhase = 0, fxA[SLOTS * 3], fxB[SLOTS * 3], fxT[SLOTS * 3];   // Zustand pro Punkt (Panel oder Kante)
+float fxFlash = 0, fxFlashX = 0, fxFlashY = 0;      // Gewitter: aktueller Blitz
+int fxHead = 0; float fxStep = 0; int fxBeat = -1;  // Komet: Kopf; Disco: Takt
+// Wandansicht: so hängt die Wand wirklich (Drehung, Spiegelung). Effekte laufen danach links/rechts, oben/unten.
+void viewXY(float x, float y, float& rx, float& ry) {
+  float a = cfg.viewRot * 0.01745329f, c = cosf(a), s = sinf(a);
+  rx = x * c - y * s; ry = x * s + y * c;
+  if (cfg.viewMir) rx = -rx;
+}
 uint32_t fxLast = 0, fxDirtyAt = 0, fxLastFrame = 0;
 bool fxDirty = false;
 uint8_t TGT[SLOTS][3][4];       // Ziel pro Panel und Kante (Effekt oder feste Farbe), Helligkeit schon eingerechnet
@@ -795,10 +814,36 @@ void fxCompute() {
   fxPhase += dt * rate;
   if (fxPhase > 100000) fxPhase = 0;
 
-  float minX = 1e9, maxX = -1e9;
-  for (int i = 0; i < SLOTS; i++) if (P[i].used && P[i].attached) { minX = fminf(minX, P[i].x * 0.5f); maxX = fmaxf(maxX, P[i].x * 0.5f); }
+  float minX = 1e9, maxX = -1e9, minY = 1e9, maxY = -1e9;
+  for (int i = 0; i < SLOTS; i++) if (P[i].used && P[i].attached) {
+    float rx, ry; viewXY(P[i].x * 0.5f, P[i].y * 0.866f, rx, ry);
+    minX = fminf(minX, rx); maxX = fmaxf(maxX, rx); minY = fminf(minY, ry); maxY = fmaxf(maxY, ry);
+  }
   float spanX = fmaxf(1.0f, maxX - minX);
+  float cxW = (minX + maxX) / 2, cyW = (minY + maxY) / 2, maxR = fmaxf(1.0f, 0.5f * hypotf(maxX - minX, maxY - minY));
   const float TAU = 6.2831853f;
+  // Gewitter: Blitze kommen und klingen schnell ab
+  fxFlash = fmaxf(0, fxFlash - dt * rate * 5);
+  if (fx.id == 11 && frand() < dt * rate * (0.12f + 0.6f * fx.inten / 255.0f)) {
+    int n = 0, pick = 0; for (int i = 0; i < SLOTS; i++) if (P[i].used && P[i].attached && frand() * (++n) < 1) pick = i;
+    viewXY(P[pick].x * 0.5f, P[pick].y * 0.866f, fxFlashX, fxFlashY); fxFlash = 0.7f + 0.3f * frand();
+  }
+  // Komet: der Kopf wandert zu einem Nachbarn weiter
+  if (fx.id == 14) {
+    if (!P[fxHead].used || !P[fxHead].attached) fxHead = 0;
+    fxStep += dt * rate * 4;
+    while (fxStep >= 1) {
+      fxStep -= 1;
+      int cand[3], n = 0;
+      for (uint8_t e = 0; e < 3; e++) { int nx, ny; neighbor(P[fxHead].x, P[fxHead].y, worldDir(P[fxHead], e), nx, ny); int j = findAt(nx, ny); if (j >= 0 && fxA[j * 3] < 0.5f) cand[n++] = j; }
+      if (!n) for (uint8_t e = 0; e < 3; e++) { int nx, ny; neighbor(P[fxHead].x, P[fxHead].y, worldDir(P[fxHead], e), nx, ny); int j = findAt(nx, ny); if (j >= 0) cand[n++] = j; }
+      if (n) fxHead = cand[(int)(frand() * n) % n];
+      fxA[fxHead * 3] = 1;
+    }
+  }
+  if (fx.id == 14) for (int i = 0; i < SLOTS; i++) if (i != fxHead) fxA[i * 3] = fmaxf(0, fxA[i * 3] - dt * rate * (2.2f - 1.6f * fx.inten / 255.0f));
+  int beat = (int)(fxPhase * 2);                  // Disco: zweimal pro Takt neue Farben
+  bool newBeat = beat != fxBeat; fxBeat = beat;
 
   for (int i = 0; i < SLOTS; i++) {
     const Panel& p = P[i];
@@ -817,8 +862,9 @@ void fxCompute() {
       }
       float c[4] = {0, 0, 0, 0};
       int s = i * 3 + e;                                       // eigener Zufallszustand pro Punkt
-      float u = (p.x * 0.5f + dx - minX) / spanX;               // 0 links … 1 rechts
-      float v = p.y * 0.866f + dy;
+      float rx, ry; viewXY(p.x * 0.5f + dx, p.y * 0.866f + dy, rx, ry);
+      float u = (rx - minX) / spanX;                            // 0 links … 1 rechts (so wie die Wand hängt)
+      float v = ry;
       float depth = p.depth + dd;
       const float K = fx.inten / 255.0f;                       // Intensität 0..1
       switch (fx.id) {
@@ -860,6 +906,46 @@ void fxCompute() {
           pcol(fxPhase * 0.04f + u * 0.48f, c, D_AURORA);
           mul(c, 1 - (0.3f + 0.7f * K) * (1 - sv)); break;
         }
+        case 9: {                                              // Lauflicht: ein heller Streifen mit Schweif
+          float d = u - (fxPhase * 0.2f - floorf(fxPhase * 0.2f)); d -= floorf(d);
+          d = 1 - d;                                           // Abstand hinter dem Streifen
+          pcol(fxPhase * 0.02f, c, D_COLOR);
+          mul(c, 0.03f + 0.97f * expf(-d * (3 + 14 * K))); break;
+        }
+        case 10: {                                             // Spirale um die Mitte der Wand
+          float a = atan2f(v - cyW, rx - cxW) / TAU, r = hypotf(rx - cxW, v - cyW) / maxR;
+          pcol(a + fxPhase * 0.08f + r * (0.2f + 1.2f * K), c, D_HUE); break;
+        }
+        case 11: {                                             // Gewitter: dunkelblau, Blitze in der Nähe eines Panels
+          float d2 = (rx - fxFlashX) * (rx - fxFlashX) + (v - fxFlashY) * (v - fxFlashY);
+          float f = fxFlash * expf(-d2 / (1.5f + 3 * K)) * (0.7f + 0.3f * frand());
+          if (fx.pal) { pcol(0.1f, c, D_COLOR); mul(c, 0.12f); } else { c[0] = 2; c[1] = 6; c[2] = 34; }
+          c[0] += 170 * f; c[1] += 170 * f; c[2] += 255 * f; c[3] += 255 * f; break;
+        }
+        case 12: {                                             // Kerzenlicht: warm, ruhig flackernd
+          fxA[s] += (frand() - fxA[s]) * fminf(1, dt * rate * 6);
+          fxB[s] += (fxA[s] - fxB[s]) * fminf(1, dt * rate * 3);
+          float h = 1 - (0.15f + 0.5f * K) * (1 - fxB[s]);
+          if (fx.pal == 0) { c[0] = 255 * h; c[1] = 105 * h * h; c[2] = 12 * h; c[3] = 70 * h * h; }
+          else { pcol(fxB[s] * 0.3f, c, D_FIRE); mul(c, h); }
+          break;
+        }
+        case 13: {                                             // Disco: im Takt neue Farben
+          if (newBeat && frand() < 0.3f + 0.7f * K) fxA[s] = frand();
+          pcol(fxA[s], c, D_HUE); break;
+        }
+        case 14: {                                             // Komet: heller Kopf, der durch die Wand wandert
+          float b = fxA[i * 3];
+          pcol(fxPhase * 0.03f, c, D_COLOR);
+          mul(c, 0.02f + 0.98f * b * b);
+          if (i == fxHead) c[3] = fminf(255, c[3] + 120);
+          break;
+        }
+        case 15: {                                             // Lava: langsam fließende Blasen
+          float sv = 0.5f + 0.5f * sinf(u * 4.0f + fxPhase * 0.35f + 1.5f * sinf(v * 1.8f - fxPhase * 0.25f));
+          pcol(sv * 0.5f + fxPhase * 0.02f, c, D_FIRE);
+          mul(c, 0.2f + 0.8f * powf(sv, 1 + 2 * K)); break;
+        }
       }
       float k = p.on ? masterK() / 255.0f : 0;
       for (int ch = 0; ch < 4; ch++) TGT[i][e][ch] = (uint8_t)fminf(255, fmaxf(0, c[ch] * k));
@@ -879,6 +965,24 @@ bool transOn = false;
 bool outForce = true, testMode = false;
 float powerScale = 1, measScale = 1;
 float sleepScale = 1;                     // Sleep-Timer: blendet zum Ende hin aus
+// Wellen beim Antippen: laufen vom angetippten Panel als Ring über die Wand
+struct Ripple { uint32_t t0; float x, y; };
+Ripple ripples[3];
+const float RIPPLE_SPEED = 4.5f;          // Panels pro Sekunde
+// Einschalt-Animation: Panel für Panel vom Hauptpanel nach außen
+uint32_t onAnimAt = 0; bool lastMasterOn = false;
+const uint16_t ON_STEP[4] = {0, 420, 210, 90}, ON_FADE[4] = {0, 600, 350, 180};   // ms je Abstand und Einblenddauer
+bool overlayActive() {
+  uint32_t now = millis();
+  for (const Ripple& r : ripples) if (r.t0 && now - r.t0 < 4000) return true;
+  return onAnimAt && now - onAnimAt < 6000;
+}
+void addRipple(int i) {
+  if (!cfg.touchWave || i < 0 || i >= SLOTS) return;
+  int k = 0; for (int j = 1; j < 3; j++) if (ripples[j].t0 < ripples[k].t0) k = j;
+  ripples[k].t0 = millis() | 1; ripples[k].x = P[i].x * 0.5f; ripples[k].y = P[i].y * 0.866f;
+  fxLastFrame = 0;
+}
 uint32_t estMa = 0;                       // geschätzter Strom aller LEDs und Panels in mA (bei 24 V)
 const uint8_t SEG_PER_PANEL = 3;          // LED-Segmente pro Panel (eins pro Kante)
 const uint16_t IDLE_PANEL_MA = 12, IDLE_MAIN_MA = 25;
@@ -913,6 +1017,36 @@ void computeTargets() {
     uint32_t k = p.on ? (uint32_t)p.bri * master : 0;
     uint8_t c[4] = {(uint8_t)(p.r * k / 65025), (uint8_t)(p.g * k / 65025), (uint8_t)(p.b * k / 65025), (uint8_t)(p.w * k / 65025)};
     for (int e = 0; e < 3; e++) memcpy(TGT[i][e], c, 4);
+  }
+  // Einschalt-Animation: beim Einschalten leuchten die Panels der Reihe nach auf, nach Abstand zum Hauptpanel
+  if (masterOn && !lastMasterOn && cfg.onAnim) { onAnimAt = now | 1; transOn = false; }
+  lastMasterOn = masterOn;
+  if (onAnimAt) {
+    uint32_t t = now - onAnimAt; bool done = true;
+    for (int i = 0; i < SLOTS; i++) {
+      if (!P[i].used || !P[i].attached || isPulse[i]) continue;
+      int32_t local = (int32_t)t - (int32_t)P[i].depth * ON_STEP[cfg.onAnim];
+      float k = local <= 0 ? 0 : fminf(1, (float)local / ON_FADE[cfg.onAnim]);
+      if (k < 1) { done = false; k = k * k * (3 - 2 * k); for (int e = 0; e < 3; e++) for (int c = 0; c < 4; c++) TGT[i][e][c] = (uint8_t)(TGT[i][e][c] * k); }
+    }
+    if (done || !masterOn) onAnimAt = 0;
+  }
+  // Wellen beim Antippen: heller Ring, der sich ausbreitet und dabei verblasst
+  for (Ripple& r : ripples) {
+    if (!r.t0) continue;
+    float t = (now - r.t0) / 1000.0f, rad = t * RIPPLE_SPEED;
+    if (t > 3.5f) { r.t0 = 0; continue; }
+    float fade = 1 - t / 3.5f;
+    for (int i = 0; i < SLOTS; i++) {
+      if (!P[i].used || !P[i].attached || P[i].state == DARK) continue;
+      float d = hypotf(P[i].x * 0.5f - r.x, P[i].y * 0.866f - r.y);
+      float a = expf(-(d - rad) * (d - rad) / 0.35f) * fade;
+      if (a < 0.02f) continue;
+      for (int e = 0; e < 3; e++) {
+        TGT[i][e][0] = (uint8_t)fminf(255, TGT[i][e][0] + 90 * a); TGT[i][e][1] = (uint8_t)fminf(255, TGT[i][e][1] + 90 * a);
+        TGT[i][e][2] = (uint8_t)fminf(255, TGT[i][e][2] + 110 * a); TGT[i][e][3] = (uint8_t)fminf(255, TGT[i][e][3] + 230 * a);
+      }
+    }
   }
   // Stromlimit: Strom schätzen und bei Bedarf alles gleichmäßig dunkler machen (wie WLED)
   uint32_t led = 0, idle = 0;
@@ -1463,6 +1597,7 @@ void touchEvent(int i, uint8_t kind) {
   if (i < 0 || i >= SLOTS || !P[i].used || !P[i].attached || kind < 1 || kind > 2) return;
   String id = hex(P[i].chip);
   uint8_t a = kind == 2 ? cfg.tapA2 : cfg.tapA1;
+  addRipple(i);
   diag("%s %s angetippt: %s", i ? ("Panel " + id.substring(4)).c_str() : "Hauptpanel", kind == 2 ? "doppelt" : "einmal", TAP_NAMES[a < TA_COUNT ? a : 0]);
   JsonDocument c;
   switch (a) {
@@ -1623,6 +1758,9 @@ void loadConfig() {
   cfg.bootMode = prefs.getUChar("bootMode", 0); if (cfg.bootMode > 3) cfg.bootMode = 0;
   cfg.bootPreset = (int8_t)prefs.getChar("bootPre", -1);
   cfg.syncOn = prefs.getBool("syncOn", false);
+  cfg.onAnim = prefs.getUChar("onAnim", 2); if (cfg.onAnim > 3) cfg.onAnim = 2;
+  cfg.touchWave = prefs.getBool("tWave", true);
+  cfg.viewRot = prefs.getUShort("viewRot", 0) % 360; cfg.viewMir = prefs.getBool("viewMir", false);
   cfg.syncGroup = constrain((int)prefs.getUChar("syncGrp", 1), 1, 9);
   if (!cfg.name.length()) cfg.name = "Trilumag";
 }
@@ -1648,7 +1786,7 @@ String configJson() {
   for (size_t i = 0; i < VALID_COUNT; i++) vp.add(VALID_PINS[i]);
   d["order"] = cfg.order;
   JsonObject li = d["light"].to<JsonObject>();
-  li["trans"] = cfg.transMs; li["pwrMax"] = cfg.pwrMax; li["pwrCh"] = cfg.pwrCh;
+  li["trans"] = cfg.transMs; li["onAnim"] = cfg.onAnim; li["pwrMax"] = cfg.pwrMax; li["pwrCh"] = cfg.pwrCh;
   li["sda"] = cfg.i2cSda; li["scl"] = cfg.i2cScl; li["shunt"] = cfg.shuntUo; li["sensor"] = ina::ok;
   { int8_t a, b; i2cDefault(cfg.board.c_str(), a, b); li["defSda"] = a; li["defScl"] = b; }
   JsonArray os = d["orders"].to<JsonArray>();
@@ -1657,7 +1795,7 @@ String configJson() {
   m["on"] = cfg.mqttOn; m["host"] = cfg.mqttHost; m["port"] = cfg.mqttPort; m["user"] = cfg.mqttUser; m["hasPass"] = cfg.mqttPass.length() > 0;
   JsonObject bo = d["boot"].to<JsonObject>(); bo["mode"] = cfg.bootMode; bo["preset"] = cfg.bootPreset;
   JsonObject t = d["touch"].to<JsonObject>();
-  t["on"] = cfg.touchOn; t["sens"] = cfg.touchSens; t["a1"] = cfg.tapA1; t["a2"] = cfg.tapA2;
+  t["on"] = cfg.touchOn; t["sens"] = cfg.touchSens; t["a1"] = cfg.tapA1; t["a2"] = cfg.tapA2; t["wave"] = cfg.touchWave;
   JsonArray tn = t["actions"].to<JsonArray>();
   for (const char* n : TAP_NAMES) tn.add(n);
   String out; serializeJson(d, out); return out;
@@ -1668,6 +1806,7 @@ String stateJson(bool meta) {
   JsonDocument d;
   d["sim"] = !cfg.bus;
   d["name"] = cfg.name;
+  { JsonObject vw = d["view"].to<JsonObject>(); vw["rot"] = cfg.viewRot; vw["mir"] = cfg.viewMir; }
   if (sleepEnd) d["sleep"] = (sleepLeft() + 999) / 1000;
   d["max"] = MAX_ATTACHED;
   d["mqtt"] = mqtt.connected();
@@ -1789,7 +1928,7 @@ void wsLoop() {
     if (wsForce || s != wsLast) { ws::broadcast("{\"t\":\"state\",\"d\":" + s + "}"); wsLast = s; }
     wsForce = false;
   }
-  if (fx.id && now - wsLastLive >= 66) {        // Effektbild etwa 15-mal pro Sekunde
+  if ((fx.id || overlayActive()) && now - wsLastLive >= 66) {        // Effektbild etwa 15-mal pro Sekunde (auch bei Wellen und Einschalt-Animation)
     wsLastLive = now;
     ws::broadcast("{\"t\":\"live\",\"d\":" + liveJson() + "}");
   }
@@ -1927,6 +2066,7 @@ String backupJson() {
   JsonObject t = c["touch"].to<JsonObject>();
   t["on"] = cfg.touchOn; t["sens"] = cfg.touchSens; t["a1"] = cfg.tapA1; t["a2"] = cfg.tapA2;
   c["pAuto"] = cfg.panelAuto; c["zbOn"] = cfg.zbOn; c["name"] = cfg.name;
+  c["onAnim"] = cfg.onAnim; c["tWave"] = cfg.touchWave; c["viewRot"] = cfg.viewRot; c["viewMir"] = cfg.viewMir;
   c["bootMode"] = cfg.bootMode; c["bootPre"] = cfg.bootPreset; c["syncOn"] = cfg.syncOn; c["syncGrp"] = cfg.syncGroup;
   JsonObject lh = d["lit"].to<JsonObject>();
   for (int i = 0; i < SLOTS; i++) if (P[i].used && P[i].litSec) lh[hex(P[i].chip)] = P[i].litSec;
@@ -1987,6 +2127,8 @@ const char* restoreBackup(JsonDocument& d) {
     prefs.putBool("pAuto", c["pAuto"] | true);
     if (HAS_ZIGBEE) prefs.putBool("zbOn", c["zbOn"] | false);
     if (c["name"].is<const char*>() && strlen(c["name"]) > 0) prefs.putString("name", (const char*)c["name"]);
+    prefs.putUChar("onAnim", c["onAnim"] | 2); prefs.putBool("tWave", c["tWave"] | true);
+    prefs.putUShort("viewRot", c["viewRot"] | 0); prefs.putBool("viewMir", c["viewMir"] | false);
     prefs.putUChar("bootMode", c["bootMode"] | 0); prefs.putChar("bootPre", c["bootPre"] | -1);
     prefs.putBool("syncOn", c["syncOn"] | false); prefs.putUChar("syncGrp", c["syncGrp"] | 1);
   }
@@ -2453,6 +2595,7 @@ const char* apiCall(const char* path, JsonDocument& d) {
   // Licht-Einstellungen ohne Neustart: {"trans":700,"pwrMax":5000,"pwrCh":12}
   if (!strcmp(path, "/api/light")) {
     if (d["trans"].is<int>()) { cfg.transMs = constrain(d["trans"].as<int>(), 0, 10000); prefs.putUShort("trans", cfg.transMs); }
+    if (d["onAnim"].is<int>()) { cfg.onAnim = constrain(d["onAnim"].as<int>(), 0, 3); prefs.putUChar("onAnim", cfg.onAnim); }
     if (d["pwrMax"].is<int>()) { cfg.pwrMax = constrain(d["pwrMax"].as<int>(), 0, 60000); prefs.putUShort("pwrMax", cfg.pwrMax); measScale = 1; }
     if (d["pwrCh"].is<int>()) { cfg.pwrCh = constrain(d["pwrCh"].as<int>(), 1, 100); prefs.putUChar("pwrCh", cfg.pwrCh); }
     if (d["sda"].is<int>() || d["scl"].is<int>() || d["shunt"].is<int>()) {   // Stromsensor, gilt sofort
@@ -2501,6 +2644,7 @@ const char* apiCall(const char* path, JsonDocument& d) {
     if (d["sens"].is<int>()) { cfg.touchSens = constrain(d["sens"].as<int>(), 1, 10); prefs.putUChar("tSens", cfg.touchSens); }
     if (d["a1"].is<int>() && d["a1"].as<int>() >= 0 && d["a1"].as<int>() < TA_COUNT) { cfg.tapA1 = d["a1"]; prefs.putUChar("tA1", cfg.tapA1); }
     if (d["a2"].is<int>() && d["a2"].as<int>() >= 0 && d["a2"].as<int>() < TA_COUNT) { cfg.tapA2 = d["a2"]; prefs.putUChar("tA2", cfg.tapA2); }
+    if (d["wave"].is<bool>()) { cfg.touchWave = d["wave"]; prefs.putBool("tWave", cfg.touchWave); }
     if (cfg.bus) bus::sendTouch(bus::ALL);
     return nullptr;
   }
@@ -2515,6 +2659,12 @@ const char* apiCall(const char* path, JsonDocument& d) {
     }
     if (strcmp(a, "all") && strcmp(a, "one")) return "Unbekannte Aktion";
     return n ? nullptr : "Kein Panel braucht ein Update";
+  }
+  // Ansicht: {"rot":60,"mir":false} so hängt die Wand
+  if (!strcmp(path, "/api/view")) {
+    if (d["rot"].is<int>()) { cfg.viewRot = ((d["rot"].as<int>() % 360 + 360) % 360) / 30 * 30; prefs.putUShort("viewRot", cfg.viewRot); }
+    if (d["mir"].is<bool>()) { cfg.viewMir = d["mir"]; prefs.putBool("viewMir", cfg.viewMir); }
+    return nullptr;
   }
   // Panel finden: {"id":"…"} blinkt 3 s weiß
   if (!strcmp(path, "/api/identify")) {
@@ -2608,7 +2758,7 @@ const char* apiCall(const char* path, JsonDocument& d) {
 
 // aktuelles Effektbild, damit die App mitleuchtet
 String liveJson() {
-  String out = "{\"fx\":\""; out += FX[fx.id].id; out += "\",\"c\":{";
+  String out = "{\"fx\":\""; out += FX[fx.id].id; out += overlayActive() ? "\",\"ov\":1,\"c\":{" : "\",\"c\":{";
   bool first = true;
   for (int i = 0; i < SLOTS; i++) {
     if (!P[i].used || !P[i].attached) continue;
@@ -2655,7 +2805,7 @@ void setupWeb() {
   server.on("/api/state", HTTP_GET, replyState);
   server.on("/api/energy", HTTP_GET, [] { server.send(200, "application/json", energyJson()); });
   // Befehle laufen über apiCall(), damit HTTP und WebSocket dasselbe tun
-  const char* cmds[] = {"/api/set", "/api/presets", "/api/effect", "/api/test", "/api/ota", "/api/light", "/api/diag", "/api/touch", "/api/panelfw", "/api/zigbee", "/api/name", "/api/identify", "/api/sleep", "/api/boot", "/api/energy", "/api/sync",
+  const char* cmds[] = {"/api/set", "/api/presets", "/api/effect", "/api/test", "/api/ota", "/api/light", "/api/diag", "/api/touch", "/api/panelfw", "/api/zigbee", "/api/name", "/api/identify", "/api/view", "/api/sleep", "/api/boot", "/api/energy", "/api/sync",
                         "/api/sim/new", "/api/sim/attach", "/api/sim/detach", "/api/sim/tap"};
   for (const char* path : cmds) {
     server.on(path, HTTP_POST, [path] {

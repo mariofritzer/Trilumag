@@ -273,6 +273,7 @@ nav.tabs button.on{color:var(--acc)}
       <div class="sw8" id="swatches"></div>
     </div>
     <div class="wall" id="bigBox"><svg id="big" aria-label="Wand mit Panels"></svg><div class="hint" id="bigHint"></div></div>
+    <div class="btnrow" id="viewRow"><span class="note">Ansicht wie an der Wand:</span><button class="btn" id="viewL" aria-label="nach links drehen">↺</button><button class="btn" id="viewR" aria-label="nach rechts drehen">↻</button><button class="btn" id="viewMir">Spiegeln</button><span class="note" id="viewT"></span></div>
     <div class="card" id="panelCard">
       <h3 id="pTitle">Panel</h3>
       <div class="kv" id="pInfo"></div>
@@ -324,6 +325,8 @@ nav.tabs button.on{color:var(--acc)}
       <h3>Licht</h3>
       <div class="sl">Übergänge<input type="range" id="ltrans" min="0" max="50" value="7"><output id="ltranso">0,7 s</output></div>
       <p class="note">So lange blenden Farb-, Preset-, Effekt- und Ein/Aus-Wechsel weich über. 0 = sofort.</p>
+      <label class="f">Einschalt-Animation<select id="onAnim"><option value="0">aus</option><option value="1">langsam</option><option value="2">mittel</option><option value="3">schnell</option></select></label>
+      <p class="note">Beim Einschalten leuchten die Panels der Reihe nach auf, vom Hauptpanel nach außen.</p>
       <div class="pins">
         <label class="f">Nach Stromausfall<select id="bootMode"><option value="0">wie vorher</option><option value="1">aus</option><option value="2">an</option><option value="3">Preset …</option></select></label>
         <label class="f" id="bootPreBox" hidden>Preset<select id="bootPre"></select></label>
@@ -364,6 +367,7 @@ nav.tabs button.on{color:var(--acc)}
       <h3>Antippen</h3>
       <label class="tog"><input type="checkbox" id="tOn"><span class="sw"></span>Panels reagieren auf Antippen</label>
       <div id="tBox">
+        <label class="tog"><input type="checkbox" id="tWave"><span class="sw"></span>Welle über die Wand beim Antippen</label>
         <div class="sl">Empfindlichkeit<input type="range" id="tSens" min="1" max="10" value="5"><output id="tSenso">5</output></div>
         <div class="pins">
           <label class="f">Einmal antippen<select id="tA1"></select></label>
@@ -499,7 +503,9 @@ function wsConnect(){
   sock.onopen=()=>{wsOk=true;render();};
   sock.onmessage=e=>{let m;try{m=JSON.parse(e.data);}catch(x){return;}
     if(m.t==='state'){takeState(m.d);if(!drag)render();}
-    else if(m.t==='live'){if(m.d.fx!=='aus'){live=m.d.c;joining=m.d.j||[];if(!drag)paintLive();}}
+    else if(m.t==='live'){if(m.d.fx!=='aus'||m.d.ov){live=m.d.c;joining=m.d.j||[];
+      if(m.d.ov&&!fxOn()){const was=Date.now()<liveOvUntil;liveOvUntil=Date.now()+400;clearTimeout(ovTimer);ovTimer=setTimeout(()=>{live={};if(!drag)render();},450);if(!was&&!drag){render();return;}}
+      if(!drag)paintLive();}}
     else if(m.t==='ota'){otaInfo=m.d;renderOta();}
     else if(m.t==='otap'){if(otaInfo){otaInfo.busy=true;otaInfo.p=m.p;renderOta();}}
     else if(m.t==='otadone'){toast('Version '+m.v+' installiert, Trilumag startet neu …');setTimeout(()=>location.reload(),9000);}
@@ -526,6 +532,8 @@ async function api(path,body){
 async function poll(){if(wsOk||drag||inflight)return;if(fxOn()&&Date.now()-lastState<2000)return;
   inflight=true;try{await api('/api/state');lastState=Date.now();render();}catch(e){$('status').textContent='keine Verbindung zum ESP32';}inflight=false;}
 function fxOn(){return st&&st.fx&&st.fx.id!=='aus';}
+let liveOvUntil=0,ovTimer=0;                            // Wellen und Einschalt-Animation kommen auch ohne Effekt als Live-Bild
+function liveOn(){return fxOn()||Date.now()<liveOvUntil;}
 async function pollLive(){
   if(wsOk||!fxOn()||drag||document.hidden||inflight)return;inflight=true;
   try{const j=await (await fetch('/api/live')).json();if(j.fx!=='aus'){live=j.c;joining=j.j||[];paintLive();}}catch(e){}
@@ -542,7 +550,10 @@ document.querySelectorAll('#tabs button').forEach(b=>b.addEventListener('click',
 document.querySelectorAll('[data-go]').forEach(b=>b.addEventListener('click',()=>showTab(b.dataset.go)));
 
 // ---------- Wand ----------
-function geom(x,y,up){const cx=x*S/2,t=y*H;const p=up?[[cx-S/2,t+H],[cx+S/2,t+H],[cx,t]]:[[cx-S/2,t],[cx+S/2,t],[cx,t+H]];return{p,c:[cx,up?t+2*H/3:t+H/3]};}
+// Ansicht: so hängt die Wand wirklich (Drehung in 30°-Schritten, Spiegeln); gilt auch für die Effekte
+function vw(q){const v=st&&st.view;if(!v||(!v.rot&&!v.mir))return q;const a=v.rot*Math.PI/180,c=Math.cos(a),s=Math.sin(a);
+  let x=q[0]*c-q[1]*s;const y=q[0]*s+q[1]*c;if(v.mir)x=-x;return[x,y];}
+function geom(x,y,up){const cx=x*S/2,t=y*H;const p=up?[[cx-S/2,t+H],[cx+S/2,t+H],[cx,t]]:[[cx-S/2,t],[cx+S/2,t],[cx,t+H]];return{p:p.map(vw),c:vw([cx,up?t+2*H/3:t+H/3])};}
 function shrink(g,k){return g.p.map(q=>[g.c[0]+(q[0]-g.c[0])*k,g.c[1]+(q[1]-g.c[1])*k]);}
 function pts(a){return a.map(q=>q[0].toFixed(1)+','+q[1].toFixed(1)).join(' ');}
 function edge1Mid(p){const g=geom(p.x,p.y,p.up);const L=p.up?['B','R','L']:['T','L','R'];const d=L[(p.rot)%3];const [a,b,c]=g.p;
@@ -575,10 +586,10 @@ function drawWall(svg,big){
     let fill=null;
     if(p.state===0)cls.push('dark');
     else if(fxOn()&&joining.includes(p.id))cls.push('pulse');
-    else if(fxOn()&&live[p.id])fill=st.on?liveCol(live[p.id]):'#141414';
+    else if(liveOn()&&live[p.id])fill=liveCol(live[p.id]);
     else if(p.state===1&&st.on)cls.push('pulse');
     else fill=staticCol(p);
-    const lv=fxOn()&&live[p.id]&&!joining.includes(p.id)&&live[p.id].includes(',')?live[p.id].split(','):null;
+    const lv=liveOn()&&live[p.id]&&!joining.includes(p.id)&&live[p.id].includes(',')?live[p.id].split(','):null;
     if(lv&&p.state!==0){                                  // Kanten einzeln: drei Teildreiecke
       const sh=shrink(g,.94);fan(p,sh,g.c).forEach((tri,e)=>{const q=el('polygon',{points:pts(tri),class:cls.filter(c=>c!=='sel').join(' ')+' part'});
         q.style.fill=st.on?liveCol(lv[e]):'#141414';q.dataset.id=p.id;q.dataset.e=e;gP.append(q);});
@@ -588,7 +599,8 @@ function drawWall(svg,big){
     poly.dataset.id=p.id;if(cls.includes('pulse'))syncPulse(poly);gP.append(poly);}
     if(big){
       if(!p.main){const m=edge1Mid(p);gP.append(el('circle',{cx:m[0],cy:m[1],r:2.4,class:'edge1'}));}
-      else{const a=g.p[0],b=g.p[1];gP.append(el('line',{x1:a[0]+8,y1:a[1]+5,x2:b[0]-8,y2:b[1]+5,stroke:'#777','stroke-width':3,'stroke-linecap':'round'}));}
+      else{const a=g.p[0],b=g.p[1],mx=(a[0]+b[0])/2,my=(a[1]+b[1])/2;let ox=mx-g.c[0],oy=my-g.c[1];const L=Math.hypot(ox,oy)||1;ox=ox/L*5;oy=oy/L*5;   // Strich außen an der Unterkante des Hauptpanels
+        const tx=(b[0]-a[0])*.12,ty=(b[1]-a[1])*.12;gP.append(el('line',{x1:a[0]+tx+ox,y1:a[1]+ty+oy,x2:b[0]-tx+ox,y2:b[1]-ty+oy,stroke:'#777','stroke-width':3,'stroke-linecap':'round'}));}
       const t=el('text',{x:g.c[0],y:g.c[1]+3,class:'lbl'+(lightish(p)?' dk':'')});t.textContent=p.main?'Haupt':p.id.slice(4);gP.append(t);
     }
   });
@@ -758,7 +770,7 @@ $('master').addEventListener('input',()=>{if(!st)return;const p=+$('master').val
 
 // ---------- Tab Wand ----------
 function renderWall(){
-  drawWall($('big'),true);renderEdges();
+  drawWall($('big'),true);renderEdges();renderView();
   const tray=$('tray');tray.innerHTML='';
   if(!st.loose.length){const e=document.createElement('span');e.className='note';e.textContent=st.sim?'Leer. Mit „Neues Panel“ eins dazunehmen oder ein Panel von der Wand hierher ziehen.':'Abgeklipste Panels erscheinen hier.';tray.append(e);}
   st.loose.forEach(id=>{const d=document.createElement('div');d.className='item';
@@ -842,6 +854,7 @@ async function loadCfg(){
   PIN_KEYS.forEach(k=>{const s=$('p_'+k);s.innerHTML='';cfg.validPins.forEach(p=>{const o=document.createElement('option');o.value=p;o.textContent='GPIO '+p;s.append(o);});s.value=cfg.pins[k];});
   $('order').innerHTML='';cfg.orders.forEach(o=>{const e=document.createElement('option');e.value=o;e.textContent=o;$('order').append(e);});$('order').value=cfg.order;
   const L=cfg.light||{};
+  $('onAnim').value=L.onAnim??2;
   $('lpwrOn').checked=L.pwrMax>0;$('lpwrBox').classList.toggle('off',!(L.pwrMax>0));
   $('lpwrMax').value=L.pwrMax?(L.pwrMax/1000).toLocaleString('de-AT'):'';$('lpwrCh').value=L.pwrCh||12;
   ['sda','scl'].forEach(k=>{const s=$('p_'+k);s.innerHTML='<option value="-1">kein Sensor</option>';const def=k==='sda'?L.defSda:L.defScl;
@@ -850,7 +863,7 @@ async function loadCfg(){
   sensDef=L.defSda>=0?`★ = Vorgabe für dein Board: SDA GPIO ${L.defSda}, SCL GPIO ${L.defScl}. `:'';
   renderSensor(L.sda,L.sensor);
   renderBoot();
-  if(cfg.touch){const T=cfg.touch;$('tOn').checked=T.on;setRange('tSens',T.sens);$('tSenso').textContent=T.sens;
+  if(cfg.touch){const T=cfg.touch;$('tOn').checked=T.on;$('tWave').checked=T.wave!==false;setRange('tSens',T.sens);$('tSenso').textContent=T.sens;
     ['tA1','tA2'].forEach((k,n)=>{const s=$(k);s.innerHTML='';T.actions.forEach((a,i)=>{const o=document.createElement('option');o.value=i;o.textContent=a;s.append(o);});s.value=n?T.a2:T.a1;});
     renderTouch();}
   $('m_on').checked=!!cfg.mqtt.on;$('mqttFields').classList.toggle('off',!cfg.mqtt.on);$('m_host').value=cfg.mqtt.host;$('m_port').value=cfg.mqtt.port;$('m_user').value=cfg.mqtt.user;
@@ -936,9 +949,9 @@ function renderTouch(){
   $('tNote').textContent=(st.sim?'In der Simulation probierst du es unter Wand aus: Panel antippen, dann „einmal“ oder „doppelt“. ':
     ps.length?`${n} von ${ps.length} Panels haben einen Bewegungssensor. `:'')+'In Home Assistant gibt es dazu das Ereignis „Antippen“ für eigene Automationen.';
 }
-function saveTouch(){renderTouch();later('touch',()=>api('/api/touch',{on:$('tOn').checked,sens:+$('tSens').value,a1:+$('tA1').value,a2:+$('tA2').value}).then(()=>{
+function saveTouch(){renderTouch();later('touch',()=>api('/api/touch',{on:$('tOn').checked,wave:$('tWave').checked,sens:+$('tSens').value,a1:+$('tA1').value,a2:+$('tA2').value}).then(()=>{
   if(cfg&&cfg.touch)Object.assign(cfg.touch,{on:$('tOn').checked,sens:+$('tSens').value,a1:+$('tA1').value,a2:+$('tA2').value});}));}
-$('tOn').addEventListener('change',saveTouch);
+$('tOn').addEventListener('change',saveTouch);$('tWave').addEventListener('change',saveTouch);
 $('tSens').addEventListener('input',()=>{$('tSenso').textContent=$('tSens').value;saveTouch();});
 ['tA1','tA2'].forEach(k=>$(k).addEventListener('change',saveTouch));
 
@@ -1097,6 +1110,15 @@ function renderSync(){const y=st&&st.sync;if(!y)return;
   l.hidden=!rows.length;$('syncGrp').closest('label').classList.toggle('off',!y.on);}
 $('syncOn').addEventListener('change',async()=>{const v=$('syncOn').checked;if(await api('/api/sync',{on:v,group:+$('syncGrp').value}))toast(v?'Gleichtakt an: andere Wände der Gruppe laufen mit':'Gleichtakt aus');});
 $('syncGrp').addEventListener('change',()=>api('/api/sync',{group:+$('syncGrp').value}));
+
+$('onAnim').addEventListener('change',async()=>{if(await api('/api/light',{onAnim:+$('onAnim').value})){if(cfg&&cfg.light)cfg.light.onAnim=+$('onAnim').value;toast('Gespeichert');}});
+
+// ---------- Ansicht drehen und spiegeln ----------
+function renderView(){const v=st&&st.view;if(!v)return;$('viewT').textContent=`${v.rot}°${v.mir?' · gespiegelt':''}`;$('viewMir').classList.toggle('pri',!!v.mir);}
+async function setView(b){Object.assign(st.view,b);render();await api('/api/view',b);}
+$('viewL').addEventListener('click',()=>setView({rot:(st.view.rot+330)%360}));
+$('viewR').addEventListener('click',()=>setView({rot:(st.view.rot+30)%360}));
+$('viewMir').addEventListener('click',()=>setView({mir:!st.view.mir}));
 
 function ago(s){return s<60?`vor ${s} s`:s<3600?`vor ${Math.round(s/60)} min`:`vor ${Math.round(s/3600)} h`;}
 async function loadDiag(){try{diagData=await (await fetch('/api/diag')).json();renderDiag();if(tab==='wall')renderWall();}catch(e){}}
