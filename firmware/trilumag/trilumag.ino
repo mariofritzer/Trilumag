@@ -115,6 +115,7 @@ struct Panel {
   uint8_t touchSeq = 0; bool touchKnown = false;
   uint8_t upd = 0, updPct = 0, updFails = 0;   // Panel-Update: 0 nichts, 1 wartet, 2 läuft, 3 fehlgeschlagen
   uint32_t identUntil = 0;          // Panel finden: blinkt bis hierher weiß
+  int8_t swapFrom = -1; uint32_t swapUntil = 0;   // neu an der Stelle eines abgeklipsten Panels: Einstellungen übernehmen?
   uint32_t litSec = 0, litSaved = 0;   // Betriebsstunden: so lange hat das Panel insgesamt geleuchtet (s)
   bool edges = false;               // Kanten einzeln: Effekte bekommen drei Farben pro Panel
   uint8_t state = DARK;
@@ -146,6 +147,7 @@ struct Config {
   uint8_t bootMode = 0;     // nach Stromausfall: 0 wie vorher, 1 aus, 2 an, 3 Preset
   int8_t bootPreset = -1;
   bool syncOn = false;      // mit anderen Wänden im selben WLAN im Gleichtakt
+  bool guard = true;        // Wächter: WLAN weg oder Hauptschleife hängt → neu verbinden bzw. neu starten
   uint8_t onAnim = 2;       // Einschalt-Animation: 0 aus, 1 langsam, 2 mittel, 3 schnell
   bool touchWave = true;    // Welle über die Wand beim Antippen
   uint16_t viewRot = 0;     // so hängt die Wand: Drehung in Grad (Vielfache von 30), wirkt in App und Effekten
@@ -227,6 +229,13 @@ void diag(const char* fmt, ...) {
   e.t = millis(); strncpy(e.m, b, sizeof e.m - 1); e.m[sizeof e.m - 1] = 0;
   diagHead = (diagHead + 1) % DIAG_N; if (diagCount < DIAG_N) diagCount++;
 }
+
+// Neustart-Grund: überlebt einen Software-Neustart im RTC-Speicher
+RTC_NOINIT_ATTR uint32_t rstMagic, rstCode;
+enum RstCode : uint8_t { R_NONE, R_UPDATE, R_APP, R_WLAN, R_HANG };
+void restartWith(uint8_t code) { rstMagic = 0x7121A600; rstCode = code; ESP.restart(); }
+String bootReason;                         // lesbar für Diagnose und Info
+uint32_t loopBeat = 0;
 
 void saveWifi(const String& ss, const String& pw);
 void wifiStart(const String& ss, const String& pw, uint32_t timeout, bool fromImprov);
@@ -704,6 +713,7 @@ const FxDef FX[] = {
   {"disco",       "Disco",           false},
   {"komet",       "Komet",           true},
   {"lava",        "Lava",            false},
+  {"verlauf",     "Farbverlauf",     true},
 };
 const uint8_t FX_COUNT = sizeof(FX) / sizeof(FX[0]);
 
@@ -733,6 +743,8 @@ float fxPhase = 0, fxA[SLOTS * 3], fxB[SLOTS * 3], fxT[SLOTS * 3];   // Zustand 
 float fxFlash = 0, fxFlashX = 0, fxFlashY = 0;      // Gewitter: aktueller Blitz
 int fxHead = 0; float fxStep = 0; int fxBeat = -1;  // Komet: Kopf; Disco: Takt
 uint16_t fxDir = 0;            // Richtung der Effekte in Grad (Lauflicht, Wellen, Lava …)
+uint8_t fxC2[4] = {0, 80, 255, 0};   // zweite Farbe für den Farbverlauf
+uint32_t fxFavs = 0;                 // Favoriten: Bit pro Effekt
 uint8_t fxSpin = 0;            // Richtung dreht sich: 0 nein, 1 langsam, 2 schnell
 float fxSpinAng = 0;
 float fxAng = 0;               // aktueller Winkel (Richtung + Drehung), pro Bild berechnet
@@ -951,6 +963,15 @@ void fxCompute() {
           pcol(fxPhase * 0.03f, c, D_COLOR);
           mul(c, 0.02f + 0.98f * b * b);
           if (i == fxHead) c[3] = fminf(255, c[3] + 120);
+          break;
+        }
+        case 16: {                                             // Farbverlauf: ruhig, in Effektrichtung, wandert mit dem Tempo
+          float t = u * (0.6f + 1.4f * K) + (fx.speed > 1 ? fxPhase * 0.02f : 0);
+          if (fx.pal == 0) {                                   // Standard: Effektfarbe → Farbe 2 → zurück
+            float m = t - floorf(t); m = m < 0.5f ? m * 2 : 2 - m * 2; m = m * m * (3 - 2 * m);
+            const float a1[4] = {(float)fx.r, (float)fx.g, (float)fx.b, (float)fx.w};
+            for (int ch = 0; ch < 4; ch++) c[ch] = a1[ch] + (fxC2[ch] - a1[ch]) * m;
+          } else pcol(t * 0.5f, c, D_COLOR);
           break;
         }
         case 15: {                                             // Lava: langsam fließende Blasen
@@ -1254,6 +1275,7 @@ void fxSave() {
   prefs.putBytes("fx2", &fx, sizeof fx);
   if (prefs.getUShort("fxDir", 0) != fxDir) prefs.putUShort("fxDir", fxDir);
   if (prefs.getUChar("fxSpin", 0) != fxSpin) prefs.putUChar("fxSpin", fxSpin);
+  { uint8_t o[4] = {0, 80, 255, 0}; prefs.getBytes("fxC2", o, 4); if (memcmp(o, fxC2, 4)) prefs.putBytes("fxC2", fxC2, 4); }
   if (prefs.getUChar("master", 255) != master) prefs.putUChar("master", master);
   if (prefs.getBool("mOn", true) != masterOn) prefs.putBool("mOn", masterOn);
   fxDirty = false;
@@ -1263,6 +1285,8 @@ void fxLoad() {
   if (prefs.getBytes("fx2", &f, sizeof f) == sizeof f && f.id < FX_COUNT && f.pal < PAL_COUNT) fx = f;
   master = prefs.getUChar("master", 255); masterOn = prefs.getBool("mOn", true);
   fxDir = prefs.getUShort("fxDir", 0) % 360; fxSpin = prefs.getUChar("fxSpin", 0) % 3;
+  prefs.getBytes("fxC2", fxC2, 4);
+  fxFavs = prefs.getUInt("favs", 0);
   fxReset();
 }
 
@@ -1272,6 +1296,7 @@ void applyFx(JsonVariantConst cmd) {
   curPreset = -1;
   if (cmd["speed"].is<int>()) fx.speed = constrain(cmd["speed"].as<int>(), 1, 100);
   if (cmd["intensity"].is<int>()) fx.inten = constrain(cmd["intensity"].as<int>(), 0, 255);
+  if (!cmd["color2"].isNull()) { JsonVariantConst c2 = cmd["color2"]; fxC2[0] = c2["r"] | fxC2[0]; fxC2[1] = c2["g"] | fxC2[1]; fxC2[2] = c2["b"] | fxC2[2]; fxC2[3] = c2["w"] | fxC2[3]; }
   if (cmd["direction"].is<int>()) fxDir = ((cmd["direction"].as<int>() % 360) + 360) % 360;
   if (cmd["spin"].is<int>()) { fxSpin = constrain(cmd["spin"].as<int>(), 0, 2); if (!fxSpin) fxSpinAng = 0; }
   if (cmd["brightness"].is<int>()) { master = constrain(cmd["brightness"].as<int>(), 1, 255); resendAll(); }
@@ -1510,7 +1535,7 @@ int presetSave(int slot, const char* name) {
   d["n"] = name;
   d["m"] = master; d["on"] = masterOn;
   JsonArray f = d["fx"].to<JsonArray>();
-  f.add(fx.id); f.add(fx.speed); f.add(fx.pal); f.add(fx.inten); f.add(fx.r); f.add(fx.g); f.add(fx.b); f.add(fx.w); f.add(fxDir); f.add(fxSpin);
+  f.add(fx.id); f.add(fx.speed); f.add(fx.pal); f.add(fx.inten); f.add(fx.r); f.add(fx.g); f.add(fx.b); f.add(fx.w); f.add(fxDir); f.add(fxSpin); f.add(fxC2[0]); f.add(fxC2[1]); f.add(fxC2[2]); f.add(fxC2[3]);
   JsonObject c = d["c"].to<JsonObject>();
   for (int i = 0; i < SLOTS; i++) {
     const Panel& p = P[i];
@@ -1554,6 +1579,7 @@ bool presetLoad(int k) {
     fx.speed = f[1]; fx.pal = (uint8_t)f[2] < PAL_COUNT ? (uint8_t)f[2] : 0; fx.inten = f[3];
     fx.r = f[4]; fx.g = f[5]; fx.b = f[6]; fx.w = f[7];
     if (f.size() >= 10) { fxDir = (uint16_t)f[8] % 360; fxSpin = (uint8_t)f[9] % 3; }
+    if (f.size() >= 14) for (int k = 0; k < 4; k++) fxC2[k] = f[10 + k];
     uint8_t id = f[0];
     if (id < FX_COUNT && id != fx.id) fxStart(id);
   }
@@ -1623,7 +1649,7 @@ void applyAll(JsonVariantConst cmd) {
   if (!strcmp(st, "ON") && !masterOn) { masterOn = true; wake = true; }
   if (*st && !sleepFiring) sleepCancel();          // Ein/Aus von Hand beendet den Sleep-Timer
   if (cmd["brightness"].is<int>()) { master = constrain(cmd["brightness"].as<int>(), 1, 255); wake = true; }
-  if (!cmd["effect"].isNull() || !cmd["speed"].isNull() || !cmd["palette"].isNull() || !cmd["intensity"].isNull() || !cmd["direction"].isNull() || !cmd["spin"].isNull()) {
+  if (!cmd["effect"].isNull() || !cmd["speed"].isNull() || !cmd["palette"].isNull() || !cmd["intensity"].isNull() || !cmd["direction"].isNull() || !cmd["spin"].isNull() || !cmd["color2"].isNull()) {
     JsonDocument d; d.set(cmd); d.remove("color"); d.remove("brightness");
     applyFx(d.as<JsonVariantConst>());
   }
@@ -1722,6 +1748,10 @@ bool placePanel(int i, int parent, uint8_t edge, uint8_t own) {
   for (uint8_t m = 0; m < 3; m++) if (list[m] == back) k = m;
   P[i].x = nx; P[i].y = ny; P[i].rot = (k - own + 3) % 3;
   P[i].attached = true; P[i].since = millis();
+  // sitzt das neue Panel genau dort, wo vorher ein anderes war? Dann fragt die App, ob es dessen Einstellungen übernehmen soll
+  P[i].swapFrom = -1;
+  if (!P[i].hasColor) for (int j = 1; j < SLOTS; j++)
+    if (j != i && P[j].used && !P[j].attached && P[j].x == nx && P[j].y == ny && (P[j].hasColor || P[j].edges)) { P[i].swapFrom = j; P[i].swapUntil = (millis() + 300000UL) | 1; break; }
   reconcile();
   return true;
 }
@@ -1819,6 +1849,7 @@ void loadConfig() {
   cfg.bootMode = prefs.getUChar("bootMode", 0); if (cfg.bootMode > 3) cfg.bootMode = 0;
   cfg.bootPreset = (int8_t)prefs.getChar("bootPre", -1);
   cfg.syncOn = prefs.getBool("syncOn", false);
+  cfg.guard = prefs.getBool("guard", true);
   cfg.onAnim = prefs.getUChar("onAnim", 2); if (cfg.onAnim > 3) cfg.onAnim = 2;
   cfg.touchWave = prefs.getBool("tWave", true);
   cfg.viewRot = prefs.getUShort("viewRot", 0) % 360; cfg.viewMir = prefs.getBool("viewMir", false);
@@ -1855,6 +1886,7 @@ String configJson() {
   JsonObject m = d["mqtt"].to<JsonObject>();
   m["on"] = cfg.mqttOn; m["host"] = cfg.mqttHost; m["port"] = cfg.mqttPort; m["user"] = cfg.mqttUser; m["hasPass"] = cfg.mqttPass.length() > 0;
   JsonObject bo = d["boot"].to<JsonObject>(); bo["mode"] = cfg.bootMode; bo["preset"] = cfg.bootPreset;
+  d["guard"] = cfg.guard; d["why"] = bootReason; d["crashes"] = prefs.getUInt("crashes", 0);
   JsonObject t = d["touch"].to<JsonObject>();
   t["on"] = cfg.touchOn; t["sens"] = cfg.touchSens; t["a1"] = cfg.tapA1; t["a2"] = cfg.tapA2; t["wave"] = cfg.touchWave;
   JsonArray tn = t["actions"].to<JsonArray>();
@@ -1886,9 +1918,11 @@ String stateJson(bool meta) {
   d["chip"] = CHIP_FAMILY;
   JsonObject f = d["fx"].to<JsonObject>();
   f["id"] = FX[fx.id].id; f["speed"] = fx.speed; f["inten"] = fx.inten; f["pal"] = PALS[fx.pal].id; f["dir"] = fxDir; f["spin"] = fxSpin;
+  { JsonObject c2 = f["c2"].to<JsonObject>(); c2["r"] = fxC2[0]; c2["g"] = fxC2[1]; c2["b"] = fxC2[2]; c2["w"] = fxC2[3]; }
   f["r"] = fx.r; f["g"] = fx.g; f["b"] = fx.b; f["w"] = fx.w; f["usesColor"] = fxUsesColor();
   d["master"] = master; d["on"] = masterOn;
   d["pfw"] = PANEL_FW_VERSION; d["pAuto"] = cfg.panelAuto;
+  { JsonArray fv = d["favs"].to<JsonArray>(); for (uint8_t k = 0; k < FX_COUNT; k++) if (fxFavs & (1u << k)) fv.add(FX[k].id); }
   wallsync::json(d["sync"].to<JsonObject>());
   { JsonObject z = d["zb"].to<JsonObject>();            // Hue/Zigbee: nur der ESP32-C6 kann es, die App zeigt es sonst ausgegraut
     z["avail"] = (bool)HAS_ZIGBEE;
@@ -1923,6 +1957,7 @@ String stateJson(bool meta) {
     o["state"] = p.state; o["on"] = p.on; o["edges"] = p.edges; o["fw"] = p.fw;
     o["clips"] = p.clips; o["caps"] = p.caps; o["lit"] = p.litSec;
     if (p.identUntil) o["ident"] = true;
+    if (p.swapFrom >= 0 && (int32_t)(p.swapUntil - millis()) > 0 && P[p.swapFrom].used && !P[p.swapFrom].attached) o["swap"] = hex(P[p.swapFrom].chip);
     if (p.upd) { o["upd"] = p.upd; o["pct"] = p.updPct; }
     o["r"] = p.r; o["g"] = p.g; o["b"] = p.b; o["w"] = p.w; o["bri"] = p.bri;
   }
@@ -2095,6 +2130,7 @@ String diagJson() {
   d["bus"] = cfg.bus; d["up"] = millis() / 1000;
   d["frames"] = busFramesSent; d["crc"] = busCrcErr; d["timeouts"] = busTimeouts; d["discovers"] = busDiscovers;
   d["heap"] = ESP.getFreeHeap();
+  d["boot"] = bootReason; d["crashes"] = prefs.getUInt("crashes", 0); d["guard"] = cfg.guard;
   JsonArray pa = d["panels"].to<JsonArray>();
   for (int i = 1; i < SLOTS; i++) {
     const Panel& p = P[i];
@@ -2128,7 +2164,7 @@ String backupJson() {
   JsonObject t = c["touch"].to<JsonObject>();
   t["on"] = cfg.touchOn; t["sens"] = cfg.touchSens; t["a1"] = cfg.tapA1; t["a2"] = cfg.tapA2;
   c["pAuto"] = cfg.panelAuto; c["zbOn"] = cfg.zbOn; c["name"] = cfg.name;
-  c["onAnim"] = cfg.onAnim; c["tWave"] = cfg.touchWave; c["viewRot"] = cfg.viewRot; c["viewMir"] = cfg.viewMir;
+  c["guard"] = cfg.guard; c["favs"] = fxFavs; c["onAnim"] = cfg.onAnim; c["tWave"] = cfg.touchWave; c["viewRot"] = cfg.viewRot; c["viewMir"] = cfg.viewMir;
   c["bootMode"] = cfg.bootMode; c["bootPre"] = cfg.bootPreset; c["syncOn"] = cfg.syncOn; c["syncGrp"] = cfg.syncGroup;
   JsonObject lh = d["lit"].to<JsonObject>();
   for (int i = 0; i < SLOTS; i++) if (P[i].used && P[i].litSec) lh[hex(P[i].chip)] = P[i].litSec;
@@ -2189,7 +2225,7 @@ const char* restoreBackup(JsonDocument& d) {
     prefs.putBool("pAuto", c["pAuto"] | true);
     if (HAS_ZIGBEE) prefs.putBool("zbOn", c["zbOn"] | false);
     if (c["name"].is<const char*>() && strlen(c["name"]) > 0) prefs.putString("name", (const char*)c["name"]);
-    prefs.putUChar("onAnim", c["onAnim"] | 2); prefs.putBool("tWave", c["tWave"] | true);
+    prefs.putBool("guard", c["guard"] | true); prefs.putUInt("favs", c["favs"] | 0); prefs.putUChar("onAnim", c["onAnim"] | 2); prefs.putBool("tWave", c["tWave"] | true);
     prefs.putUShort("viewRot", c["viewRot"] | 0); prefs.putBool("viewMir", c["viewMir"] | false);
     prefs.putUChar("bootMode", c["bootMode"] | 0); prefs.putChar("bootPre", c["bootPre"] | -1);
     prefs.putBool("syncOn", c["syncOn"] | false); prefs.putUChar("syncGrp", c["syncGrp"] | 1);
@@ -2597,6 +2633,65 @@ void zbStart() {}
 void zbLoop() {}
 #endif
 
+// ---------- Wächter und Neustart-Grund ----------
+const char* reasonText(esp_reset_reason_t r, uint8_t code) {
+  switch (r) {
+  case ESP_RST_POWERON: return "Strom eingeschaltet oder Stromausfall";
+  case ESP_RST_BROWNOUT: return "Spannung zu niedrig (Netzteil prüfen)";
+  case ESP_RST_PANIC: return "Absturz";
+  case ESP_RST_INT_WDT: case ESP_RST_TASK_WDT: case ESP_RST_WDT: return "hing, vom Watchdog neu gestartet";
+  case ESP_RST_EXT: return "Reset-Taster";
+  case ESP_RST_SW:
+    switch (code) {
+    case R_UPDATE: return "nach einem Update";
+    case R_APP: return "aus der App (Einstellungen, Sicherung oder WLAN)";
+    case R_WLAN: return "vom Wächter: WLAN war 10 Minuten weg";
+    case R_HANG: return "vom Wächter: Hauptschleife hing";
+    default: return "Neustart (Software)";
+    }
+  default: return "unbekannt";
+  }
+}
+void guardBoot() {
+  esp_reset_reason_t r = esp_reset_reason();
+  uint8_t code = rstMagic == 0x7121A600 ? rstCode : 0;
+  rstMagic = 0; rstCode = 0;
+  bootReason = reasonText(r, code);
+  if (r == ESP_RST_PANIC || r == ESP_RST_INT_WDT || r == ESP_RST_TASK_WDT || r == ESP_RST_WDT) prefs.putUInt("crashes", prefs.getUInt("crashes", 0) + 1);
+  diag("Gestartet: %s", bootReason.c_str());
+  // läuft die Hauptschleife eine Minute nicht mehr, neu starten (nur mit eingeschaltetem Wächter)
+  static esp_timer_handle_t t = nullptr;
+  esp_timer_create_args_t a = {};
+  a.callback = [](void*) { if (cfg.guard && millis() - loopBeat > 60000) { rstMagic = 0x7121A600; rstCode = R_HANG; esp_restart(); } };
+  a.name = "guard";
+  loopBeat = millis();
+  if (esp_timer_create(&a, &t) == ESP_OK) esp_timer_start_periodic(t, 5000000);
+}
+// WLAN weg: nach 3 Minuten neu verbinden, nach 10 Minuten neu starten (nicht, solange jemand im Einrichtungs-WLAN ist)
+void guardLoop() {
+  loopBeat = millis();
+  static uint32_t lostAt = 0, lastMdns = 0; static bool retried = false;
+  if (!cfg.guard) { lostAt = 0; return; }
+  uint32_t now = millis();
+  String ss = prefs.getString("ssid", "");
+  if (wlanOk || !ss.length() || wPhase == W_CONNECTING) {
+    lostAt = 0; retried = false;
+    if (wlanOk && now - lastMdns > 1800000UL) { lastMdns = now; mdnsStart(); }   // trilumag.local alle 30 Minuten neu ankündigen
+    return;
+  }
+  if (!lostAt) { lostAt = now | 1; return; }
+  if (!retried && now - lostAt > 180000UL) {
+    retried = true;
+    diag("Wächter: WLAN seit 3 Minuten weg, verbinde neu");
+    WiFi.disconnect(false); wifiStart(ss, prefs.getString("pass", ""), 20000, false);
+  }
+  if (now - lostAt > 600000UL && WiFi.softAPgetStationNum() == 0) {
+    diag("Wächter: WLAN seit 10 Minuten weg, starte neu");
+    fxSave(); saveColors(); enSave();
+    restartWith(R_WLAN);
+  }
+}
+
 // ---------- Online-Updates ----------
 bool otaCheckNow = false;
 bool otaLatestAfterCheck = false;     // Notfall-Seite: nach der Abfrage die neueste Version installieren
@@ -2647,7 +2742,7 @@ void otaLoop() {
       logf("[OTA] fertig, starte neu\n");
       ws::broadcast("{\"t\":\"otadone\",\"v\":\"" + v + "\"}");
       delay(600);
-      ESP.restart();
+      restartWith(R_UPDATE);
     }
     logf("[OTA] %s\n", ota::error.c_str());
   }
@@ -2776,6 +2871,30 @@ const char* apiCall(const char* path, JsonDocument& d) {
     if (d["mir"].is<bool>()) { cfg.viewMir = d["mir"]; prefs.putBool("viewMir", cfg.viewMir); }
     return nullptr;
   }
+  // Favoriten: {"effect":"lauflicht","on":true}
+  if (!strcmp(path, "/api/favs")) {
+    int k = fxFind(d["effect"] | ""); if (k < 0) return "Effekt unbekannt";
+    if (d["on"] | true) fxFavs |= 1u << k; else fxFavs &= ~(1u << k);
+    prefs.putUInt("favs", fxFavs);
+    return nullptr;
+  }
+  // Panel tauschen: {"id":"neu","take":true} übernimmt Farbe, Helligkeit und Kanten des alten Panels an dieser Stelle
+  if (!strcmp(path, "/api/swap")) {
+    int i = findChip(parseHex(d["id"] | "0"));
+    if (i < 0 || P[i].swapFrom < 0) return "Nichts zu übernehmen";
+    int j = P[i].swapFrom; P[i].swapFrom = -1;
+    if (!(d["take"] | false)) return nullptr;
+    Panel& a = P[i]; const Panel& b = P[j];
+    a.r = b.r; a.g = b.g; a.b = b.b; a.w = b.w; a.bri = b.bri; a.on = b.on; a.hasColor = b.hasColor;
+    if (a.state != DARK) a.state = ACTIVE;
+    a.edges = b.edges;
+    if (a.edges) prefs.putBool(("e" + hex(a.chip)).c_str(), true);
+    colorsDirty = true; colorsDirtyAt = millis(); sendToPanel(i); publishState(i);
+    diag("Panel %s übernimmt die Einstellungen von %s", hex(a.chip).substring(4).c_str(), hex(b.chip).substring(4).c_str());
+    return nullptr;
+  }
+  // Wächter: {"on":true}
+  if (!strcmp(path, "/api/guard")) { cfg.guard = d["on"] | true; prefs.putBool("guard", cfg.guard); return nullptr; }
   // Panel finden: {"id":"…"} blinkt 3 s weiß
   if (!strcmp(path, "/api/identify")) {
     int i = findChip(parseHex(d["id"] | "0"));
@@ -2915,7 +3034,7 @@ void setupWeb() {
   server.on("/api/state", HTTP_GET, replyState);
   server.on("/api/energy", HTTP_GET, [] { server.send(200, "application/json", energyJson()); });
   // Befehle laufen über apiCall(), damit HTTP und WebSocket dasselbe tun
-  const char* cmds[] = {"/api/set", "/api/presets", "/api/effect", "/api/test", "/api/ota", "/api/light", "/api/diag", "/api/touch", "/api/panelfw", "/api/zigbee", "/api/name", "/api/identify", "/api/view", "/api/signal", "/api/progress", "/api/sleep", "/api/boot", "/api/energy", "/api/sync",
+  const char* cmds[] = {"/api/set", "/api/presets", "/api/effect", "/api/test", "/api/ota", "/api/light", "/api/diag", "/api/touch", "/api/panelfw", "/api/zigbee", "/api/name", "/api/identify", "/api/guard", "/api/swap", "/api/favs", "/api/view", "/api/signal", "/api/progress", "/api/sleep", "/api/boot", "/api/energy", "/api/sync",
                         "/api/sim/new", "/api/sim/attach", "/api/sim/detach", "/api/sim/tap"};
   for (const char* path : cmds) {
     server.on(path, HTTP_POST, [path] {
@@ -2958,13 +3077,13 @@ void setupWeb() {
     if (const char* err = restoreBackup(d)) return replyError(err);
     server.send(200, "application/json", "{\"ok\":true,\"restart\":true}");
     delay(600);
-    ESP.restart();
+    restartWith(R_APP);
   });
   // Firmware-Datei hochladen (wie bei WLED unter /update)
   server.on("/update", HTTP_POST, [] {
     bool ok = !Update.hasError();
     server.send(ok ? 200 : 400, "application/json", ok ? "{\"ok\":true}" : "{\"error\":\"Datei passt nicht oder ist beschädigt\"}");
-    if (ok) { logf("[OTA] Datei installiert, starte neu\n"); delay(600); ESP.restart(); }
+    if (ok) { logf("[OTA] Datei installiert, starte neu\n"); delay(600); restartWith(R_UPDATE); }
   }, [] {
     HTTPUpload& u = server.upload();
     if (u.status == UPLOAD_FILE_START) {
@@ -3020,7 +3139,7 @@ void setupWeb() {
     server.send(200, "application/json", "{\"ok\":true,\"restart\":true}");
     logf("Einstellungen gespeichert, starte neu\n");
     delay(600);
-    ESP.restart();
+    restartWith(R_APP);
   });
   server.on("/api/wifi/scan", HTTP_GET, [] {
     int n = scanWifi();
@@ -3044,7 +3163,7 @@ void setupWeb() {
     saveWifi(ss, pw);
     server.send(200, "application/json", "{\"ok\":true}");
     delay(800);
-    ESP.restart();
+    restartWith(R_APP);
   });
   ws::onOpen = wsOpen; ws::onText = wsText;
   ota::onProgress = [](int p) {                 // Fortschritt an die App; ws::loop läuft während des Downloads nicht
@@ -3264,6 +3383,7 @@ void setup() {
   P[0].state = ACTIVE; P[0].hasColor = true; P[0].w = 200;
   loadColor(0);
   otaBootCheck();
+  guardBoot();
   fxLoad();
   presetsLoad();
   bootApply();                                      // nach Stromausfall: aus, an oder Preset (Einstellung)
@@ -3296,6 +3416,7 @@ void setup() {
 }
 
 void loop() {
+  guardLoop();
   otaVerifyLoop();
   ina::loop();
   server.handleClient();
@@ -3329,7 +3450,7 @@ void loop() {
   litLoop();
   enLoop();
   wallsync::loop();
-  if (restartAt && (int32_t)(millis() - restartAt) >= 0) { fxSave(); saveColors(); enSave(); ESP.restart(); }
+  if (restartAt && (int32_t)(millis() - restartAt) >= 0) { fxSave(); saveColors(); enSave(); restartWith(R_APP); }
 #if HAS_ZIGBEE
   if (zbResetAt && (int32_t)(millis() - zbResetAt) >= 0) { zbResetAt = 0; prefs.remove("zbBoot"); zb::factoryReset(); }
 #endif
