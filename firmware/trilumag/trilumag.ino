@@ -972,10 +972,14 @@ const float RIPPLE_SPEED = 4.5f;          // Panels pro Sekunde
 // Einschalt-Animation: Panel für Panel vom Hauptpanel nach außen
 uint32_t onAnimAt = 0; bool lastMasterOn = false;
 const uint16_t ON_STEP[4] = {0, 420, 210, 90}, ON_FADE[4] = {0, 600, 350, 180};   // ms je Abstand und Einblenddauer
+// Signal (Benachrichtigung): die ganze Wand blinkt ein paar Mal in einer Farbe, danach läuft alles weiter
+uint32_t sigAt = 0; uint8_t sigCol[4] = {0, 0, 255, 0}, sigBlinks = 3; uint16_t sigMs = 700;
+// Fortschritt: die Wand füllt sich vom Hauptpanel aus (0 = aus)
+float progVal = 0; uint8_t progCol[4] = {0, 255, 40, 0};
 bool overlayActive() {
   uint32_t now = millis();
   for (const Ripple& r : ripples) if (r.t0 && now - r.t0 < 4000) return true;
-  return onAnimAt && now - onAnimAt < 6000;
+  return (onAnimAt && now - onAnimAt < 6000) || sigAt || progVal > 0;
 }
 void addRipple(int i) {
   if (!cfg.touchWave || i < 0 || i >= SLOTS) return;
@@ -1017,6 +1021,33 @@ void computeTargets() {
     uint32_t k = p.on ? (uint32_t)p.bri * master : 0;
     uint8_t c[4] = {(uint8_t)(p.r * k / 65025), (uint8_t)(p.g * k / 65025), (uint8_t)(p.b * k / 65025), (uint8_t)(p.w * k / 65025)};
     for (int e = 0; e < 3; e++) memcpy(TGT[i][e], c, 4);
+  }
+  // Fortschritt: Panels nach Abstand zum Hauptpanel (bei gleichem Abstand von links nach rechts) der Reihe nach füllen
+  if (progVal > 0) {
+    int8_t ord[SLOTS]; float key[SLOTS]; int n = 0;
+    for (int i = 0; i < SLOTS; i++) {
+      if (!P[i].used || !P[i].attached) continue;
+      float rx, ry; viewXY(P[i].x * 0.5f, P[i].y * 0.866f, rx, ry);
+      float k = P[i].depth * 1000 + rx;
+      int j = n++; while (j > 0 && key[j - 1] > k) { key[j] = key[j - 1]; ord[j] = ord[j - 1]; j--; }
+      key[j] = k; ord[j] = i;
+    }
+    float lit = progVal / 100.0f * n, kb = (masterOn ? master : 150) / 255.0f;
+    for (int j = 0; j < n; j++) {
+      int i = ord[j]; isPulse[i] = false;
+      float a = fminf(1, fmaxf(0, lit - j)); a = 0.06f + 0.94f * a;   // noch nicht erreicht: ganz schwach
+      for (int e = 0; e < 3; e++) for (int c = 0; c < 4; c++) TGT[i][e][c] = (uint8_t)(progCol[c] * a * kb);
+    }
+  }
+  // Signal: Farbe an, normales Bild, Farbe an … (auch bei ausgeschalteter Wand)
+  if (sigAt) {
+    uint32_t ph = (now - sigAt) / (sigMs / 2);
+    if (ph >= (uint32_t)sigBlinks * 2) sigAt = 0;
+    else if (ph % 2 == 0) for (int i = 0; i < SLOTS; i++) {
+      if (!P[i].used || !P[i].attached) continue;
+      isPulse[i] = false;
+      for (int e = 0; e < 3; e++) memcpy(TGT[i][e], sigCol, 4);
+    }
   }
   // Einschalt-Animation: beim Einschalten leuchten die Panels der Reihe nach auf, nach Abstand zum Hauptpanel
   if (masterOn && !lastMasterOn && cfg.onAnim) { onAnimAt = now | 1; transOn = false; }
@@ -1346,6 +1377,15 @@ void publishExtras() {
     t["state_topic"] = "trilumag/touch"; t["icon"] = "mdi:gesture-tap";
     JsonArray et = t["event_types"].to<JsonArray>(); et.add("einmal"); et.add("doppelt");
     haDevice(t); haPublish("event", "touch", t); }
+  { JsonDocument t;                                 // Signal: notify.send_message mit "blau 3"
+    t["name"] = "Signal"; t["unique_id"] = "trilumag_signal_" + hex(P[0].chip);
+    t["command_topic"] = "trilumag/signal/set"; t["icon"] = "mdi:bell-ring";
+    haDevice(t); haPublish("notify", "signal", t); }
+  { JsonDocument t;                                 // Fortschritt 0..100 % (0 = aus)
+    t["name"] = "Fortschritt"; t["unique_id"] = "trilumag_fortschritt_" + hex(P[0].chip);
+    t["command_topic"] = "trilumag/fortschritt/set"; t["state_topic"] = "trilumag/fortschritt/state";
+    t["min"] = 0; t["max"] = 100; t["step"] = 1; t["unit_of_measurement"] = "%"; t["mode"] = "slider"; t["icon"] = "mdi:progress-helper";
+    haDevice(t); haPublish("number", "fortschritt", t); }
   { JsonDocument t;                                 // Zähler für das Energie-Dashboard
     t["name"] = "Energie"; t["unique_id"] = "trilumag_energie_" + hex(P[0].chip);
     t["state_topic"] = "trilumag/energie/state"; t["device_class"] = "energy"; t["unit_of_measurement"] = "kWh";
@@ -1808,6 +1848,7 @@ String stateJson(bool meta) {
   d["name"] = cfg.name;
   { JsonObject vw = d["view"].to<JsonObject>(); vw["rot"] = cfg.viewRot; vw["mir"] = cfg.viewMir; }
   if (sleepEnd) d["sleep"] = (sleepLeft() + 999) / 1000;
+  if (progVal > 0) d["prog"] = progVal;
   d["max"] = MAX_ATTACHED;
   d["mqtt"] = mqtt.connected();
   d["mqttSet"] = cfg.mqttOn && cfg.mqttHost.length() > 0;
@@ -2211,6 +2252,51 @@ void otaVerifyLoop() {
   if (otaWd) { esp_timer_stop(otaWd); esp_timer_delete(otaWd); otaWd = nullptr; }
   if (prefs.getString("otaTry", "") == FW_VERSION) { otaNotice = "Update auf " + String(FW_VERSION) + " erfolgreich."; prefs.remove("otaTry"); }
   logf("[OTA] Version %s bewährt\n", FW_VERSION);
+}
+
+// ---------- Signale und Fortschritt (für Home Assistant und andere) ----------
+struct NamedCol { const char* n; uint8_t c[4]; };
+const NamedCol NAMED_COLS[] = {
+  {"rot", {255, 0, 0, 0}}, {"grün", {0, 255, 0, 0}}, {"gruen", {0, 255, 0, 0}}, {"blau", {0, 0, 255, 0}}, {"gelb", {255, 170, 0, 0}},
+  {"orange", {255, 70, 0, 0}}, {"lila", {140, 0, 255, 0}}, {"violett", {140, 0, 255, 0}}, {"pink", {255, 0, 120, 0}},
+  {"türkis", {0, 220, 200, 0}}, {"tuerkis", {0, 220, 200, 0}}, {"cyan", {0, 220, 255, 0}}, {"weiß", {0, 0, 0, 255}}, {"weiss", {0, 0, 0, 255}},
+  {"red", {255, 0, 0, 0}}, {"green", {0, 255, 0, 0}}, {"blue", {0, 0, 255, 0}}, {"yellow", {255, 170, 0, 0}}, {"white", {0, 0, 0, 255}},
+};
+// Farbe aus Name ("blau"), "#RRGGBB" oder {"r":..,"g":..,"b":..,"w":..}; false, wenn unbekannt
+bool parseColor(JsonVariantConst v, uint8_t* out) {
+  if (v.is<JsonObjectConst>()) { out[0] = v["r"] | 0; out[1] = v["g"] | 0; out[2] = v["b"] | 0; out[3] = v["w"] | 0; return true; }
+  String t = v | ""; t.trim(); t.toLowerCase();
+  if (t.startsWith("#") && t.length() == 7) { uint32_t x = strtoul(t.c_str() + 1, nullptr, 16); out[0] = x >> 16; out[1] = x >> 8; out[2] = x; out[3] = 0; return true; }
+  for (const NamedCol& c : NAMED_COLS) if (t == c.n) { memcpy(out, c.c, 4); return true; }
+  return false;
+}
+// {"color":"blau","blink":3,"ms":700} oder als Text "blau 3"
+const char* signalCmd(JsonVariantConst d) {
+  uint8_t c[4];
+  if (!parseColor(d["color"], c)) return "Farbe unbekannt (z. B. rot, grün, blau, gelb, weiß oder #RRGGBB)";
+  memcpy(sigCol, c, 4);
+  sigBlinks = constrain((int)(d["blink"] | 3), 1, 20);
+  sigMs = constrain((int)(d["ms"] | 700), 200, 3000);
+  sigAt = millis() | 1; fxLastFrame = 0;
+  diag("Signal: %u-mal blinken", sigBlinks);
+  return nullptr;
+}
+const char* signalText(const char* txt) {           // "blau", "grün 2", "#ff8800 5"
+  JsonDocument d; String t(txt); t.trim();
+  int sp = t.indexOf(' ');
+  d["color"] = sp > 0 ? t.substring(0, sp) : t;
+  if (sp > 0) d["blink"] = t.substring(sp + 1).toInt();
+  return signalCmd(d.as<JsonVariantConst>());
+}
+// {"value":40,"color":"grün"}; 0 schaltet den Fortschritt aus
+const char* progressCmd(JsonVariantConst d) {
+  if (!d["color"].isNull()) { uint8_t c[4]; if (!parseColor(d["color"], c)) return "Farbe unbekannt"; memcpy(progCol, c, 4); }
+  if (!d["value"].is<float>() && !d["value"].is<int>()) return "Wert fehlt (0 bis 100)";
+  float v = constrain(d["value"].as<float>(), 0.0f, 100.0f);
+  if ((progVal > 0) != (v > 0)) transition();
+  progVal = v; fxLastFrame = 0;
+  if (mqtt.connected()) mqtt.publish("trilumag/fortschritt/state", String((int)roundf(v)).c_str(), true);
+  return nullptr;
 }
 
 // ---------- Panel finden ----------
@@ -2660,6 +2746,8 @@ const char* apiCall(const char* path, JsonDocument& d) {
     if (strcmp(a, "all") && strcmp(a, "one")) return "Unbekannte Aktion";
     return n ? nullptr : "Kein Panel braucht ein Update";
   }
+  if (!strcmp(path, "/api/signal")) return signalCmd(d.as<JsonVariantConst>());
+  if (!strcmp(path, "/api/progress")) return progressCmd(d.as<JsonVariantConst>());
   // Ansicht: {"rot":60,"mir":false} so hängt die Wand
   if (!strcmp(path, "/api/view")) {
     if (d["rot"].is<int>()) { cfg.viewRot = ((d["rot"].as<int>() % 360 + 360) % 360) / 30 * 30; prefs.putUShort("viewRot", cfg.viewRot); }
@@ -2805,7 +2893,7 @@ void setupWeb() {
   server.on("/api/state", HTTP_GET, replyState);
   server.on("/api/energy", HTTP_GET, [] { server.send(200, "application/json", energyJson()); });
   // Befehle laufen über apiCall(), damit HTTP und WebSocket dasselbe tun
-  const char* cmds[] = {"/api/set", "/api/presets", "/api/effect", "/api/test", "/api/ota", "/api/light", "/api/diag", "/api/touch", "/api/panelfw", "/api/zigbee", "/api/name", "/api/identify", "/api/view", "/api/sleep", "/api/boot", "/api/energy", "/api/sync",
+  const char* cmds[] = {"/api/set", "/api/presets", "/api/effect", "/api/test", "/api/ota", "/api/light", "/api/diag", "/api/touch", "/api/panelfw", "/api/zigbee", "/api/name", "/api/identify", "/api/view", "/api/signal", "/api/progress", "/api/sleep", "/api/boot", "/api/energy", "/api/sync",
                         "/api/sim/new", "/api/sim/attach", "/api/sim/detach", "/api/sim/tap"};
   for (const char* path : cmds) {
     server.on(path, HTTP_POST, [path] {
@@ -2953,6 +3041,17 @@ void onMqtt(char* topic, byte* payload, unsigned int len) {
   if (!strcmp(topic, "trilumag/intensitaet/set")) { JsonDocument d; d["intensity"] = atoi(b); applyFx(d.as<JsonVariantConst>()); return; }
   if (!strcmp(topic, "trilumag/palette/set")) { JsonDocument d; d["palette"] = b; applyFx(d.as<JsonVariantConst>()); return; }
   if (!strcmp(topic, "trilumag/szene/set")) { presetLoad(presetFind(b)); return; }
+  if (!strcmp(topic, "trilumag/signal/set")) {      // Text "blau 3" oder JSON {"color":"blau","blink":3}
+    JsonDocument d;
+    if (len && payload[0] == '{' && !deserializeJson(d, payload, len)) signalCmd(d.as<JsonVariantConst>()); else signalText(b);
+    wsKick(); return;
+  }
+  if (!strcmp(topic, "trilumag/fortschritt/set")) {
+    JsonDocument d;
+    if (len && payload[0] == '{' && !deserializeJson(d, payload, len)) progressCmd(d.as<JsonVariantConst>());
+    else { d["value"] = atof(b); progressCmd(d.as<JsonVariantConst>()); }
+    wsKick(); return;
+  }
   JsonDocument d;
   if (deserializeJson(d, payload, len)) return;
   String t(topic);                       // trilumag/<ID>/set

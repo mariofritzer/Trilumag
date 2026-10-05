@@ -363,6 +363,13 @@ nav.tabs button.on{color:var(--acc)}
       <p class="note" id="eNote"></p>
       <div class="btnrow"><button class="btn" id="eReset">Zähler zurücksetzen</button></div>
     </div>
+    <div class="card" id="sigCard">
+      <h3>Signale und Fortschritt</h3>
+      <div class="chips" id="sigCols"><button class="chip on" data-c="blau">Blau</button><button class="chip" data-c="grün">Grün</button><button class="chip" data-c="rot">Rot</button><button class="chip" data-c="gelb">Gelb</button><button class="chip" data-c="weiß">Weiß</button></div>
+      <div class="btnrow"><button class="btn" id="sigTest">Signal testen (3-mal blinken)</button></div>
+      <div class="sl">Fortschritt<input type="range" id="progR" min="0" max="100" value="0"><output id="progRo">aus</output></div>
+      <p class="note">Gedacht für Home Assistant: Das Gerät „Signal“ lässt die Wand blinken, etwa mit der Nachricht „blau 3“ für die Türklingel. Danach läuft alles weiter wie vorher. „Fortschritt“ füllt die Wand vom Hauptpanel aus, 0 % schaltet es wieder aus. Hier kannst du beides ausprobieren.</p>
+    </div>
     <div class="card" id="touchCard">
       <h3>Antippen</h3>
       <label class="tog"><input type="checkbox" id="tOn"><span class="sw"></span>Panels reagieren auf Antippen</label>
@@ -663,7 +670,7 @@ function render(){
   if(document.activeElement!==$('master')){const p=pct(st.master);setRange('master',p);$('mastero').textContent=p+' %';}
   $('apBanner').hidden=!st.ap||tab==='opt';
   $('updBadge').hidden=!st.upd;
-  if(tab==='opt'){renderWifi();renderPower();renderPfw();renderTouch();renderZb();renderSync();renderBoot();}
+  if(tab==='opt'){renderWifi();renderPower();renderPfw();renderTouch();renderZb();renderSync();renderBoot();renderSig();}
   [...sel].forEach(id=>{if(!st.panels.some(p=>p.id===id))sel.delete(id);});     // abgeklipste Panels aus der Auswahl nehmen
   if(tab!=='wall'&&tab!=='opt'){drawWall($('mini'),false);
     $('miniHint').textContent=tab==='col'?(sel.size?`${sel.size} Panel${sel.size>1?'s':''} ausgewählt`:'Panels antippen, um nur diese einzufärben'):'';}
@@ -1119,6 +1126,13 @@ async function setView(b){Object.assign(st.view,b);render();await api('/api/view
 $('viewL').addEventListener('click',()=>setView({rot:(st.view.rot+330)%360}));
 $('viewR').addEventListener('click',()=>setView({rot:(st.view.rot+30)%360}));
 $('viewMir').addEventListener('click',()=>setView({mir:!st.view.mir}));
+
+// ---------- Signale und Fortschritt ----------
+let sigC='blau';
+$('sigCols').querySelectorAll('button').forEach(b=>b.addEventListener('click',()=>{sigC=b.dataset.c;$('sigCols').querySelectorAll('button').forEach(x=>x.classList.toggle('on',x===b));}));
+$('sigTest').addEventListener('click',()=>api('/api/signal',{color:sigC,blink:3}));
+$('progR').addEventListener('input',()=>{const v=+$('progR').value;$('progRo').textContent=v?v+' %':'aus';later('prog',()=>api('/api/progress',{value:v,color:sigC}));});
+function renderSig(){if(!st||document.activeElement===$('progR')||tSend.prog)return;const v=Math.round(st.prog||0);setRange('progR',v);$('progRo').textContent=v?v+' %':'aus';}
 
 function ago(s){return s<60?`vor ${s} s`:s<3600?`vor ${Math.round(s/60)} min`:`vor ${Math.round(s/3600)} h`;}
 async function loadDiag(){try{diagData=await (await fetch('/api/diag')).json();renderDiag();if(tab==='wall')renderWall();}catch(e){}}

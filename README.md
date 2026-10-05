@@ -75,6 +75,19 @@ In der App unter Optionen „MQTT aktiv“ einschalten und die Adresse des Broke
 - **Schieberegler:** „Effekt-Tempo“ und „Effekt-Intensität“.
 - **Auswahlen:** „Palette“ und „Preset“.
 
+## Signale und Fortschritt (Home Assistant)
+
+- **Signal:** Das Gerät „Signal“ (notify) lässt die ganze Wand blinken, danach läuft alles weiter wie vorher, auch ein Effekt. Nachricht: Farbe und Anzahl, z. B. `blau 3` oder `#ff8800 5`. Farben: rot, grün, blau, gelb, orange, lila, pink, türkis, weiß.
+
+  ```yaml
+  action: notify.send_message
+  target: {entity_id: notify.trilumag_signal}
+  data: {message: "blau 3"}
+  ```
+
+  Per MQTT geht auch JSON an `trilumag/signal/set`: `{"color":"grün","blink":2,"ms":700}`.
+- **Fortschritt:** Die Zahl „Fortschritt“ (0 bis 100 %) füllt die Wand vom Hauptpanel aus, 0 % schaltet es aus. Mit Farbe per MQTT an `trilumag/fortschritt/set`: `{"value":40,"color":"grün"}`.
+
 ## Mehrere Wände
 
 Unter Optionen → Mehrere Wände lassen sich Wände im selben WLAN zu einer Gruppe (1 bis 9) verbinden. Sie teilen Ein/Aus, Helligkeit und Effekt mit allen Einstellungen, egal an welcher Wand man etwas ändert. Den Takt der Effekte gibt die Wand mit der kleinsten Chip-ID vor. Feste Farben einzelner Panels bleiben pro Wand.
@@ -105,6 +118,8 @@ Mit einem ESP32-C6 als Hauptpanel meldet sich Trilumag zusätzlich als Zigbee-3.
 | `GET /api/backup`, `POST /api/restore` | Sicherung herunterladen und einspielen |
 | `POST /api/light` | Übergangszeit, Stromlimit und Stromsensor-Pins |
 | `POST /api/touch` | Antippen: an/aus, Empfindlichkeit 1–10, Aktion für einmal (`a1`) und doppelt (`a2`) |
+| `POST /api/signal` | Signal: `{"color":"blau","blink":3,"ms":700}` |
+| `POST /api/progress` | Fortschritt: `{"value":40,"color":"grün"}`, `0` = aus |
 | `POST /api/identify` | Panel finden: `{"id":"…"}`, das Panel blinkt 3 s weiß |
 | `POST /api/sleep` | Sleep-Timer: `{"min":30}`, `0` beendet ihn |
 | `POST /api/boot` | Nach Stromausfall: `{"mode":0}` wie vorher, `1` aus, `2` an, `3` mit `"preset"` |
