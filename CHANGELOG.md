@@ -2,6 +2,28 @@
 
 Die Versionsnummer im Webinstaller und in der App setzt sich aus der Version in der Firmware und der Nummer des automatischen Builds zusammen, zum Beispiel **0.5.11** = Version 0.5, Build 11. Bis Build 9 hat der Build die Nummer immer als 0.2.x ausgegeben, die tatsächlichen Stände stehen deshalb unten mit beiden Nummern.
 
+## 0.7.37 · 5. Oktober 2026
+
+**WLAN-Wächter und Neustart-Grund**
+- Neu unter Optionen → WLAN, ein- und ausschaltbar (Standard: an).
+- Ist das WLAN 3 Minuten weg, verbindet sich Trilumag neu; nach 10 Minuten startet es neu, außer jemand ist gerade im Setup-Netz.
+- Hängt die Software eine Minute, startet Trilumag ebenfalls neu. trilumag.local wird alle 30 Minuten neu angekündigt.
+- Unter Info stehen jetzt „Letzter Neustart“ (Stromausfall, Update, Absturz, Wächter …) und die Zahl der Abstürze.
+
+**Panel tauschen**
+- Unter Wand das Panel antippen und „Tauschen“ wählen, dann bleiben 5 Minuten: altes Panel abklipsen, neues an dieselbe Stelle.
+- Das neue übernimmt Farbe, Helligkeit und „Kanten einzeln“. Ein kleines Fenster unten zeigt die Restzeit, ✕ bricht ab.
+- In der Simulation kommen Panels, die hinter dem alten hingen, danach von selbst an ihren Platz zurück.
+
+**Effekte**
+- Neuer Effekt Farbverlauf: von Farbe 1 zu Farbe 2 und zurück, Farbe 2 im Tab Farben. Mit Tempo wandert der Verlauf.
+- Favoriten: Stern pro Effekt, Favoriten stehen oben.
+- Jeder Effekt hat in der Liste eine kleine animierte Vorschau.
+
+**App**
+- Die App gibt es auf Englisch. Sie richtet sich nach der Browsersprache und lässt sich unter Optionen → Name fest einstellen.
+- Die App wird gepackt ausgeliefert, lädt schneller und braucht rund 100 KB weniger Flash.
+
 ## 0.7.35 · 5. Oktober 2026
 
 **Effekt-Richtung**
