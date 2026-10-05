@@ -43,7 +43,8 @@
 #include "ws.h"
 #include "ota.h"
 #include "zigbee.h"     // Philips Hue über Zigbee, nur ESP32-C6
-#include "panel_fw.h"   // aktuelle Panel-Firmware für Updates über den Bus (erzeugt beim Build)
+#include "panel_fw.h"
+#include "energy_types.h" // eigene Typen in einer Datei, sonst stolpern die automatischen Arduino-Prototypen   // aktuelle Panel-Firmware für Updates über den Bus (erzeugt beim Build)
 #include <Wire.h>
 #include <WiFiUdp.h>
 #include <time.h>
@@ -1010,8 +1011,6 @@ void outLoop() {
 
 // ---------- Energieverbrauch (gemessen oder geschätzt) ----------
 // Wh pro Tag (31), Monat (24) und Jahr (10), dazu gesamt. Datum per NTP, Zeitzone Österreich.
-struct EBin { uint32_t key; float wh; };
-struct EnergyLog { double total; EBin days[31]; EBin months[24]; EBin years[10]; };
 EnergyLog en;
 double enPending = 0;                     // Wh, solange die Uhrzeit noch unbekannt ist
 bool enDirty = false;
