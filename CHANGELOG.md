@@ -2,6 +2,21 @@
 
 Die Versionsnummer im Webinstaller und in der App setzt sich aus der Version in der Firmware und der Nummer des automatischen Builds zusammen, zum Beispiel **0.5.11** = Version 0.5, Build 11. Bis Build 9 hat der Build die Nummer immer als 0.2.x ausgegeben, die tatsächlichen Stände stehen deshalb unten mit beiden Nummern.
 
+## 0.7.35 · 5. Oktober 2026
+
+**Effekt-Richtung**
+- Im Tab Effekte gibt es den neuen Regler „Richtung“ in 15°-Schritten einmal ringsum, also nach rechts, nach unten, nach links und so weiter.
+- „Richtung dreht sich“: nein, langsam (eine Runde pro Minute) oder schnell (eine Runde in 12 s).
+- Wirkt bei Effekten, die über die Wand laufen: Regenbogen, Regenbogenwelle, Lauflicht, Polarlicht, Lava und Spirale.
+- Presets und der Gleichtakt mehrerer Wände übernehmen die Richtung. Alle Wände einer Gruppe brauchen dafür diese Version.
+
+**App**
+- Farbwechsel blenden jetzt auch in der App-Vorschau weich über, so wie an der Wand.
+- Das Kästchen „Philips Hue (Zigbee)“ steht direkt unter „Home Assistant (MQTT)“.
+
+**Fehlerbehebung**
+- Die Welle beim Antippen, das Signal und die Einschalt-Animation fielen manchmal aus, wenn sie im falschen Moment ausgelöst wurden.
+
 ## 0.7.34 · 5. Oktober 2026
 
 **7 neue Effekte (jetzt 16)**
