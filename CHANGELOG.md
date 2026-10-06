@@ -2,6 +2,25 @@
 
 Die Versionsnummer im Webinstaller und in der App setzt sich aus der Version in der Firmware und der Nummer des automatischen Builds zusammen, zum Beispiel **0.5.11** = Version 0.5, Build 11. Bis Build 9 hat der Build die Nummer immer als 0.2.x ausgegeben, die tatsächlichen Stände stehen deshalb unten mit beiden Nummern.
 
+## 0.7.45 · 6. Oktober 2026
+
+**Licht**
+- Neuer Regler „Weißton“ im Tab Farben: Weiß von 2200 K (warm) bis 6500 K (kalt). Home Assistant bekommt dafür den Farbtemperatur-Modus.
+- Tageslicht-Kurve (Optionen → Licht): ab 18 Uhr wärmer und dunkler, nachts warm auf 35 %, ab 6 Uhr wieder normal.
+
+**7 neue Effekte (jetzt 24)**
+- Herzschlag, Plasma, Regen, Sternenhimmel, Feuerwerk, Matrix und Wetter.
+- Wetter: Farbe nach Außentemperatur, bei Regen blaue, bei Schnee weiße Tropfen. Ort unter Optionen → Wetter (Daten von Open-Meteo, ohne Anmeldung).
+
+**Neu**
+- Spiel „Simon sagt“ unter Wand: Folge nachtippen, jede Runde ein Panel mehr, Rekord wird gespeichert.
+- WLED nachahmen (Optionen): Trilumag übernimmt Ein/Aus, Helligkeit, Farbe, Tempo, Intensität und passende Effekte eines WLED-Geräts im WLAN.
+- Störungsanzeige: Hauptpanel blinkt kurz orange (WLAN weg) oder rot (Panel antwortet nicht). Abschaltbar unter Optionen → WLAN.
+- Wand als Bild speichern: PNG mit Farben, Panelnummern, Chip-IDs, Ausrichtung und Datenverbindungen.
+
+**App**
+- Die Vorschau der Wand läuft flüssiger: 25 Bilder pro Sekunde, und der Zustand wird nur noch bei echten Änderungen geschickt (vorher wegen des Stroms mehrmals pro Sekunde).
+
 ## 0.7.42 · 6. Oktober 2026
 
 **Updates auf mehreren Wänden**
