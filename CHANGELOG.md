@@ -2,6 +2,16 @@
 
 Die Versionsnummer im Webinstaller und in der App setzt sich aus der Version in der Firmware und der Nummer des automatischen Builds zusammen, zum Beispiel **0.5.11** = Version 0.5, Build 11. Bis Build 9 hat der Build die Nummer immer als 0.2.x ausgegeben, die tatsächlichen Stände stehen deshalb unten mit beiden Nummern.
 
+## 0.7.51 · 6. Oktober 2026
+
+**Android-App**
+- Neu: `trilumag-app.apk` liegt bei jedem Release. Die App findet alle Trilumag im WLAN und zeigt sie als Liste mit Farbe, Ein/Aus-Schalter und Helligkeit, wie die WLED-App.
+- Antippen öffnet die Steuerung im Vollbild; ＋ fügt eine Wand über ihre IP hinzu, langes Drücken entfernt sie.
+- Die App sieht selbst nach, ob es eine neuere Version gibt, und zeigt dann oben einen Hinweis zum Herunterladen.
+
+**Updates**
+- Während ein Update geladen und installiert wird, ruhen die Abfragen für Hue und WLED; die Verbindung zur Hue Bridge bleibt offen statt jedes Mal neu aufgebaut zu werden. Das behebt, dass sich 0.7.49 bei laufendem Hue-Nachahmen nicht installieren ließ.
+
 ## 0.7.49 · 6. Oktober 2026
 
 **Hue-Lampe nachahmen**
