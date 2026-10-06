@@ -445,6 +445,9 @@ void reconcile();
 void simChanged();
 bool timeOk();
 uint32_t faultPanelAt = 0;     // wann zuletzt ein Panel nicht mehr geantwortet hat
+// Während Updates ruhen die Abfragen an Hue und WLED: zwei verschlüsselte Verbindungen gleichzeitig brauchen zu viel Speicher
+volatile bool netQuiet = false, hueInReq = false, wledInReq = false;
+void netQuietOn() { netQuiet = true; for (int i = 0; i < 600 && (hueInReq || wledInReq); i++) delay(10); }
 namespace wx { extern String place, err; extern volatile bool busy; void json(JsonObject o); }
 namespace mirror { extern String ip; void json(JsonObject o); }
 namespace hueb { void json(JsonObject o); }
@@ -2513,6 +2516,8 @@ int mapFx(int f) {
   }
 }
 void pollOnce() {
+    if (netQuiet) return;
+    wledInReq = true;
     HTTPClient h; h.setTimeout(2500);
     bool ok = false;
     if (h.begin("http://" + ip + "/json/state") && h.GET() == 200) {
@@ -2528,7 +2533,7 @@ void pollOnce() {
         ok = true;
       }
     }
-    h.end();
+    h.end(); wledInReq = false;
     fail = !ok; if (ok) okAt = millis() | 1;
 }
 void task(void*) {
@@ -2623,7 +2628,13 @@ void start(const char* what) {
   if (xTaskCreate(work, "hue", 8192, nullptr, 1, nullptr) != pdPASS) busy = false;
 }
 void pollOnce() {
-  String r; int c = req("GET", "/clip/v2/resource/light/" + light, "", r, true);
+  if (netQuiet) return;
+  hueInReq = true;
+  static NetworkClientSecure pc; static bool pcInit = false; if (!pcInit) { pc.setInsecure(); pcInit = true; }
+  static HTTPClient ph; ph.setReuse(true); ph.setTimeout(4000);           // Verbindung offen halten: nicht jede Sekunde neu verschlüsseln
+  String r; int c = -1;
+  if (ph.begin(pc, "https://" + ip + "/clip/v2/resource/light/" + light)) { ph.addHeader("hue-application-key", key.c_str()); c = ph.GET(); r = c > 0 ? ph.getString() : String(); ph.end(); }
+  hueInReq = false;
   JsonDocument f; JsonObject fd = f["data"][0].to<JsonObject>();
   fd["on"] = true; fd["dimming"] = true; fd["color"]["xy"] = true; fd["color_temperature"] = true; fd["effects"]["status"] = true; fd["mode"] = true;
   JsonDocument d; bool ok = false;
@@ -3446,7 +3457,9 @@ void otaLoop() {
   if ((int32_t)(now - otaNext) >= 0) { otaCheckNow = true; otaNext = now + OTA_EVERY; }
   if (otaCheckNow) {
     otaCheckNow = false;
+    netQuietOn();
     bool ok = ota::check();
+    netQuiet = false;
     logf("[OTA] %s\n", ok ? ("neueste Version " + ota::latest()).c_str() : ota::error.c_str());
     otaPush(); wsForce = true;
     if (ok && cfg.autoUpdate && ota::cmp(ota::latest(), FW_VERSION) > 0 && ota::latest() != prefs.getString("otaBad", "")) otaInstallVer = ota::latest();
@@ -3459,7 +3472,9 @@ void otaLoop() {
     logf("[OTA] installiere %s …\n", v.c_str());
     saveColors(); fxSave(); if (simDirty) simSave();           // nichts verlieren
     prefs.putString("otaTry", v);                              // nach dem Neustart prüfen, ob sie wirklich läuft
+    netQuietOn();
     bool ok = ota::install(v);
+    netQuiet = false;
     if (!ok) prefs.remove("otaTry");
     otaPush();
     if (ok) {
