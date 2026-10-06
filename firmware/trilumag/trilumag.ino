@@ -968,7 +968,8 @@ void fxCompute() {
         if (!f && !b) fxPlan[fxPlanN++] = e0;                       // Sackgasse: zurück zur Eingangskante
       }
     }
-    float dec = dt * rate * (2.2f - 1.6f * fx.inten / 255.0f);
+    float ik = 1 - fx.inten / 255.0f;                         // Intensität = Schweiflänge: 0 kurz … 255 sehr lang
+    float dec = dt * rate * (0.1f + 2.4f * ik * ik);
     for (int s = 0; s < SLOTS * 3; s++) if (s != fxHead * 3 + fxHeadE) fxA[s] = fmaxf(0, fxA[s] - dec);
   }
   int beat = (int)(fxPhase * 2);                  // Disco: zweimal pro Takt neue Farben
@@ -1059,7 +1060,7 @@ void fxCompute() {
         case 14: {                                             // Komet: heller Kopf, der durch die Wand wandert
           float b = fxA[s];
           pcol(fxPhase * 0.03f, c, D_COLOR);
-          mul(c, 0.02f + 0.98f * b * b);
+          mul(c, 0.02f + 0.98f * powf(b, 1.6f));
           if (i == fxHead && e == fxHeadE) c[3] = fminf(255, c[3] + 120);
           break;
         }
