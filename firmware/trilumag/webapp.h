@@ -68,6 +68,7 @@ main{max-width:720px;margin:0 auto;padding:12px 14px;display:flex;flex-direction
 .hint{position:absolute;left:12px;bottom:8px;right:12px;font:11.5px ui-monospace,Menlo,monospace;color:var(--muted);pointer-events:none}
 .tri{stroke:#000;stroke-width:1.6;transition:fill .12s linear;cursor:pointer}
 .tri.main{stroke:#666;stroke-width:2}
+.link{stroke:#fff;stroke-width:1.3;stroke-linecap:round;opacity:.9;pointer-events:none}
 .tri.sel{stroke:#fff;stroke-width:3}
 .tri.tap{stroke:#fff;stroke-width:5;filter:brightness(1.6)}
 .prow{display:flex;flex-direction:column;gap:6px;padding:12px 14px;border-bottom:1px solid var(--card)}
@@ -89,7 +90,6 @@ main{max-width:720px;margin:0 auto;padding:12px 14px;display:flex;flex-direction
 .ghost.hot{stroke:var(--acc);stroke-width:2.2;fill:rgba(110,139,255,.15)}
 .lbl{font:9px ui-monospace,Menlo,monospace;fill:rgba(255,255,255,.6);pointer-events:none;text-anchor:middle}
 .lbl.dk{fill:rgba(0,0,0,.6)}
-.edge1{fill:rgba(255,255,255,.75);pointer-events:none}
 /* Auswahl-Chips */
 .chips{display:flex;gap:8px;flex-wrap:wrap}
 #fdiro{width:64px;white-space:nowrap}
@@ -619,9 +619,6 @@ function vw(q){const v=st&&st.view;if(!v||(!v.rot&&!v.mir))return q;const a=v.ro
 function geom(x,y,up){const cx=x*S/2,t=y*H;const p=up?[[cx-S/2,t+H],[cx+S/2,t+H],[cx,t]]:[[cx-S/2,t],[cx+S/2,t],[cx,t+H]];return{p:p.map(vw),c:vw([cx,up?t+2*H/3:t+H/3])};}
 function shrink(g,k){return g.p.map(q=>[g.c[0]+(q[0]-g.c[0])*k,g.c[1]+(q[1]-g.c[1])*k]);}
 function pts(a){return a.map(q=>q[0].toFixed(1)+','+q[1].toFixed(1)).join(' ');}
-function edge1Mid(p){const g=geom(p.x,p.y,p.up);const L=p.up?['B','R','L']:['T','L','R'];const d=L[(p.rot)%3];const [a,b,c]=g.p;
-  let m;if(p.up)m=d==='B'?[a,b]:d==='R'?[b,c]:[a,c];else m=d==='T'?[a,b]:d==='L'?[a,c]:[b,c];
-  const mx=(m[0][0]+m[1][0])/2,my=(m[0][1]+m[1][1])/2;return[mx+(g.c[0]-mx)*.28,my+(g.c[1]-my)*.28];}
 // Anzeige: dunkle LED-Werte etwas anheben, damit man sie am Bildschirm sieht
 function disp(r,g,b,w){const f=c=>Math.round(255*Math.pow(Math.min(1,(c+w*.85)/255),.55));return`rgb(${f(r)},${f(g)},${f(b)})`;}
 function staticCol(p){const k=(st.on?st.master:0)/255*p.bri/255;if(!p.on||!k)return'#141414';return disp(p.r*k,p.g*k,p.b*k,p.w*k);}
@@ -661,13 +658,18 @@ function drawWall(svg,big){
     const poly=el('polygon',{points:pts(shrink(g,.94)),class:cls.join(' ')});if(fill)poly.style.fill=fill;
     poly.dataset.id=p.id;if(cls.includes('pulse'))syncPulse(poly);gP.append(poly);}
     if(big){
-      if(!p.main){const m=edge1Mid(p);gP.append(el('circle',{cx:m[0],cy:m[1],r:2.4,class:'edge1'}));}
-      else{const a=g.p[0],b=g.p[1],mx=(a[0]+b[0])/2,my=(a[1]+b[1])/2;let ox=mx-g.c[0],oy=my-g.c[1];const L=Math.hypot(ox,oy)||1;ox=ox/L*5;oy=oy/L*5;   // Strich außen an der Unterkante des Hauptpanels
+      if(p.main){const a=g.p[0],b=g.p[1],mx=(a[0]+b[0])/2,my=(a[1]+b[1])/2;let ox=mx-g.c[0],oy=my-g.c[1];const L=Math.hypot(ox,oy)||1;ox=ox/L*5;oy=oy/L*5;   // Strich außen an der Unterkante des Hauptpanels
         const tx=(b[0]-a[0])*.12,ty=(b[1]-a[1])*.12;gP.append(el('line',{x1:a[0]+tx+ox,y1:a[1]+ty+oy,x2:b[0]-tx+ox,y2:b[1]-ty+oy,stroke:'#777','stroke-width':3,'stroke-linecap':'round'}));}
       const t=el('text',{x:g.c[0],y:g.c[1]+3,class:'lbl'+(lightish(p)?' dk':'')});t.textContent=p.main?'Haupt':p.id.slice(4);gP.append(t);
     }
   });
-  if(big)drawDrag(svg);
+  if(big){                                              // feiner Strich: über diese Kante läuft der Bus zum vorigen Panel
+    const gL=el('g',{class:'links'});svg.insertBefore(gL,gO);
+    st.panels.forEach(p=>{const q=p.parent&&st.panels.find(x=>x.id===p.parent);if(!q)return;
+      const a=geom(p.x,p.y,p.up).p,b=geom(q.x,q.y,q.up).p,c=a.filter(u=>b.some(v=>Math.hypot(u[0]-v[0],u[1]-v[1])<1));
+      if(c.length!==2)return;const [u,v]=c;
+      gL.append(el('line',{x1:u[0]+(v[0]-u[0])*.3,y1:u[1]+(v[1]-u[1])*.3,x2:u[0]+(v[0]-u[0])*.7,y2:u[1]+(v[1]-u[1])*.7,class:'link'}));});
+    drawDrag(svg);}
 }
 function paintLive(){
   let rebuild=false;
