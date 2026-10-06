@@ -2060,14 +2060,62 @@ void wsLoop() {
 // Damit funktionieren die WLED-Integration von Home Assistant und andere WLED-Programme.
 String macPlain() { uint8_t m[6]; WiFi.macAddress(m); char b[13]; snprintf(b, sizeof b, "%02x%02x%02x%02x%02x%02x", m[0], m[1], m[2], m[3], m[4], m[5]); return b; }
 
+namespace peers { extern volatile bool busy; }
 void mdnsStart() {
+  if (peers::busy) return;                          // gerade läuft eine Suche nach anderen Wänden
   MDNS.end();
   MDNS.begin(HOSTNAME);
   MDNS.setInstanceName(cfg.name.c_str());          // so heißt die Wand in Geräte-Listen; die Adresse bleibt trilumag.local
   MDNS.addService("http", "tcp", 80);
   MDNS.addService("wled", "tcp", 80);
   MDNS.addServiceTxt("wled", "tcp", "mac", macPlain().c_str());
+  MDNS.addServiceTxt("wled", "tcp", "tl", FW_VERSION);          // daran erkennen sich Trilumag-Wände
+  MDNS.addServiceTxt("wled", "tcp", "name", cfg.name.c_str());
 }
+
+// ---------- Andere Trilumag im WLAN finden (für die Liste in der App) ----------
+// Die mDNS-Abfrage dauert 3 s, deshalb läuft sie in einer eigenen Aufgabe; die Hauptschleife übernimmt das Ergebnis.
+namespace peers {
+struct Peer { String name, host, ip, ver; };
+const uint8_t MAXP = 16;
+Peer cur[MAXP], nxt[MAXP];
+uint8_t nCur = 0, nNxt = 0;
+volatile bool busy = false, ready = false;
+uint32_t at = 0;
+void task(void*) {
+  int k = MDNS.queryService("wled", "tcp");                    // ältere Trilumag-Versionen melden sich nur so
+  String me = WiFi.localIP().toString();
+  nNxt = 0;
+  for (int i = 0; i < k && nNxt < MAXP; i++) {
+    String h = MDNS.hostname(i), ip = MDNS.address(i).toString();
+    bool tl = MDNS.hasTxt(i, "tl");
+    if (!tl && !h.startsWith("trilumag")) continue;              // echte WLED-Geräte auslassen
+    if (ip == me || ip == "0.0.0.0") continue;
+    Peer& p = nxt[nNxt++];
+    p.host = h; p.ip = ip; p.ver = tl ? MDNS.txt(i, "tl") : String();
+    p.name = MDNS.hasTxt(i, "name") ? MDNS.txt(i, "name") : h;
+  }
+  ready = true;
+  vTaskDelete(nullptr);
+}
+void start() {
+  if (busy || !wlanOk) return;
+  busy = true; ready = false;
+  if (xTaskCreate(task, "peers", 6144, nullptr, 1, nullptr) != pdPASS) busy = false;
+}
+void loop() {
+  if (!ready) return;
+  for (uint8_t i = 0; i < nNxt; i++) cur[i] = nxt[i];
+  nCur = nNxt; at = millis() | 1; ready = false; busy = false;
+}
+String json() {
+  JsonDocument d;
+  d["busy"] = (bool)busy; d["ago"] = at ? (int32_t)((millis() - at) / 1000) : -1;
+  JsonArray a = d["list"].to<JsonArray>();
+  for (uint8_t i = 0; i < nCur; i++) { JsonObject o = a.add<JsonObject>(); o["name"] = cur[i].name; o["host"] = cur[i].host; o["ip"] = cur[i].ip; o["ver"] = cur[i].ver; }
+  String out; serializeJson(d, out); return out;
+}
+}  // namespace peers
 
 int ledCount() { return countAttached() * SEG_PER_PANEL; }
 
@@ -2946,6 +2994,7 @@ const char* apiCall(const char* path, JsonDocument& d) {
     return nullptr;
   }
   // Energie: {"action":"reset"} setzt alle Zähler zurück
+  if (!strcmp(path, "/api/peers")) { if (!wlanOk) return "Kein WLAN"; peers::start(); return nullptr; }
   if (!strcmp(path, "/api/energy")) {
     if (strcmp(d["action"] | "", "reset")) return "Unbekannte Aktion";
     memset(&en, 0, sizeof en); enPending = 0; enSave();
@@ -2968,6 +3017,7 @@ const char* apiCall(const char* path, JsonDocument& d) {
     if (n == cfg.name) return nullptr;
     cfg.name = n; prefs.putString("name", n);
     MDNS.setInstanceName(n.c_str());
+    MDNS.addServiceTxt("wled", "tcp", "name", n.c_str());
     diag("Die Wand heißt jetzt „%s“", n.c_str());
     if (mqtt.connected()) {                            // Gerätename in Home Assistant nachziehen
       publishAllLight();
@@ -3078,8 +3128,9 @@ void setupWeb() {
   });
   server.on("/api/state", HTTP_GET, replyState);
   server.on("/api/energy", HTTP_GET, [] { server.send(200, "application/json", energyJson()); });
+  server.on("/api/peers", HTTP_GET, [] { server.send(200, "application/json", peers::json()); });
   // Befehle laufen über apiCall(), damit HTTP und WebSocket dasselbe tun
-  const char* cmds[] = {"/api/set", "/api/presets", "/api/effect", "/api/test", "/api/ota", "/api/light", "/api/diag", "/api/touch", "/api/panelfw", "/api/zigbee", "/api/name", "/api/identify", "/api/guard", "/api/swap", "/api/favs", "/api/view", "/api/signal", "/api/progress", "/api/sleep", "/api/boot", "/api/energy", "/api/sync",
+  const char* cmds[] = {"/api/set", "/api/presets", "/api/effect", "/api/test", "/api/ota", "/api/light", "/api/diag", "/api/touch", "/api/panelfw", "/api/zigbee", "/api/name", "/api/identify", "/api/guard", "/api/swap", "/api/favs", "/api/view", "/api/signal", "/api/progress", "/api/sleep", "/api/boot", "/api/energy", "/api/peers", "/api/sync",
                         "/api/sim/new", "/api/sim/remove", "/api/sim/attach", "/api/sim/detach", "/api/sim/tap"};
   for (const char* path : cmds) {
     server.on(path, HTTP_POST, [path] {
@@ -3491,6 +3542,7 @@ void loop() {
   if (simDirty && millis() - simDirtyAt > 1500) simSave();
   if (fxDirty && millis() - fxDirtyAt > 5000) fxSave();
   zbLoop();
+  peers::loop();
   sleepLoop();
   litLoop();
   enLoop();
