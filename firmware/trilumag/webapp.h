@@ -25,7 +25,8 @@ button{font:inherit;color:inherit}
 .bri svg{width:20px;height:20px;flex:none;fill:var(--muted)}
 .pct{flex:none;width:46px;text-align:right;font:13px ui-monospace,Menlo,monospace;color:var(--fg)}
 .status{max-width:720px;margin:4px auto 0;font:11.5px ui-monospace,Menlo,monospace;color:var(--muted);display:flex;justify-content:space-between;gap:8px}
-.status b{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:45%;color:var(--fg);font-weight:600;font-family:system-ui,sans-serif;letter-spacing:.02em}
+.status b{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;flex:none;max-width:62%;color:var(--fg);font-weight:600;font-family:system-ui,sans-serif;letter-spacing:.02em}
+.status span{min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;text-align:right}
 /* Regler */
 input[type=range]{-webkit-appearance:none;appearance:none;width:100%;height:28px;background:transparent;margin:0}
 input[type=range]::-webkit-slider-runnable-track{height:8px;border-radius:4px;background:linear-gradient(90deg,var(--acc) var(--p,50%),#3a3a3a var(--p,50%))}
