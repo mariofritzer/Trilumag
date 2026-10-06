@@ -2,6 +2,15 @@
 
 Die Versionsnummer im Webinstaller und in der App setzt sich aus der Version in der Firmware und der Nummer des automatischen Builds zusammen, zum Beispiel **0.5.11** = Version 0.5, Build 11. Bis Build 9 hat der Build die Nummer immer als 0.2.x ausgegeben, die tatsächlichen Stände stehen deshalb unten mit beiden Nummern.
 
+## 0.7.48 · 6. Oktober 2026
+
+**Hue-Lampe nachahmen**
+- Neu unter Optionen, mit jedem Chip: Die Wand folgt einer Lampe deiner Hue Bridge (Ein/Aus, Helligkeit, Farbe, Weißton und Effekte wie Kerze oder Feuer).
+- Einrichten: Bridge suchen, den Knopf auf der Bridge drücken, „Koppeln“, Lampe wählen.
+
+**Komet**
+- Die Intensität bestimmt jetzt die Schweiflänge: bei 255 ein langer Schweif über viele Panels, bei 0 ein kurzer.
+
 ## 0.7.47 · 6. Oktober 2026
 
 **Eigene Paletten**

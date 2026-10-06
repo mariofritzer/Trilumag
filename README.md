@@ -126,6 +126,10 @@ Unter Wand → Spiel startet ein Merkspiel: Die Wand zeigt eine Folge von Panels
 
 Unter Optionen → WLED nachahmen findet die App WLED-Geräte im WLAN (oder man gibt die IP ein). Trilumag fragt das Gerät alle 1,5 s ab und übernimmt Änderungen an Ein/Aus, Helligkeit, Farbe, Tempo und Intensität, dazu den Effekt, wenn es ein Gegenstück gibt (etwa Rainbow, Breathe, Fire 2012, Aurora, Sparkle, Meteor, Lightning, Fireworks).
 
+## Hue-Lampe nachahmen
+
+Unter Optionen → Hue-Lampe nachahmen folgt die Wand einer Lampe der Hue Bridge (geht mit jedem Chip, übers WLAN): Bridge suchen, den runden Knopf auf der Bridge drücken und „Koppeln“ tippen, dann eine Lampe wählen. Trilumag fragt die Lampe jede Sekunde über die lokale Schnittstelle der Bridge (API v2) ab und übernimmt Ein/Aus, Helligkeit, Farbe, Weißton und die Effekte Kerze, Feuer, Funkeln, Prisma und Opal.
+
 ## Störungsanzeige
 
 Ist das WLAN weg oder antwortet ein Panel nicht mehr, blinkt das Hauptpanel alle 10 Sekunden zweimal kurz (orange bzw. rot), solange die Wand an ist. Abschaltbar unter Optionen → WLAN.
@@ -174,6 +178,7 @@ Mit einem ESP32-C6 als Hauptpanel meldet sich Trilumag zusätzlich als Zigbee-3.
 | `POST /api/palette` | Eigene Palette: `{"action":"save","slot":0,"name":"Rot-Gold-Weiß","colors":["#FF0000","#FFB000","#FFFFFF"]}`, `{"action":"delete","slot":0}` |
 | `POST /api/weather` | Wetter: `{"place":"Wien"}` (Ort suchen und Wetter holen), `{"place":""}` löscht ihn |
 | `POST /api/game` | Spiel „Simon sagt“: `{"action":"start"}` / `{"action":"stop"}` |
+| `POST /api/hue`, `GET /api/hue` | Hue-Lampe nachahmen: `{"action":"find"}`, `{"action":"pair"}`, `{"action":"lights"}`, `{"action":"follow","id":"…","name":"…"}`, `{"action":"stop"}`, `{"action":"forget"}`; GET liefert Bridges und Lampen |
 | `POST /api/mirror` | WLED nachahmen: `{"ip":"192.168.1.70"}`, `{"ip":""}` beendet es |
 | `POST /api/fault` | Störungsanzeige: `{"on":true}` |
 | `POST /api/guard` | WLAN-Wächter: `{"on":true}` |

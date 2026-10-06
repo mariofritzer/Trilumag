@@ -447,6 +447,7 @@ bool timeOk();
 uint32_t faultPanelAt = 0;     // wann zuletzt ein Panel nicht mehr geantwortet hat
 namespace wx { extern String place, err; extern volatile bool busy; void json(JsonObject o); }
 namespace mirror { extern String ip; void json(JsonObject o); }
+namespace hueb { void json(JsonObject o); }
 extern bool outForce, testMode;
 void transition();
 bool placePanel(int i, int parent, uint8_t edge, uint8_t own);
@@ -2235,6 +2236,7 @@ String stateJson(bool meta) {
   if (wx::place.length() || wx::err.length() || wx::busy) wx::json(d["wx"].to<JsonObject>());
   game::json(d["game"].to<JsonObject>());
   if (mirror::ip.length()) mirror::json(d["mirror"].to<JsonObject>());
+  hueb::json(d["hue"].to<JsonObject>());
   if (cfg.daylight) { JsonObject dy = d["day"].to<JsonObject>(); dy["ok"] = timeOk(); if (timeOk()) { float dm, wm; dayCurve(dm, wm); dy["dim"] = (int)(dm * 100 + 0.5f); dy["warm"] = (int)(wm * 100 + 0.5f); } }
   d["upd"] = ota::count && ota::cmp(ota::latest(), FW_VERSION) > 0 ? ota::latest() : String();   // neuere Version verfügbar
   d["ver"] = FW_VERSION;
@@ -2557,6 +2559,136 @@ void loop() {
 }
 void json(JsonObject o) { o["ip"] = ip; o["ok"] = okAt && !fail && millis() - okAt < 10000; }
 }  // namespace mirror
+
+// ---------- Hue-Lampe nachahmen (über die Hue Bridge im WLAN, auf jedem Chip) ----------
+// Bridge finden (mDNS), einmal koppeln (Knopf auf der Bridge), Lampe wählen. Dann fragt Trilumag die Lampe jede
+// Sekunde über die lokale Schnittstelle (API v2, HTTPS) ab und übernimmt Änderungen wie beim WLED-Nachahmen.
+namespace hueb {
+String ip, key, light, lname, err;            // Bridge, Schlüssel, gefolgte Lampe (ID, Name), letzter Fehler
+volatile bool busy = false, run = false, fresh = false, fail = false;
+String want;                                  // Auftrag für die Aufgabe: "find", "pair", "lights"
+String bridges[4]; uint8_t nBr = 0;
+struct L { String id, name; }; L lights[40]; uint8_t nL = 0;
+struct St { bool on; uint8_t bri; bool ct; uint16_t mirek; float x, y; String fx; };
+St got, last; bool haveLast = false; uint32_t okAt = 0;
+// CIE xy → RGB (hellster Kanal 255)
+void xyRgb(float x, float y, uint8_t* o) {
+  if (y < 0.001f) y = 0.001f;
+  float X = x / y, Z = (1 - x - y) / y;
+  float r = 3.2406f * X - 1.5372f - 0.4986f * Z, g = -0.9689f * X + 1.8758f + 0.0415f * Z, b = 0.0557f * X - 0.2040f + 1.0570f * Z;
+  r = fmaxf(0, r); g = fmaxf(0, g); b = fmaxf(0, b); float m = fmaxf(r, fmaxf(g, b)); if (m <= 0) m = 1;
+  o[0] = lroundf(255 * r / m); o[1] = lroundf(255 * g / m); o[2] = lroundf(255 * b / m);
+}
+int req(const char* method, const String& path, const String& body, String& out, bool auth) {
+  NetworkClientSecure c; c.setInsecure();                 // die Bridge hat ein selbst ausgestelltes Zertifikat
+  HTTPClient h; h.setTimeout(4000);
+  if (!h.begin(c, "https://" + ip + path)) return -1;
+  if (auth) h.addHeader("hue-application-key", key.c_str());
+  int code;
+  if (!strcmp(method, "POST")) { h.addHeader("Content-Type", "application/json"); code = h.POST(body); } else code = h.GET();
+  out = code > 0 ? h.getString() : String();
+  h.end();
+  return code;
+}
+void work(void*) {
+  String e;
+  if (want == "find") {
+    int k = MDNS.queryService("hue", "tcp"); nBr = 0;
+    for (int i = 0; i < k && nBr < 4; i++) { String a = MDNS.address(i).toString(); if (a != "0.0.0.0") bridges[nBr++] = a; }
+    if (!nBr) e = "Keine Hue Bridge gefunden";
+    else if (!ip.length()) ip = bridges[0];
+  } else if (want == "pair") {
+    String r; int c = req("POST", "/api", "{\"devicetype\":\"trilumag#wand\"}", r, false);
+    JsonDocument d;
+    if (c != 200 || deserializeJson(d, r)) e = "Bridge nicht erreichbar";
+    else if (d[0]["success"]["username"].is<const char*>()) { key = d[0]["success"]["username"].as<const char*>(); prefs.putString("hueKey", key); prefs.putString("hueIp", ip); want = "lights"; }
+    else if ((d[0]["error"]["type"] | 0) == 101) e = "Bitte zuerst den runden Knopf auf der Bridge drücken, dann gleich noch einmal koppeln";
+    else e = "Koppeln ging nicht";
+  }
+  if (!e.length() && want == "lights") {
+    String r; int c = req("GET", "/clip/v2/resource/light", "", r, true);
+    JsonDocument f; JsonObject fd = f["data"][0].to<JsonObject>(); fd["id"] = true; fd["metadata"]["name"] = true;
+    JsonDocument d;
+    if (c == 403 || c == 401) { e = "Bridge kennt Trilumag nicht mehr, bitte neu koppeln"; key = ""; prefs.remove("hueKey"); }
+    else if (c != 200 || deserializeJson(d, r, DeserializationOption::Filter(f))) e = "Lampen ließen sich nicht abrufen";
+    else { nL = 0; for (JsonVariant v : d["data"].as<JsonArray>()) if (nL < 40) { lights[nL].id = (const char*)(v["id"] | ""); lights[nL].name = (const char*)(v["metadata"]["name"] | "?"); nL++; } }
+  }
+  err = e; want = ""; busy = false;
+  vTaskDelete(nullptr);
+}
+void start(const char* what) {
+  if (busy || !wlanOk) return;
+  want = what; busy = true;
+  if (xTaskCreate(work, "hue", 8192, nullptr, 1, nullptr) != pdPASS) busy = false;
+}
+void pollOnce() {
+  String r; int c = req("GET", "/clip/v2/resource/light/" + light, "", r, true);
+  JsonDocument f; JsonObject fd = f["data"][0].to<JsonObject>();
+  fd["on"] = true; fd["dimming"] = true; fd["color"]["xy"] = true; fd["color_temperature"] = true; fd["effects"]["status"] = true;
+  JsonDocument d; bool ok = false;
+  if (c == 200 && !deserializeJson(d, r, DeserializationOption::Filter(f))) {
+    JsonVariant v = d["data"][0];
+    St n; n.on = v["on"]["on"] | false; n.bri = constrain((int)lroundf((v["dimming"]["brightness"] | 100.0f) * 2.55f), 1, 255);
+    n.ct = v["color_temperature"]["mirek_valid"] | false; n.mirek = v["color_temperature"]["mirek"] | 366;
+    n.x = v["color"]["xy"]["x"] | 0.4573f; n.y = v["color"]["xy"]["y"] | 0.41f;
+    n.fx = (const char*)(v["effects"]["status"] | "no_effect");
+    if (!fresh) { got = n; fresh = true; }
+    ok = true;
+  }
+  fail = !ok; if (ok) okAt = millis() | 1;
+}
+void task(void*) {
+  while (run) { pollOnce(); for (int t = 0; t < 10 && run; t++) vTaskDelay(pdMS_TO_TICKS(100)); }
+  vTaskDelete(nullptr);
+}
+void follow(const String& id, const String& nm) {
+  light = id; lname = nm; haveLast = false; fresh = false; fail = false; okAt = 0;
+  prefs.putString("hueLight", id); prefs.putString("hueLName", nm);
+  if (!run && id.length()) { run = true; if (xTaskCreate(task, "huepoll", 8192, nullptr, 1, nullptr) != pdPASS) run = false; }
+}
+void stop() { run = false; light = ""; lname = ""; prefs.remove("hueLight"); }
+// Hue-Effekte auf Trilumag-Effekte
+const char* mapFx(const String& f) {
+  if (f == "candle") return "kerzen"; if (f == "fire") return "feuer"; if (f == "sparkle" || f == "glisten") return "funkeln";
+  if (f == "prism") return "regenbogen"; if (f == "opal") return "polarlicht"; if (f == "cosmos") return "sterne"; if (f == "sunbeam") return "atmen";
+  return "aus";
+}
+void loop() {
+  if (!fresh) return;
+  St n = got; fresh = false;
+  JsonDocument d;
+  if (!haveLast || n.on != last.on) d["state"] = n.on ? "ON" : "OFF";
+  if (!haveLast || n.bri != last.bri) d["brightness"] = n.bri;
+  bool fxCh = !haveLast || n.fx != last.fx;
+  const char* fxId = mapFx(n.fx);
+  if (fxCh) d["effect"] = fxId;
+  bool colCh = !haveLast || n.ct != last.ct || (n.ct ? n.mirek != last.mirek : (fabsf(n.x - last.x) > 0.002f || fabsf(n.y - last.y) > 0.002f));
+  bool colOk = !strcmp(fxId, "aus") || FX[fxFind(fxId)].color;
+  if (colOk && (colCh || fxCh)) {
+    uint8_t c[4] = {0, 0, 0, 0};
+    if (n.ct) kelvinRgbw(1000000 / (n.mirek ? n.mirek : 366), c); else xyRgb(n.x, n.y, c);
+    JsonObject o = d["color"].to<JsonObject>(); o["r"] = c[0]; o["g"] = c[1]; o["b"] = c[2]; o["w"] = c[3];
+  }
+  last = n; haveLast = true;
+  if (d.size()) { applyAll(d.as<JsonVariantConst>()); wsKick(); }
+}
+void load() {
+  ip = prefs.getString("hueIp", ""); key = prefs.getString("hueKey", "");
+  String l = prefs.getString("hueLight", "");
+  if (key.length() && l.length()) follow(l, prefs.getString("hueLName", ""));
+}
+void json(JsonObject o) {
+  o["ip"] = ip; o["paired"] = key.length() > 0; o["busy"] = (bool)busy;
+  if (light.length()) { o["light"] = light; o["name"] = lname; o["ok"] = okAt && !fail && millis() - okAt < 10000; }
+  if (err.length()) o["err"] = err;
+}
+String listJson() {
+  JsonDocument d; d["busy"] = (bool)busy; d["ip"] = ip; d["paired"] = key.length() > 0; if (err.length()) d["err"] = err;
+  JsonArray b = d["bridges"].to<JsonArray>(); for (uint8_t i = 0; i < nBr; i++) b.add(bridges[i]);
+  JsonArray l = d["lights"].to<JsonArray>(); for (uint8_t i = 0; i < nL; i++) { JsonObject o = l.add<JsonObject>(); o["id"] = lights[i].id; o["name"] = lights[i].name; }
+  String out; serializeJson(d, out); return out;
+}
+}  // namespace hueb
 
 // ---------- Wetter (Open-Meteo, kostenlos, ohne Anmeldung) ----------
 // Ort einmal in Koordinaten umrechnen, dann alle 15 Minuten Temperatur und Niederschlag holen. Läuft in einer eigenen Aufgabe.
@@ -3546,11 +3678,24 @@ const char* apiCall(const char* path, JsonDocument& d) {
     }
     return "Unbekannte Aktion";
   }
+  // Hue-Lampe nachahmen: {"action":"find"} | {"action":"pair","ip":"…"} | {"action":"lights"} | {"action":"follow","id":"…","name":"…"} | {"action":"stop"} | {"action":"forget"}
+  if (!strcmp(path, "/api/hue")) {
+    const char* a = d["action"] | "";
+    if (!wlanOk && strcmp(a, "stop") && strcmp(a, "forget")) return "Kein WLAN";
+    if (hueb::busy && strcmp(a, "stop")) return "Hue: einen Moment, es läuft noch etwas";
+    if (!strcmp(a, "find")) { hueb::start("find"); return nullptr; }
+    if (!strcmp(a, "pair")) { String i = d["ip"] | hueb::ip; if (!i.length()) return "Bitte zuerst die Bridge suchen oder ihre IP eingeben"; hueb::ip = i; hueb::start("pair"); return nullptr; }
+    if (!strcmp(a, "lights")) { if (!hueb::key.length()) return "Bitte zuerst koppeln"; hueb::start("lights"); return nullptr; }
+    if (!strcmp(a, "follow")) { String id = d["id"] | ""; if (!id.length() || !hueb::key.length()) return "Lampe unbekannt"; mirror::stop(); prefs.putString("wledIp", ""); hueb::follow(id, d["name"] | ""); diag("Ahmt die Hue-Lampe „%s“ nach", hueb::lname.c_str()); return nullptr; }
+    if (!strcmp(a, "stop")) { hueb::stop(); return nullptr; }
+    if (!strcmp(a, "forget")) { hueb::stop(); hueb::key = ""; hueb::nL = 0; prefs.remove("hueKey"); return nullptr; }
+    return "Unbekannte Aktion";
+  }
   // WLED nachahmen: {"ip":"192.168.1.70"} oder {"ip":""} zum Beenden
   if (!strcmp(path, "/api/mirror")) {
     String a = d["ip"] | "";
     prefs.putString("wledIp", a);
-    if (a.length()) mirror::start(a); else mirror::stop();
+    if (a.length()) { hueb::stop(); mirror::start(a); } else mirror::stop();
     if (a.length()) diag("Ahmt das WLED-Gerät %s nach", a.c_str()); else diag("WLED nachahmen aus");
     return nullptr;
   }
@@ -3716,8 +3861,9 @@ void setupWeb() {
   server.on("/api/state", HTTP_GET, replyState);
   server.on("/api/energy", HTTP_GET, [] { server.send(200, "application/json", energyJson()); });
   server.on("/api/peers", HTTP_GET, [] { server.send(200, "application/json", peers::json()); });
+  server.on("/api/hue", HTTP_GET, [] { server.send(200, "application/json", hueb::listJson()); });
   // Befehle laufen über apiCall(), damit HTTP und WebSocket dasselbe tun
-  const char* cmds[] = {"/api/set", "/api/presets", "/api/effect", "/api/test", "/api/ota", "/api/light", "/api/diag", "/api/touch", "/api/panelfw", "/api/zigbee", "/api/name", "/api/identify", "/api/guard", "/api/swap", "/api/favs", "/api/view", "/api/signal", "/api/progress", "/api/sleep", "/api/boot", "/api/energy", "/api/peers", "/api/weather", "/api/game", "/api/fault", "/api/mirror", "/api/palette", "/api/sync",
+  const char* cmds[] = {"/api/set", "/api/presets", "/api/effect", "/api/test", "/api/ota", "/api/light", "/api/diag", "/api/touch", "/api/panelfw", "/api/zigbee", "/api/name", "/api/identify", "/api/guard", "/api/swap", "/api/favs", "/api/view", "/api/signal", "/api/progress", "/api/sleep", "/api/boot", "/api/energy", "/api/peers", "/api/weather", "/api/game", "/api/fault", "/api/mirror", "/api/hue", "/api/palette", "/api/sync",
                         "/api/sim/new", "/api/sim/remove", "/api/sim/rotate", "/api/sim/attach", "/api/sim/detach", "/api/sim/tap"};
   for (const char* path : cmds) {
     server.on(path, HTTP_POST, [path] {
@@ -4071,6 +4217,7 @@ void setup() {
   fxLoad();
   wx::load();
   { String m = prefs.getString("wledIp", ""); if (m.length()) mirror::start(m); }
+  hueb::load();
   presetsLoad();
   bootApply();                                      // nach Stromausfall: aus, an oder Preset (Einstellung)
   enLoad();
@@ -4135,6 +4282,7 @@ void loop() {
   peers::loop();
   wx::loop();
   mirror::loop();
+  hueb::loop();
   sleepLoop();
   litLoop();
   enLoop();
