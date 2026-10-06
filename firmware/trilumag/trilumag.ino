@@ -276,6 +276,18 @@ int edgeFacing(int i, Dir d) {
   for (uint8_t e = 0; e < 3; e++) if (worldDir(P[i], e) == d) return e;
   return -1;
 }
+// Mitte von Kante e des Panels i (Seitenlänge 1) und ob sie zum Elternpanel zeigt: dd -0,33 (Eingang) oder +0,17
+void edgePos(int i, int e, float& x, float& y, float& dd) {
+  const Panel& p = P[i]; float dx = 0, dy = 0; dd = 0;
+  if (e >= 0) {
+    Dir w = worldDir(p, e);
+    if (w == BOTTOM) dy = 0.289f; else if (w == TOP) dy = -0.289f;
+    else { dx = w == RIGHT ? 0.25f : -0.25f; dy = isUp(p.x, p.y) ? -0.144f : 0.144f; }
+    int nx, ny; neighbor(p.x, p.y, w, nx, ny);
+    dd = (p.parent >= 0 && P[p.parent].x == nx && P[p.parent].y == ny) ? -0.33f : 0.17f;
+  }
+  x = p.x * 0.5f + dx; y = p.y * 0.866f + dy;
+}
 int countAttached() { int n = 0; for (int i = 0; i < SLOTS; i++) if (P[i].used && P[i].attached) n++; return n; }
 String hex(uint32_t c) { char b[9]; snprintf(b, sizeof b, "%08X", c); return String(b); }
 uint32_t parseHex(const char* s) { return (uint32_t)strtoul(s, nullptr, 16); }
@@ -755,7 +767,7 @@ const uint32_t FX_FRAME_MS = 40;
 
 float fxPhase = 0, fxA[SLOTS * 3], fxB[SLOTS * 3], fxT[SLOTS * 3];   // Zustand pro Punkt (Panel oder Kante)
 float fxFlash = 0, fxFlashX = 0, fxFlashY = 0;      // Gewitter: aktueller Blitz
-int fxHead = 0; float fxStep = 0; int fxBeat = -1;  // Komet: Kopf; Disco: Takt
+int fxHead = 0, fxHeadE = 0, fxInPanel = 0; float fxStep = 0; int fxBeat = -1;  // Komet: Kopf (Panel, Kante); Disco: Takt
 float fwX = 0, fwY = 0, fwT = 9, fwH = 0;          // Feuerwerk: Mitte, Alter und Farbe der aktuellen Rakete
 float wxTemp = 15; uint8_t wxKind = 0; bool wxOk = false;   // Wetter: Temperatur, 0 trocken, 1 Regen, 2 Schnee
 uint16_t fxDir = 0;            // Richtung der Effekte in Grad (Lauflicht, Wellen, Lava …)
@@ -888,19 +900,41 @@ void fxCompute() {
     effXY(P[pick].x * 0.5f, P[pick].y * 0.866f, fxFlashX, fxFlashY); fxFlash = 0.7f + 0.3f * frand();
   }
   // Komet: der Kopf wandert zu einem Nachbarn weiter
+  // Panels mit "Kanten einzeln": der Kopf läuft Kante für Kante durchs Panel und über die Kante ins nächste
   if (fx.id == 14) {
-    if (!P[fxHead].used || !P[fxHead].attached) fxHead = 0;
+    if (!P[fxHead].used || !P[fxHead].attached) { fxHead = 0; fxHeadE = 0; }
+    if (!P[fxHead].edges) fxHeadE = 0;
     fxStep += dt * rate * 4;
     while (fxStep >= 1) {
       fxStep -= 1;
-      int cand[3], n = 0;
-      for (uint8_t e = 0; e < 3; e++) { int nx, ny; neighbor(P[fxHead].x, P[fxHead].y, worldDir(P[fxHead], e), nx, ny); int j = findAt(nx, ny); if (j >= 0 && fxA[j * 3] < 0.5f) cand[n++] = j; }
-      if (!n) for (uint8_t e = 0; e < 3; e++) { int nx, ny; neighbor(P[fxHead].x, P[fxHead].y, worldDir(P[fxHead], e), nx, ny); int j = findAt(nx, ny); if (j >= 0) cand[n++] = j; }
-      if (n) fxHead = cand[(int)(frand() * n) % n];
-      fxA[fxHead * 3] = 1;
+      int cj[6], ce[6], n = 0;
+      const Panel& h = P[fxHead];
+      if (h.edges) for (int k = 1; k < 3; k++) { cj[n] = fxHead; ce[n] = (fxHeadE + k) % 3; n++; }   // weiter im selben Panel
+      for (uint8_t e = 0; e < 3; e++) {
+        if (h.edges && e != fxHeadE) continue;                    // aus einem Kanten-Panel nur über die leuchtende Kante hinaus
+        Dir w = worldDir(h, e); int nx, ny; neighbor(h.x, h.y, w, nx, ny); int j = findAt(nx, ny);
+        if (j < 0) continue;
+        int ej = P[j].edges ? edgeFacing(j, opposite(w)) : 0; if (ej < 0) ej = 0;
+        cj[n] = j; ce[n] = ej; n++;
+      }
+      // erst die anderen Kanten des Panels, dann über die leuchtende Kante hinüber; führt dort nichts weiter,
+      // zu einer Kante mit Nachbarn; sonst zufällig, bevorzugt noch dunkle Punkte
+      auto hasNb = [&](int e) { int nx, ny; neighbor(h.x, h.y, worldDir(h, e), nx, ny); return findAt(nx, ny) >= 0; };
+      int pick = -1;
+      if (h.edges && fxInPanel < 2) { for (int k = 0; k < n; k++) if (cj[k] == fxHead && fxA[cj[k] * 3 + ce[k]] < 0.5f) { pick = k; break; } }
+      if (pick < 0) {                                            // hinüber
+        int fr[6], m = 0, all[6], a = 0;
+        for (int k = 0; k < n; k++) if (cj[k] != fxHead) { all[a++] = k; if (fxA[cj[k] * 3 + ce[k]] < 0.5f) fr[m++] = k; }
+        if (m) pick = fr[(int)(frand() * m) % m]; else if (a) pick = all[(int)(frand() * a) % a];
+      }
+      if (pick < 0) for (int k = 0; k < n; k++) if (cj[k] == fxHead && hasNb(ce[k])) { pick = k; break; }   // zur Ausgangskante
+      if (pick < 0 && n) pick = (int)(frand() * n) % n;
+      if (pick >= 0) { fxInPanel = cj[pick] == fxHead ? fxInPanel + 1 : 0; fxHead = cj[pick]; fxHeadE = ce[pick]; }
+      fxA[fxHead * 3 + fxHeadE] = 1;
     }
+    float dec = dt * rate * (2.2f - 1.6f * fx.inten / 255.0f);
+    for (int s = 0; s < SLOTS * 3; s++) if (s != fxHead * 3 + fxHeadE) fxA[s] = fmaxf(0, fxA[s] - dec);
   }
-  if (fx.id == 14) for (int i = 0; i < SLOTS; i++) if (i != fxHead) fxA[i * 3] = fmaxf(0, fxA[i * 3] - dt * rate * (2.2f - 1.6f * fx.inten / 255.0f));
   int beat = (int)(fxPhase * 2);                  // Disco: zweimal pro Takt neue Farben
   bool newBeat = beat != fxBeat; fxBeat = beat;
 
@@ -911,17 +945,10 @@ void fxCompute() {
     int points = p.edges ? 3 : 1;
     for (int e = 0; e < points; e++) {
       // Position des Punkts: Mitte des Panels oder Mitte der Kante e (Seitenlänge 1)
-      float dx = 0, dy = 0, dd = 0;
-      if (p.edges) {
-        Dir w = worldDir(p, e);
-        if (w == BOTTOM) dy = 0.289f; else if (w == TOP) dy = -0.289f;
-        else { dx = w == RIGHT ? 0.25f : -0.25f; dy = up ? -0.144f : 0.144f; }
-        int nx, ny; neighbor(p.x, p.y, w, nx, ny);              // Kante zum Elternpanel liegt näher am Hauptpanel
-        dd = (p.parent >= 0 && P[p.parent].x == nx && P[p.parent].y == ny) ? -0.33f : 0.17f;
-      }
+      float px, py, dd; edgePos(i, p.edges ? e : -1, px, py, dd);   // Kante zum Elternpanel liegt näher am Hauptpanel
       float c[4] = {0, 0, 0, 0};
       int s = i * 3 + e;                                       // eigener Zufallszustand pro Punkt
-      float rx, ry; effXY(p.x * 0.5f + dx, p.y * 0.866f + dy, rx, ry);
+      float rx, ry; effXY(px, py, rx, ry);
       float u = (rx - minX) / spanX;                            // 0 links … 1 rechts (so wie die Wand hängt)
       float v = ry;
       float depth = p.depth + dd;
@@ -994,10 +1021,10 @@ void fxCompute() {
           pcol(fxA[s], c, D_HUE); break;
         }
         case 14: {                                             // Komet: heller Kopf, der durch die Wand wandert
-          float b = fxA[i * 3];
+          float b = fxA[s];
           pcol(fxPhase * 0.03f, c, D_COLOR);
           mul(c, 0.02f + 0.98f * b * b);
-          if (i == fxHead) c[3] = fminf(255, c[3] + 120);
+          if (i == fxHead && e == fxHeadE) c[3] = fminf(255, c[3] + 120);
           break;
         }
         case 16: {                                             // Farbverlauf: ruhig, in Effektrichtung, wandert mit dem Tempo
@@ -1242,8 +1269,15 @@ void computeTargets() {
     float lit = progVal / 100.0f * n, kb = (masterOn ? master : 150) / 255.0f;
     for (int j = 0; j < n; j++) {
       int i = ord[j]; isPulse[i] = false;
-      float a = fminf(1, fmaxf(0, lit - j)); a = 0.06f + 0.94f * a;   // noch nicht erreicht: ganz schwach
-      for (int e = 0; e < 3; e++) for (int c = 0; c < 4; c++) TGT[i][e][c] = (uint8_t)(progCol[c] * a * kb);
+      float a = fminf(1, fmaxf(0, lit - j));
+      for (int e = 0; e < 3; e++) {
+        float ae = a;
+        if (P[i].edges) { int ein = -1; for (int k = 0; k < 3; k++) { float x, y, dd; edgePos(i, k, x, y, dd); if (dd < 0) ein = k; }
+          int rank = e == ein ? 0 : (ein < 0 ? e : 1); if (ein >= 0 && e != ein) for (int k = 0; k < e; k++) if (k != ein) rank++;
+          ae = fminf(1, fmaxf(0, a * 3 - rank)); }
+        ae = 0.06f + 0.94f * ae;                                   // noch nicht erreicht: ganz schwach
+        for (int c = 0; c < 4; c++) TGT[i][e][c] = (uint8_t)(progCol[c] * ae * kb);
+      }
     }
   }
   // Signal: Farbe an, normales Bild, Farbe an … (auch bei ausgeschalteter Wand)
@@ -1263,9 +1297,12 @@ void computeTargets() {
     uint32_t t = since(onAnimAt, now); bool done = true;
     for (int i = 0; i < SLOTS; i++) {
       if (!P[i].used || !P[i].attached || isPulse[i]) continue;
-      int32_t local = (int32_t)t - (int32_t)P[i].depth * ON_STEP[cfg.onAnim];
-      float k = local <= 0 ? 0 : fminf(1, (float)local / ON_FADE[cfg.onAnim]);
-      if (k < 1) { done = false; k = k * k * (3 - 2 * k); for (int e = 0; e < 3; e++) for (int c = 0; c < 4; c++) TGT[i][e][c] = (uint8_t)(TGT[i][e][c] * k); }
+      for (int e = 0; e < 3; e++) {
+        float x, y, dd = 0; if (P[i].edges) edgePos(i, e, x, y, dd);
+        int32_t local = (int32_t)t - (int32_t)((P[i].depth + dd + (P[i].edges ? 0.33f : 0)) * ON_STEP[cfg.onAnim]);
+        float k = local <= 0 ? 0 : fminf(1, (float)local / ON_FADE[cfg.onAnim]);
+        if (k < 1) { done = false; k = k * k * (3 - 2 * k); for (int c = 0; c < 4; c++) TGT[i][e][c] = (uint8_t)(TGT[i][e][c] * k); }
+      }
     }
     if (done || !masterOn) onAnimAt = 0;
   }
@@ -1277,10 +1314,11 @@ void computeTargets() {
     float fade = 1 - t / 3.5f;
     for (int i = 0; i < SLOTS; i++) {
       if (!P[i].used || !P[i].attached || P[i].state == DARK) continue;
-      float d = hypotf(P[i].x * 0.5f - r.x, P[i].y * 0.866f - r.y);
-      float a = expf(-(d - rad) * (d - rad) / 0.35f) * fade;
-      if (a < 0.02f) continue;
       for (int e = 0; e < 3; e++) {
+        float x, y, dd; edgePos(i, P[i].edges ? e : -1, x, y, dd);
+        float d = hypotf(x - r.x, y - r.y);
+        float a = expf(-(d - rad) * (d - rad) / (P[i].edges ? 0.12f : 0.35f)) * fade;
+        if (a < 0.02f) continue;
         TGT[i][e][0] = (uint8_t)fminf(255, TGT[i][e][0] + 90 * a); TGT[i][e][1] = (uint8_t)fminf(255, TGT[i][e][1] + 90 * a);
         TGT[i][e][2] = (uint8_t)fminf(255, TGT[i][e][2] + 110 * a); TGT[i][e][3] = (uint8_t)fminf(255, TGT[i][e][3] + 230 * a);
       }
