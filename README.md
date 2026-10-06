@@ -122,7 +122,7 @@ Mit einem ESP32-C6 als Hauptpanel meldet sich Trilumag zusätzlich als Zigbee-3.
 | Aufruf | Zweck |
 | --- | --- |
 | `GET /api/state` | alle Panels mit Position, Drehung und Farbe, dazu Ein/Aus, Gesamthelligkeit, Effekt, Effekte, Paletten und Presets |
-| `POST /api/set` | ein Panel: `{"id":"A3F2C1D0","state":"ON","brightness":180,"color":{"r":255,"g":0,"b":0,"w":0}}`, mehrere: `{"ids":[…],…}`, ganze Wand: `{"id":"alle","state":"ON","brightness":200,"color":{…}}` (hier ist `brightness` die Gesamthelligkeit) |
+| `POST /api/set` | ein Panel: `{"id":"A3F2C1D0","state":"ON","brightness":180,"color":{"r":255,"g":0,"b":0,"w":0}}`, mehrere: `{"ids":[…],…}`, ganze Wand: `{"id":"alle","state":"ON","brightness":200,"color":{…}}` (hier ist `brightness` die Gesamthelligkeit), Helligkeit aller Panels: `{"panelBri":255}` |
 | `POST /api/effect` | `{"effect":"welle","speed":50,"intensity":128,"palette":"ozean","direction":90,"spin":0}`, alle Felder optional, `"aus"` heißt Einfarbig. Beim Farbverlauf (`"verlauf"`) setzt `"color2":{"r":0,"g":80,"b":255,"w":0}` die zweite Farbe |
 | `POST /api/presets` | `{"action":"save","name":"Abend"}`, `{"action":"load","id":0}`, `{"action":"delete","id":0}` |
 | `GET /api/live` | aktuelles Effektbild aller Panels als RRGGBBWW |
