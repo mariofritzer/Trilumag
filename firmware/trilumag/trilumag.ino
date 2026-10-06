@@ -3072,6 +3072,13 @@ const char* apiCall(const char* path, JsonDocument& d) {
     int i = findChip(parseHex(d["id"] | "0")), par = findChip(parseHex(d["parent"] | "0"));
     return simAttach(i, par, d["edge"] | 9) ? nullptr : "Anklipsen nicht möglich";
   }
+  if (!strcmp(path, "/api/sim/rotate")) {           // Panel an Ort und Stelle drehen: eine andere eigene Kante zeigt zum Nachbarn
+    int i = findChip(parseHex(d["id"] | "0"));
+    if (i <= 0 || !P[i].attached) return "Panel unbekannt";
+    P[i].rot = (P[i].rot + 1) % 3;
+    reconcile(); outForce = true; simChanged();
+    return nullptr;
+  }
   if (!strcmp(path, "/api/sim/detach")) { simDetach(findChip(parseHex(d["id"] | "0"))); return nullptr; }
   return "Unbekannter Befehl";
 }
@@ -3131,7 +3138,7 @@ void setupWeb() {
   server.on("/api/peers", HTTP_GET, [] { server.send(200, "application/json", peers::json()); });
   // Befehle laufen über apiCall(), damit HTTP und WebSocket dasselbe tun
   const char* cmds[] = {"/api/set", "/api/presets", "/api/effect", "/api/test", "/api/ota", "/api/light", "/api/diag", "/api/touch", "/api/panelfw", "/api/zigbee", "/api/name", "/api/identify", "/api/guard", "/api/swap", "/api/favs", "/api/view", "/api/signal", "/api/progress", "/api/sleep", "/api/boot", "/api/energy", "/api/peers", "/api/sync",
-                        "/api/sim/new", "/api/sim/remove", "/api/sim/attach", "/api/sim/detach", "/api/sim/tap"};
+                        "/api/sim/new", "/api/sim/remove", "/api/sim/rotate", "/api/sim/attach", "/api/sim/detach", "/api/sim/tap"};
   for (const char* path : cmds) {
     server.on(path, HTTP_POST, [path] {
       JsonDocument d;

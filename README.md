@@ -150,4 +150,5 @@ Mit einem ESP32-C6 als Hauptpanel meldet sich Trilumag zusätzlich als Zigbee-3.
 | `/json`, `/json/state`, `/json/info`, `/presets.json` | WLED-kompatible Schnittstelle (eine Wand = ein Segment) |
 | `POST /api/sim/attach` | Simulation: Panel anklipsen |
 | `POST /api/sim/detach` | Simulation: Panel abklipsen |
+| `POST /api/sim/rotate` | Simulation: Panel an Ort und Stelle drehen, `{"id":"…"}` |
 | `POST /api/sim/remove` | Simulation: Panel aus der Ablage löschen, `{"id":"…"}` oder `{"all":true}` |
