@@ -122,7 +122,7 @@ struct Panel {
   uint32_t joinAt = 0;    // bei laufendem Effekt: bis hierher noch blau pulsieren (0 = nicht)
   bool hasColor = false;
   bool on = true;
-  uint8_t r = 0, g = 0, b = 0, w = 0, bri = 180;
+  uint8_t r = 0, g = 0, b = 0, w = 0, bri = 255;
 };
 
 struct Config {
@@ -2776,6 +2776,15 @@ void otaLoop() {
 const char* apiCall(const char* path, JsonDocument& d) {
   if (!strcmp(path, "/api/set")) {
     const char* id = d["id"] | "";
+    if (d["panelBri"].is<int>()) {                      // Helligkeit aller Panels auf einmal (auch der in der Ablage)
+      uint8_t v = constrain(d["panelBri"].as<int>(), 1, 255);
+      for (int i = 0; i < SLOTS; i++) if (P[i].used && P[i].bri != v) {
+        P[i].bri = v;
+        if (P[i].attached) { sendToPanel(i); publishState(i); }
+      }
+      curPreset = -1; colorsDirty = true; colorsDirtyAt = millis();
+      return nullptr;
+    }
     if (d["ids"].is<JsonArrayConst>()) {                 // mehrere ausgewählte Panels
       for (JsonVariantConst v : d["ids"].as<JsonArrayConst>()) { int i = findChip(parseHex(v | "0")); if (i >= 0) applyCommand(i, d.as<JsonVariantConst>()); }
     } else if (!strcmp(id, "alle")) applyAll(d.as<JsonVariantConst>());
