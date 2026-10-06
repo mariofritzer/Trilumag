@@ -106,6 +106,30 @@ Unter Optionen → Andere Trilumag sucht die App nach weiteren Wänden im selben
 
 Unter Optionen → Updates lässt sich dann auswählen, auf welchen Wänden eine Version installiert wird: diese Wand und/oder gefundene andere. Die anderen holen sich die Version selbst von GitHub; ist diese Wand auch dabei, kommt sie zuletzt dran. Wände ab 0.7.21 lassen sich so aktualisieren.
 
+## Weißton und Tageslicht-Kurve
+
+Im Tab Farben stellt der Regler „Weißton“ Weiß zwischen 2200 K (warm) und 6500 K (kalt) ein; Home Assistant bekommt dafür den Farbtemperatur-Modus. Unter Optionen → Licht macht die „Tageslicht-Kurve“ alle Farben und Effekte abends wärmer und dunkler (ab 18 Uhr, nachts ganz warm auf 35 %, ab 6 Uhr wieder hell). Die Uhrzeit kommt per Internet.
+
+## Wetter
+
+Der Effekt „Wetter“ zeigt die Außentemperatur als Farbe (blau = kalt, gelb = mild, rot = heiß), bei Regen laufen blaue Tropfen über die Wand, bei Schnee weiße. Den Ort trägst du unter Optionen → Wetter ein; die Daten kommen alle 15 Minuten von Open-Meteo, kostenlos und ohne Anmeldung.
+
+## Spiel „Simon sagt“
+
+Unter Wand → Spiel startet ein Merkspiel: Die Wand zeigt eine Folge von Panels, man tippt sie nach, jede Runde kommt eines dazu. Dafür muss „Panels reagieren auf Antippen“ an sein, und es braucht mindestens zwei Panels mit Sensor. Der Rekord wird gespeichert.
+
+## WLED nachahmen
+
+Unter Optionen → WLED nachahmen findet die App WLED-Geräte im WLAN (oder man gibt die IP ein). Trilumag fragt das Gerät alle 1,5 s ab und übernimmt Änderungen an Ein/Aus, Helligkeit, Farbe, Tempo und Intensität, dazu den Effekt, wenn es ein Gegenstück gibt (etwa Rainbow, Breathe, Fire 2012, Aurora, Sparkle, Meteor, Lightning, Fireworks).
+
+## Störungsanzeige
+
+Ist das WLAN weg oder antwortet ein Panel nicht mehr, blinkt das Hauptpanel alle 10 Sekunden zweimal kurz (orange bzw. rot), solange die Wand an ist. Abschaltbar unter Optionen → WLAN.
+
+## Wand als Bild
+
+Unter Wand → „Wand als Bild speichern“ entsteht ein PNG mit den aktuellen Farben, Panelnummern, Chip-IDs, der Ausrichtung (Punkt = Kante 1) und den Datenverbindungen.
+
 ## Panel tauschen
 
 In der App unter Wand das Panel antippen und „Tauschen“ wählen. Danach bleiben 5 Minuten Zeit: das alte Panel abklipsen und das neue an genau dieselbe Stelle setzen. Das neue übernimmt Farbe, Helligkeit und „Kanten einzeln“ des alten. Solange läuft unten in der App ein kleines Fenster mit der Restzeit und ✕ zum Abbrechen. Panels, die hinter dem alten hingen, gehen beim Abklipsen kurz aus und melden sich über das neue wieder; in der Simulation landen sie dazwischen in der Ablage und kommen danach von selbst an ihren Platz zurück.
@@ -128,7 +152,7 @@ Mit einem ESP32-C6 als Hauptpanel meldet sich Trilumag zusätzlich als Zigbee-3.
 | Aufruf | Zweck |
 | --- | --- |
 | `GET /api/state` | alle Panels mit Position, Drehung und Farbe, dazu Ein/Aus, Gesamthelligkeit, Effekt, Effekte, Paletten und Presets |
-| `POST /api/set` | ein Panel: `{"id":"A3F2C1D0","state":"ON","brightness":180,"color":{"r":255,"g":0,"b":0,"w":0}}`, mehrere: `{"ids":[…],…}`, ganze Wand: `{"id":"alle","state":"ON","brightness":200,"color":{…}}` (hier ist `brightness` die Gesamthelligkeit), Helligkeit aller Panels: `{"panelBri":255}` |
+| `POST /api/set` | ein Panel: `{"id":"A3F2C1D0","state":"ON","brightness":180,"color":{"r":255,"g":0,"b":0,"w":0}}`, mehrere: `{"ids":[…],…}`, ganze Wand: `{"id":"alle","state":"ON","brightness":200,"color":{…}}` (hier ist `brightness` die Gesamthelligkeit), Helligkeit aller Panels: `{"panelBri":255}`, Weißton: `"kelvin":2700` statt `color` |
 | `POST /api/effect` | `{"effect":"welle","speed":50,"intensity":128,"palette":"ozean","direction":90,"spin":0}`, alle Felder optional, `"aus"` heißt Einfarbig. Beim Farbverlauf (`"verlauf"`) setzt `"color2":{"r":0,"g":80,"b":255,"w":0}` die zweite Farbe |
 | `POST /api/presets` | `{"action":"save","name":"Abend"}`, `{"action":"load","id":0}`, `{"action":"delete","id":0}` |
 | `GET /api/live` | aktuelles Effektbild aller Panels als RRGGBBWW |
@@ -143,6 +167,10 @@ Mit einem ESP32-C6 als Hauptpanel meldet sich Trilumag zusätzlich als Zigbee-3.
 | `POST /api/swap` | Panel tauschen: `{"id":"altes Panel"}` startet, danach 5 Minuten Zeit; `{"stop":true}` bricht ab |
 | `POST /api/ota` | Updates: `{"action":"check"}`, `{"action":"install","version":"0.7.40"}`, auch für andere Wände: `"peers":["192.168.1.61"]`, ohne diese Wand: `"self":false` |
 | `POST /api/peers`, `GET /api/peers` | andere Trilumag im WLAN suchen (dauert etwa 3 s) und die Liste abholen |
+| `POST /api/weather` | Wetter: `{"place":"Wien"}` (Ort suchen und Wetter holen), `{"place":""}` löscht ihn |
+| `POST /api/game` | Spiel „Simon sagt“: `{"action":"start"}` / `{"action":"stop"}` |
+| `POST /api/mirror` | WLED nachahmen: `{"ip":"192.168.1.70"}`, `{"ip":""}` beendet es |
+| `POST /api/fault` | Störungsanzeige: `{"on":true}` |
 | `POST /api/guard` | WLAN-Wächter: `{"on":true}` |
 | `POST /api/sleep` | Sleep-Timer: `{"min":30}`, `0` beendet ihn |
 | `POST /api/boot` | Nach Stromausfall: `{"mode":0}` wie vorher, `1` aus, `2` an, `3` mit `"preset"` |

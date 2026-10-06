@@ -150,6 +150,8 @@ struct Config {
   bool guard = true;        // Wächter: WLAN weg oder Hauptschleife hängt → neu verbinden bzw. neu starten
   uint8_t onAnim = 2;       // Einschalt-Animation: 0 aus, 1 langsam, 2 mittel, 3 schnell
   bool touchWave = true;    // Welle über die Wand beim Antippen
+  bool daylight = false;    // Tageslicht-Kurve: abends wärmer und dunkler
+  bool faultBlink = true;   // Störung (WLAN weg, Panel antwortet nicht): Hauptpanel blinkt kurz
   uint16_t viewRot = 0;     // so hängt die Wand: Drehung in Grad (Vielfache von 30), wirkt in App und Effekten
   bool viewMir = false;
   uint8_t syncGroup = 1;    // nur Wände derselben Gruppe (1 bis 9) laufen zusammen
@@ -429,6 +431,10 @@ void begin() {
 
 void reconcile();
 void simChanged();
+bool timeOk();
+uint32_t faultPanelAt = 0;     // wann zuletzt ein Panel nicht mehr geantwortet hat
+namespace wx { extern String place, err; extern volatile bool busy; void json(JsonObject o); }
+namespace mirror { extern String ip; void json(JsonObject o); }
 extern bool outForce, testMode;
 void transition();
 bool placePanel(int i, int parent, uint8_t edge, uint8_t own);
@@ -537,6 +543,7 @@ void busLoop() {
         if (r.len >= 1 && r.data[0] == DARK && p.state != DARK) outForce = true;   // Panel hat Zustand verloren: alles neu schicken   // Panel hat Zustand verloren
       } else if (p.missed++, busTimeouts++, ++p.miss >= 3) {
         diag("Panel %s antwortet nicht mehr, gilt als abgeklipst", hex(p.chip).substring(4).c_str());
+        faultPanelAt = millis() | 1;
         bus::send(p.addr, bus::C_RESET);
         p.attached = false; p.addr = 0; p.state = DARK; publishAvail(i, false); lost = true;
       }
@@ -714,6 +721,13 @@ const FxDef FX[] = {
   {"komet",       "Komet",           true},
   {"lava",        "Lava",            false},
   {"verlauf",     "Farbverlauf",     true},
+  {"herz",        "Herzschlag",      true},
+  {"plasma",      "Plasma",          false},
+  {"regen",       "Regen",           false},
+  {"sterne",      "Sternenhimmel",   false},
+  {"feuerwerk",   "Feuerwerk",       false},
+  {"matrix",      "Matrix",          false},
+  {"wetter",      "Wetter",          false},
 };
 const uint8_t FX_COUNT = sizeof(FX) / sizeof(FX[0]);
 
@@ -742,6 +756,8 @@ const uint32_t FX_FRAME_MS = 40;
 float fxPhase = 0, fxA[SLOTS * 3], fxB[SLOTS * 3], fxT[SLOTS * 3];   // Zustand pro Punkt (Panel oder Kante)
 float fxFlash = 0, fxFlashX = 0, fxFlashY = 0;      // Gewitter: aktueller Blitz
 int fxHead = 0; float fxStep = 0; int fxBeat = -1;  // Komet: Kopf; Disco: Takt
+float fwX = 0, fwY = 0, fwT = 9, fwH = 0;          // Feuerwerk: Mitte, Alter und Farbe der aktuellen Rakete
+float wxTemp = 15; uint8_t wxKind = 0; bool wxOk = false;   // Wetter: Temperatur, 0 trocken, 1 Regen, 2 Schnee
 uint16_t fxDir = 0;            // Richtung der Effekte in Grad (Lauflicht, Wellen, Lava …)
 uint8_t fxC2[4] = {0, 80, 255, 0};   // zweite Farbe für den Farbverlauf
 uint32_t fxFavs = 0;                 // Favoriten: Bit pro Effekt
@@ -821,6 +837,17 @@ void pcol(float t, float* c, uint8_t def) {   // def: PalDefault (als uint8_t, w
   f = f * f * (3 - 2 * f);
   for (int k = 0; k < 4; k++) c[k] = stops[a][k] + (stops[b][k] - stops[a][k]) * f;
 }
+// Temperatur in °C → Farbe: -10 tiefblau, 0 hellblau, 10 türkis, 20 gelb, 30 rot
+void tempColor(float t, float* c) {
+  static const float T[][4] = {{-10, 0, 30, 255}, {0, 0, 150, 255}, {10, 0, 220, 140}, {20, 255, 200, 0}, {30, 255, 30, 0}};
+  if (t <= T[0][0]) { c[0] = T[0][1]; c[1] = T[0][2]; c[2] = T[0][3]; c[3] = 0; return; }
+  for (int k = 0; k < 4; k++) if (t <= T[k + 1][0]) {
+    float f = (t - T[k][0]) / 10;
+    for (int j = 0; j < 3; j++) c[j] = T[k][j + 1] + (T[k + 1][j + 1] - T[k][j + 1]) * f;
+    c[3] = 0; return;
+  }
+  c[0] = 255; c[1] = 30; c[2] = 0; c[3] = 0;
+}
 void mul(float* c, float k) { for (int i = 0; i < 4; i++) c[i] *= k; }
 
 void fxReset() {
@@ -848,6 +875,14 @@ void fxCompute() {
   const float TAU = 6.2831853f;
   // Gewitter: Blitze kommen und klingen schnell ab
   fxFlash = fmaxf(0, fxFlash - dt * rate * 5);
+  // Feuerwerk: alle 1,5 s (bei Tempo 50) eine neue Rakete an einem zufälligen Panel
+  if (fx.id == 21) {
+    fwT += dt * rate;
+    if (fwT > 1.6f - 0.8f * fx.inten / 255.0f) {
+      int n = 0, pick = 0; for (int i = 0; i < SLOTS; i++) if (P[i].used && P[i].attached && frand() * (++n) < 1) pick = i;
+      effXY(P[pick].x * 0.5f, P[pick].y * 0.866f, fwX, fwY); fwT = 0; fwH = frand();
+    }
+  }
   if (fx.id == 11 && frand() < dt * rate * (0.12f + 0.6f * fx.inten / 255.0f)) {
     int n = 0, pick = 0; for (int i = 0; i < SLOTS; i++) if (P[i].used && P[i].attached && frand() * (++n) < 1) pick = i;
     effXY(P[pick].x * 0.5f, P[pick].y * 0.866f, fxFlashX, fxFlashY); fxFlash = 0.7f + 0.3f * frand();
@@ -979,6 +1014,58 @@ void fxCompute() {
           pcol(sv * 0.5f + fxPhase * 0.02f, c, D_FIRE);
           mul(c, 0.2f + 0.8f * powf(sv, 1 + 2 * K)); break;
         }
+        case 17: {                                             // Herzschlag: doppelter Puls, läuft vom Hauptpanel nach außen
+          float t = fxPhase * 0.8f - depth * (0.03f + 0.08f * K); t -= floorf(t);
+          float b = expf(-(t * t) / 0.003f) + 0.65f * expf(-((t - 0.2f) * (t - 0.2f)) / 0.003f);
+          pcol(fxPhase * 0.02f, c, D_COLOR);
+          mul(c, 0.06f + 0.94f * fminf(1, b)); break;
+        }
+        case 18: {                                             // Plasma: ineinander fließende Farben
+          float sv = sinf(u * (3 + 5 * K) + fxPhase * 0.6f) + sinf(v * 2.2f - fxPhase * 0.45f) + sinf((u + v) * 2.5f + fxPhase * 0.3f);
+          pcol(sv * 0.17f + fxPhase * 0.03f, c, D_HUE); break;
+        }
+        case 19: {                                             // Regen: einzelne Tropfen blitzen auf, darunter dunkles Blau
+          fxA[s] = fmaxf(0, fxA[s] - dt * rate * 3.5f);
+          if (frand() < dt * rate * (0.15f + 1.6f * K) / points) fxA[s] = 1;
+          float a = fxA[s] * fxA[s];
+          if (fx.pal == 0) { c[0] = 4 + 40 * a; c[1] = 10 + 110 * a; c[2] = 40 + 215 * a; c[3] = 60 * a; }
+          else { pcol(u * 0.4f + fxPhase * 0.02f, c, D_COLOR); mul(c, 0.12f + 0.88f * a); }
+          break;
+        }
+        case 20: {                                             // Sternenhimmel: dunkel, einzelne Sterne funkeln langsam
+          float tw = 0.5f + 0.5f * sinf(fxPhase * (0.6f + fxB[s]) + fxA[s] * TAU);
+          float star = fxB[s] > 0.55f - 0.35f * K ? powf(tw, 6) : 0;
+          if (fx.pal == 0) { c[0] = 2 + 60 * star; c[1] = 3 + 70 * star; c[2] = 18 + 90 * star; c[3] = 200 * star; }
+          else { pcol(fxA[s], c, D_COLOR); mul(c, 0.05f + 0.95f * star); }
+          break;
+        }
+        case 21: {                                             // Feuerwerk: Ring breitet sich von der Rakete aus und verglüht
+          float d = hypotf(rx - fwX, v - fwY), r = fwT * 2.6f, life = fmaxf(0, 1 - fwT / 1.4f);
+          float a = expf(-(d - r) * (d - r) / 0.25f) * life + (fwT < 0.12f && d < 0.4f ? 1 : 0);
+          pcol(fwH + d * 0.08f, c, D_HUE);
+          mul(c, fminf(1, a)); c[3] = fminf(255, c[3] + (fwT < 0.15f ? 255 * a : 40 * a * life)); break;
+        }
+        case 22: {                                             // Matrix: grüne Ströme fallen nach unten
+          float off = sinf(roundf(rx * 2) * 12.9898f) * 43758.5f; off -= floorf(off);
+          float d = v * 0.35f - fxPhase * 0.35f + off; d -= floorf(d);
+          float b = powf(1 - d, 3 + 8 * K);
+          if (fx.pal == 0) { c[0] = 0; c[1] = 20 + 235 * b; c[2] = 30 * b * b; c[3] = d > 0.96f ? 160 : 0; }
+          else { pcol(off, c, D_COLOR); mul(c, 0.05f + 0.95f * b); }
+          break;
+        }
+        case 23: {                                             // Wetter: Farbe nach Außentemperatur, dazu Regen- oder Schneetropfen
+          float tc[4]; tempColor(wxOk ? wxTemp : 15, tc);
+          float br = 0.55f + 0.15f * sinf(fxPhase * 0.5f - u * 2);
+          for (int ch = 0; ch < 4; ch++) c[ch] = tc[ch] * br;
+          if (wxOk && wxKind) {
+            fxA[s] = fmaxf(0, fxA[s] - dt * rate * 2.5f);
+            if (frand() < dt * rate * (0.2f + 1.2f * K) / points) fxA[s] = 1;
+            float a = fxA[s] * fxA[s];
+            if (wxKind == 1) { c[0] *= 1 - a; c[1] = c[1] * (1 - a) + 90 * a; c[2] = c[2] * (1 - a) + 255 * a; }
+            else { c[0] += 120 * a; c[1] += 120 * a; c[2] += 140 * a; c[3] += 220 * a; }
+          }
+          break;
+        }
       }
       float k = p.on ? masterK() / 255.0f : 0;
       for (int ch = 0; ch < 4; ch++) TGT[i][e][ch] = (uint8_t)fminf(255, fmaxf(0, c[ch] * k));
@@ -997,6 +1084,90 @@ uint32_t transStart = 0, transDur = 0, lastKeep = 0;
 bool transOn = false;
 bool outForce = true, testMode = false;
 float powerScale = 1, measScale = 1;
+
+// ---------- Spiel "Simon sagt" ----------
+// Die Wand zeigt eine Folge von Panels, man tippt sie nach; jede Runde ein Panel mehr.
+namespace game {
+enum Ph : uint8_t { OFF, SHOW, INPUT, FAIL, WIN };
+Ph ph = OFF;
+int8_t pan[SLOTS]; uint8_t nPan = 0;      // mitspielende Panels (mit Sensor, ohne Hauptpanel)
+uint8_t seq[100]; uint8_t len = 0, pos = 0, best = 0;
+uint32_t t0 = 0; int8_t lit = -1; uint32_t litUntil = 0;
+bool active() { return ph != OFF; }
+uint16_t stepMs() { return len < 12 ? 650 - len * 30 : 290; }
+void hueOf(uint8_t k, uint8_t* c) {
+  float h = (float)k / nPan * 6; int s = (int)h; float f = h - s, q = 1 - f; float r, g, b;
+  switch (s % 6) { case 0: r = 1; g = f; b = 0; break; case 1: r = q; g = 1; b = 0; break; case 2: r = 0; g = 1; b = f; break;
+                   case 3: r = 0; g = q; b = 1; break; case 4: r = f; g = 0; b = 1; break; default: r = 1; g = 0; b = q; }
+  c[0] = r * 255; c[1] = g * 255; c[2] = b * 255; c[3] = 0;
+}
+void next() { if (len < sizeof seq) seq[len++] = esp_random() % nPan; pos = 0; ph = SHOW; t0 = millis(); }
+const char* start() {
+  nPan = 0;
+  for (int i = 1; i < SLOTS; i++) if (P[i].used && P[i].attached && P[i].state != DARK && (P[i].caps & 1)) pan[nPan++] = i;
+  if (nPan < 2) return "Zum Spielen braucht es mindestens 2 Panels mit Sensor";
+  if (!cfg.touchOn) return "Bitte zuerst unter Antippen „Panels reagieren auf Antippen“ einschalten";
+  best = prefs.getUChar("simon", 0);
+  len = 0; next(); t0 = millis() + 600;
+  diag("Spiel gestartet");
+  return nullptr;
+}
+void stop() { ph = OFF; lit = -1; outForce = true; }
+void over() {
+  uint8_t score = len ? len - 1 : 0;
+  if (score > best) { best = score; prefs.putUChar("simon", best); }
+  diag("Spiel vorbei: %u Runden geschafft", score);
+  ph = FAIL; t0 = millis();
+}
+void tap(int slot) {
+  if (ph != INPUT) return;
+  int8_t k = -1; for (uint8_t j = 0; j < nPan; j++) if (pan[j] == slot) k = j;
+  if (k < 0) return;
+  lit = k; litUntil = millis() + 250;
+  if (k != seq[pos]) { over(); return; }
+  if (++pos >= len) { ph = WIN; t0 = millis(); }
+  else t0 = millis();                                      // Zeit für den nächsten Tipp läuft neu
+}
+// läuft mit jedem Bild: Ablauf weiterschalten und die Wand zeichnen
+void draw(uint8_t TG[][3][4]) {
+  if (ph == OFF) return;
+  uint32_t now = millis();
+  int32_t t = (int32_t)(now - t0);
+  if (ph == SHOW && t >= 0 && t / (stepMs() + 180) >= len) { ph = INPUT; t0 = now; }
+  if (ph == INPUT && t > 8000) over();                      // 8 s ohne Tipp: vorbei
+  if (ph == WIN && t > 700) { next(); t0 = now + 300; }
+  if (ph == FAIL && t > 1800) { stop(); return; }
+  t = (int32_t)(now - t0);
+  for (int i = 0; i < SLOTS; i++) for (int e = 0; e < 3; e++) for (int c = 0; c < 4; c++) TG[i][e][c] = 0;
+  for (uint8_t j = 0; j < nPan; j++) {
+    uint8_t c[4]; hueOf(j, c); float k = 0.08f;
+    if (ph == SHOW && t >= 0) { uint16_t st = stepMs(); int n = t / (st + 180); if (n < len && seq[n] == j && t % (st + 180) < st) k = 1; }
+    if (ph == INPUT && lit == j && now < litUntil) k = 1;
+    if (ph == WIN) k = 0.5f + 0.5f * ((t / 120) % 2);
+    if (ph == FAIL) { c[0] = 255; c[1] = c[2] = c[3] = 0; k = (t / 250) % 2 ? 0.1f : 1; }
+    for (int e = 0; e < 3; e++) for (int ch = 0; ch < 4; ch++) TG[pan[j]][e][ch] = c[ch] * k;
+  }
+  // Hauptpanel zeigt die Runde: weiß, je weiter, desto heller
+  for (int e = 0; e < 3; e++) TG[0][e][3] = ph == FAIL ? 0 : 20 + (len > 20 ? 200 : len * 10);
+}
+uint8_t level() { return len ? len - (ph == SHOW || ph == WIN ? 1 : 0) : 0; }
+void json(JsonObject o) { o["on"] = active(); o["level"] = level(); o["ph"] = (int)ph; o["best"] = best ? best : prefs.getUChar("simon", 0); }
+}  // namespace game
+
+// Tageslicht-Kurve nach Uhrzeit: (Stunde, Helligkeit, Wärme), dazwischen linear
+const float DAYC[][3] = {{0, 0.35f, 1}, {6, 0.35f, 1}, {7.5f, 1, 0}, {18, 1, 0}, {21, 0.75f, 0.7f}, {23, 0.45f, 1}, {24, 0.35f, 1}};
+void dayCurveAt(float h, float& dim, float& warm) {
+  for (uint8_t k = 0; k + 1 < sizeof DAYC / sizeof DAYC[0]; k++)
+    if (h >= DAYC[k][0] && h <= DAYC[k + 1][0]) {
+      float f = (h - DAYC[k][0]) / (DAYC[k + 1][0] - DAYC[k][0]);
+      dim = DAYC[k][1] + (DAYC[k + 1][1] - DAYC[k][1]) * f; warm = DAYC[k][2] + (DAYC[k + 1][2] - DAYC[k][2]) * f; return;
+    }
+  dim = 1; warm = 0;
+}
+void dayCurve(float& dim, float& warm) {
+  time_t t = time(nullptr); struct tm lt; localtime_r(&t, &lt);
+  dayCurveAt(lt.tm_hour + lt.tm_min / 60.0f, dim, warm);
+}
 float sleepScale = 1;                     // Sleep-Timer: blendet zum Ende hin aus
 // Wellen beim Antippen: laufen vom angetippten Panel als Ring über die Wand
 struct Ripple { uint32_t t0; float x, y; };
@@ -1015,7 +1186,7 @@ bool overlayActive() {
   uint32_t now = millis();
   if (transOn) return true;                          // weiche Übergänge auch in der App zeigen
   for (const Ripple& r : ripples) if (r.t0 && now - r.t0 < 4000) return true;
-  return (onAnimAt && now - onAnimAt < 6000) || sigAt || progVal > 0;
+  return (onAnimAt && now - onAnimAt < 6000) || sigAt || progVal > 0 || game::active();
 }
 void addRipple(int i) {
   if (!cfg.touchWave || i < 0 || i >= SLOTS) return;
@@ -1113,6 +1284,23 @@ void computeTargets() {
         TGT[i][e][0] = (uint8_t)fminf(255, TGT[i][e][0] + 90 * a); TGT[i][e][1] = (uint8_t)fminf(255, TGT[i][e][1] + 90 * a);
         TGT[i][e][2] = (uint8_t)fminf(255, TGT[i][e][2] + 110 * a); TGT[i][e][3] = (uint8_t)fminf(255, TGT[i][e][3] + 230 * a);
       }
+    }
+  }
+  game::draw(TGT);
+  // Störungsanzeige: Hauptpanel blinkt alle 10 s zweimal kurz (orange: WLAN weg, rot: ein Panel antwortet nicht mehr)
+  if (cfg.faultBlink && masterOn && !game::active()) {
+    bool wifiBad = !wlanOk && wSsid.length() && !apMode;
+    bool panelBad = faultPanelAt && now - faultPanelAt < 120000;
+    uint32_t fp = now % 10000;
+    if ((wifiBad || panelBad) && (fp < 150 || (fp >= 300 && fp < 450)))
+      for (int e = 0; e < 3; e++) { TGT[0][e][0] = 255; TGT[0][e][1] = panelBad ? 0 : 90; TGT[0][e][2] = 0; TGT[0][e][3] = 0; }
+  }
+  // Tageslicht-Kurve: abends wärmer (weniger Blau und Grün) und dunkler, tagsüber unverändert
+  if (cfg.daylight && timeOk()) {
+    float dim, warm; dayCurve(dim, warm);
+    if (dim < 0.999f || warm > 0.001f) {
+      const float k[4] = {dim, dim * (1 - 0.3f * warm), dim * (1 - 0.8f * warm), dim * (1 - 0.15f * warm)};
+      for (int i = 0; i < SLOTS; i++) if (P[i].used && P[i].attached && !isPulse[i]) for (int e = 0; e < 3; e++) for (int c = 0; c < 4; c++) TGT[i][e][c] = (uint8_t)(TGT[i][e][c] * k[c]);
     }
   }
   // Stromlimit: Strom schätzen und bei Bedarf alles gleichmäßig dunkler machen (wie WLED)
@@ -1315,6 +1503,26 @@ void applyFx(JsonVariantConst cmd) {
 // Panel i hat sich geändert: weich zum neuen Zustand überblenden (die Ausgabe schickt es mit dem nächsten Bild)
 void sendToPanel(int i) { (void)i; transition(); }
 
+// ---------- Farbtemperatur ----------
+// Kelvin (1500 bis 10000) in RGBW: Schwarzkörper-Farbe, der gemeinsame Weißanteil geht auf die weiße LED
+void kelvinRgbw(int k, uint8_t* o) {
+  float t = constrain(k, 1500, 10000) / 100.0f, r, g, b;
+  r = t <= 66 ? 255 : 329.698727446f * powf(t - 60, -0.1332047592f);
+  g = t <= 66 ? 99.4708025861f * logf(t) - 161.1195681661f : 288.1221695283f * powf(t - 60, -0.0755148492f);
+  b = t >= 66 ? 255 : (t <= 19 ? 0 : 138.5177312231f * logf(t - 10) - 305.0447927307f);
+  r = fminf(255, fmaxf(0, r)); g = fminf(255, fmaxf(0, g)); b = fminf(255, fmaxf(0, b));
+  float w = fminf(r, fminf(g, b));
+  o[0] = r - w; o[1] = g - w; o[2] = b - w; o[3] = w;
+}
+// "kelvin" (App) oder "color_temp" (Home Assistant, in Kelvin) wird zu einer normalen Farbe
+void kelvinToColor(JsonDocument& d) {
+  int k = d["kelvin"] | (int)(d["color_temp"] | 0);
+  if (k < 1000) return;
+  uint8_t c[4]; kelvinRgbw(k, c);
+  JsonObject o = d["color"].to<JsonObject>(); o["r"] = c[0]; o["g"] = c[1]; o["b"] = c[2]; o["w"] = c[3];
+  d.remove("kelvin"); d.remove("color_temp");
+}
+
 // ---------- MQTT / Home Assistant ----------
 String tBase(int i) { return "trilumag/" + hex(P[i].chip); }
 
@@ -1346,7 +1554,8 @@ void publishDiscovery(int i) {
   d["command_topic"] = tBase(i) + "/set";
   d["state_topic"] = tBase(i) + "/state";
   d["brightness"] = true;
-  d["supported_color_modes"].to<JsonArray>().add("rgbw");
+  { JsonArray cm = d["supported_color_modes"].to<JsonArray>(); cm.add("rgbw"); cm.add("color_temp"); }
+  d["color_temp_kelvin"] = true; d["min_kelvin"] = 2200; d["max_kelvin"] = 6500;
   JsonArray av = d["availability"].to<JsonArray>();
   av.add<JsonObject>()["topic"] = "trilumag/bridge/avail";
   av.add<JsonObject>()["topic"] = tBase(i) + "/avail";
@@ -1357,7 +1566,7 @@ void publishDiscovery(int i) {
   dev["manufacturer"] = "DIY";
   dev["model"] = "Panel v0.1";
   dev["sw_version"] = FW_VERSION;
-  char buf[900]; size_t n = serializeJson(d, buf, sizeof buf);
+  char buf[1400]; size_t n = serializeJson(d, buf, sizeof buf);
   mqtt.publish(("homeassistant/light/trilumag_" + id + "/config").c_str(), (const uint8_t*)buf, n, true);
 }
 
@@ -1368,7 +1577,8 @@ void publishAllLight() {
   d["schema"] = "json";
   d["command_topic"] = "trilumag/alle/set";
   d["brightness"] = true;
-  d["supported_color_modes"].to<JsonArray>().add("rgbw");
+  { JsonArray cm = d["supported_color_modes"].to<JsonArray>(); cm.add("rgbw"); cm.add("color_temp"); }
+  d["color_temp_kelvin"] = true; d["min_kelvin"] = 2200; d["max_kelvin"] = 6500;
   d["state_topic"] = "trilumag/alle/state";
   d["effect"] = true;
   JsonArray el = d["effect_list"].to<JsonArray>();
@@ -1377,7 +1587,7 @@ void publishAllLight() {
   JsonObject dev = d["device"].to<JsonObject>();
   dev["identifiers"].to<JsonArray>().add("trilumag_" + hex(P[0].chip));
   dev["name"] = cfg.name;
-  char buf[900]; size_t n = serializeJson(d, buf, sizeof buf);
+  char buf[1400]; size_t n = serializeJson(d, buf, sizeof buf);
   mqtt.publish(("homeassistant/light/trilumag_alle_" + hex(P[0].chip) + "/config").c_str(), (const uint8_t*)buf, n, true);
 
   publishExtras();
@@ -1391,7 +1601,7 @@ void haDevice(JsonDocument& d) {
   dev["name"] = cfg.name;
 }
 void haPublish(const char* comp, const char* key, JsonDocument& d) {
-  char buf[900]; size_t n = serializeJson(d, buf, sizeof buf);
+  char buf[1400]; size_t n = serializeJson(d, buf, sizeof buf);
   String t = String("homeassistant/") + comp + "/trilumag_" + key + "_" + hex(P[0].chip) + "/config";
   mqtt.publish(t.c_str(), (const uint8_t*)buf, n, true);
 }
@@ -1682,6 +1892,7 @@ const char* const TAP_NAMES[TA_COUNT] = {"nichts", "Panel ein/aus", "Wand ein/au
 // kind: 1 = einmal, 2 = doppelt angetippt
 void touchEvent(int i, uint8_t kind) {
   if (i < 0 || i >= SLOTS || !P[i].used || !P[i].attached || kind < 1 || kind > 2) return;
+  if (game::active()) { game::tap(i); wsKick(); return; }    // im Spiel zählt nur, welches Panel
   String id = hex(P[i].chip);
   uint8_t a = kind == 2 ? cfg.tapA2 : cfg.tapA1;
   addRipple(i);
@@ -1876,6 +2087,8 @@ void loadConfig() {
   cfg.guard = prefs.getBool("guard", true);
   cfg.onAnim = prefs.getUChar("onAnim", 2); if (cfg.onAnim > 3) cfg.onAnim = 2;
   cfg.touchWave = prefs.getBool("tWave", true);
+  cfg.daylight = prefs.getBool("dayc", false);
+  cfg.faultBlink = prefs.getBool("fault", true);
   cfg.viewRot = prefs.getUShort("viewRot", 0) % 360; cfg.viewMir = prefs.getBool("viewMir", false);
   cfg.syncGroup = constrain((int)prefs.getUChar("syncGrp", 1), 1, 9);
   if (!cfg.name.length()) cfg.name = "Trilumag";
@@ -1902,7 +2115,7 @@ String configJson() {
   for (size_t i = 0; i < VALID_COUNT; i++) vp.add(VALID_PINS[i]);
   d["order"] = cfg.order;
   JsonObject li = d["light"].to<JsonObject>();
-  li["trans"] = cfg.transMs; li["onAnim"] = cfg.onAnim; li["pwrMax"] = cfg.pwrMax; li["pwrCh"] = cfg.pwrCh;
+  li["trans"] = cfg.transMs; li["onAnim"] = cfg.onAnim; li["daylight"] = cfg.daylight; li["pwrMax"] = cfg.pwrMax; li["pwrCh"] = cfg.pwrCh;
   li["sda"] = cfg.i2cSda; li["scl"] = cfg.i2cScl; li["shunt"] = cfg.shuntUo; li["sensor"] = ina::ok;
   { int8_t a, b; i2cDefault(cfg.board.c_str(), a, b); li["defSda"] = a; li["defScl"] = b; }
   JsonArray os = d["orders"].to<JsonArray>();
@@ -1910,6 +2123,7 @@ String configJson() {
   JsonObject m = d["mqtt"].to<JsonObject>();
   m["on"] = cfg.mqttOn; m["host"] = cfg.mqttHost; m["port"] = cfg.mqttPort; m["user"] = cfg.mqttUser; m["hasPass"] = cfg.mqttPass.length() > 0;
   JsonObject bo = d["boot"].to<JsonObject>(); bo["mode"] = cfg.bootMode; bo["preset"] = cfg.bootPreset;
+  d["fault"] = cfg.faultBlink;
   d["guard"] = cfg.guard; d["why"] = bootReason; d["crashes"] = prefs.getUInt("crashes", 0);
   JsonObject t = d["touch"].to<JsonObject>();
   t["on"] = cfg.touchOn; t["sens"] = cfg.touchSens; t["a1"] = cfg.tapA1; t["a2"] = cfg.tapA2; t["wave"] = cfg.touchWave;
@@ -1919,6 +2133,14 @@ String configJson() {
 }
 
 // ---------- JSON für die App ----------
+// Strom schwankt mit jedem Effektbild: für die App kommt er separat einmal pro Sekunde (sjNoPwr), sonst ginge
+// der ganze Zustand mehrmals pro Sekunde raus.
+bool sjNoPwr = false;
+void pwrJson(JsonObject pw) {
+  pw["est"] = estMa; pw["lim"] = cfg.pwrMax; pw["scale"] = (int)(powerScale * measScale * 100 + 0.5f);
+  if (ina::ok) { pw["ma"] = (int)(ina::amps * 1000); pw["v"] = roundf(ina::volts * 100) / 100; }
+  pw["sensor"] = ina::ok; pw["sda"] = cfg.i2cSda; pw["scl"] = cfg.i2cScl; pw["shunt"] = cfg.shuntUo;
+}
 String stateJson(bool meta) {
   JsonDocument d;
   d["sim"] = !cfg.bus;
@@ -1931,12 +2153,13 @@ String stateJson(bool meta) {
   d["mqttSet"] = cfg.mqttOn && cfg.mqttHost.length() > 0;
   d["ap"] = apMode;
   d["ssid"] = wlanOk ? WiFi.SSID() : String();
-  if (wlanOk) { d["rssi"] = WiFi.RSSI(); d["ip"] = WiFi.localIP().toString(); }
-  JsonObject pw = d["pwr"].to<JsonObject>();          // Strom: geschätzt, Limit, Dämpfung, Messung
-  pw["est"] = estMa; pw["lim"] = cfg.pwrMax; pw["scale"] = (int)(powerScale * measScale * 100 + 0.5f);
-  if (ina::ok) { pw["ma"] = (int)(ina::amps * 1000); pw["v"] = roundf(ina::volts * 100) / 100; }
-  pw["sensor"] = ina::ok; pw["sda"] = cfg.i2cSda; pw["scl"] = cfg.i2cScl; pw["shunt"] = cfg.shuntUo;
+  if (wlanOk) { d["rssi"] = WiFi.RSSI() / 3 * 3; d["ip"] = WiFi.localIP().toString(); }   // in 3-dB-Schritten, sonst ändert es sich dauernd
+  if (!sjNoPwr) pwrJson(d["pwr"].to<JsonObject>());     // Strom: geschätzt, Limit, Dämpfung, Messung
   d["trans"] = cfg.transMs;
+  if (wx::place.length() || wx::err.length() || wx::busy) wx::json(d["wx"].to<JsonObject>());
+  game::json(d["game"].to<JsonObject>());
+  if (mirror::ip.length()) mirror::json(d["mirror"].to<JsonObject>());
+  if (cfg.daylight) { JsonObject dy = d["day"].to<JsonObject>(); dy["ok"] = timeOk(); if (timeOk()) { float dm, wm; dayCurve(dm, wm); dy["dim"] = (int)(dm * 100 + 0.5f); dy["warm"] = (int)(wm * 100 + 0.5f); } }
   d["upd"] = ota::count && ota::cmp(ota::latest(), FW_VERSION) > 0 ? ota::latest() : String();   // neuere Version verfügbar
   d["ver"] = FW_VERSION;
   d["chip"] = CHIP_FAMILY;
@@ -1981,7 +2204,7 @@ String stateJson(bool meta) {
     o["x"] = p.x; o["y"] = p.y; o["up"] = isUp(p.x, p.y); o["rot"] = p.rot;
     o["parent"] = p.parent >= 0 ? hex(P[p.parent].chip) : String();
     o["state"] = p.state; o["on"] = p.on; o["edges"] = p.edges; o["fw"] = p.fw;
-    o["clips"] = p.clips; o["caps"] = p.caps; o["lit"] = p.litSec;
+    o["clips"] = p.clips; o["caps"] = p.caps; o["lit"] = p.litSec / 60 * 60;   // minutengenau reicht
     if (p.identUntil) o["ident"] = true;
     if (p.upd) { o["upd"] = p.upd; o["pct"] = p.updPct; }
     o["r"] = p.r; o["g"] = p.g; o["b"] = p.b; o["w"] = p.w; o["bri"] = p.bri;
@@ -2046,11 +2269,16 @@ void wsLoop() {
   uint32_t now = millis();
   if (wsForce || now - wsLastState > 250) {
     wsLastState = now;
-    String s = stateJson(false);
+    sjNoPwr = true; String s = stateJson(false); sjNoPwr = false;
     if (wsForce || s != wsLast) { ws::broadcast("{\"t\":\"state\",\"d\":" + s + "}"); wsLast = s; }
     wsForce = false;
   }
-  if ((fx.id || overlayActive()) && now - wsLastLive >= 66) {        // Effektbild etwa 15-mal pro Sekunde (auch bei Wellen und Einschalt-Animation)
+  static uint32_t lastPwr = 0; static String pwrLast;
+  if (now - lastPwr >= 1000) {                                        // Strom einmal pro Sekunde, nur wenn er sich ändert
+    lastPwr = now; JsonDocument p; pwrJson(p.to<JsonObject>()); String ps; serializeJson(p, ps);
+    if (ps != pwrLast) { ws::broadcast("{\"t\":\"pwr\",\"d\":" + ps + "}"); pwrLast = ps; }
+  }
+  if ((fx.id || overlayActive()) && now - wsLastLive >= 40) {        // Effektbild 25-mal pro Sekunde, so oft wie die Wand selbst (auch bei Wellen und Einschalt-Animation)
     wsLastLive = now;
     ws::broadcast("{\"t\":\"live\",\"d\":" + liveJson() + "}");
   }
@@ -2081,20 +2309,34 @@ struct Peer { String name, host, ip, ver; };
 const uint8_t MAXP = 16;
 Peer cur[MAXP], nxt[MAXP];
 uint8_t nCur = 0, nNxt = 0;
+Peer wCur[MAXP], wNxt[MAXP];               // echte WLED-Geräte (zum Nachahmen)
+uint8_t nwCur = 0, nwNxt = 0;
 volatile bool busy = false, ready = false;
 uint32_t at = 0;
 void task(void*) {
   int k = MDNS.queryService("wled", "tcp");                    // ältere Trilumag-Versionen melden sich nur so
   String me = WiFi.localIP().toString();
-  nNxt = 0;
-  for (int i = 0; i < k && nNxt < MAXP; i++) {
+  nNxt = 0; nwNxt = 0;
+  for (int i = 0; i < k; i++) {
     String h = MDNS.hostname(i), ip = MDNS.address(i).toString();
     bool tl = MDNS.hasTxt(i, "tl");
-    if (!tl && !h.startsWith("trilumag")) continue;              // echte WLED-Geräte auslassen
     if (ip == me || ip == "0.0.0.0") continue;
+    if (!tl && !h.startsWith("trilumag")) {                       // echtes WLED-Gerät
+      if (nwNxt < MAXP) { Peer& w = wNxt[nwNxt++]; w.host = h; w.ip = ip; w.name = h; }
+      continue;
+    }
+    if (nNxt >= MAXP) continue;
     Peer& p = nxt[nNxt++];
     p.host = h; p.ip = ip; p.ver = tl ? MDNS.txt(i, "tl") : String();
     p.name = MDNS.hasTxt(i, "name") ? MDNS.txt(i, "name") : h;
+  }
+  for (uint8_t i = 0; i < nwNxt; i++) {                         // WLED-Geräte: ihren Namen erfragen
+    HTTPClient h; h.setTimeout(1500);
+    if (h.begin("http://" + wNxt[i].ip + "/json/info") && h.GET() == 200) {
+      JsonDocument f; f["name"] = true; JsonDocument d;
+      if (!deserializeJson(d, h.getString(), DeserializationOption::Filter(f)) && d["name"].is<const char*>()) wNxt[i].name = d["name"].as<const char*>();
+    }
+    h.end();
   }
   ready = true;
   vTaskDelete(nullptr);
@@ -2151,7 +2393,8 @@ void start() {
 void loop() {
   if (!ready) return;
   for (uint8_t i = 0; i < nNxt; i++) cur[i] = nxt[i];
-  nCur = nNxt; at = millis() | 1; ready = false; busy = false;
+  for (uint8_t i = 0; i < nwNxt; i++) wCur[i] = wNxt[i];
+  nCur = nNxt; nwCur = nwNxt; at = millis() | 1; ready = false; busy = false;
 }
 String json() {
   JsonDocument d;
@@ -2162,9 +2405,146 @@ String json() {
     if (uint8_t u = pushState(cur[i].ip)) { o["upd"] = u; o["updVer"] = upVer; }
   }
   d["pushing"] = (bool)pushing;
+  JsonArray w = d["wled"].to<JsonArray>();
+  for (uint8_t i = 0; i < nwCur; i++) { JsonObject o = w.add<JsonObject>(); o["name"] = wCur[i].name; o["host"] = wCur[i].host; o["ip"] = wCur[i].ip; }
   String out; serializeJson(d, out); return out;
 }
 }  // namespace peers
+
+// ---------- WLED nachahmen ----------
+// Ein WLED-Gerät im WLAN vorgeben: Trilumag fragt alle 1,5 s dessen Zustand ab und übernimmt Änderungen
+// (Ein/Aus, Helligkeit, Farbe, Tempo, Intensität und – wo es ein Gegenstück gibt – den Effekt).
+namespace mirror {
+String ip;                                  // leer = aus
+volatile bool run = false, fresh = false, fail = false;
+struct St { bool on; uint8_t bri, fx, sx, ix; uint8_t c[4]; };
+St got, last; bool haveLast = false;
+uint32_t okAt = 0;
+// WLED-Effektnummer → Trilumag-Effekt (-1: keine Entsprechung, dann nur die Farbe)
+int mapFx(int f) {
+  switch (f) {
+    case 0: return 0;  case 2: return 3;  case 8: return 4;  case 9: return 1;  case 10: case 11: return 9;
+    case 20: case 21: case 22: case 74: return 5;  case 38: return 8;  case 45: return 12;  case 57: return 11;
+    case 66: return 7;  case 76: return 14;  case 63: return 2;  case 89: case 90: return 21;
+    default: return -1;
+  }
+}
+void pollOnce() {
+    HTTPClient h; h.setTimeout(2500);
+    bool ok = false;
+    if (h.begin("http://" + ip + "/json/state") && h.GET() == 200) {
+      JsonDocument f; f["on"] = true; f["bri"] = true;
+      JsonObject sf = f["seg"][0].to<JsonObject>(); sf["col"] = true; sf["fx"] = true; sf["sx"] = true; sf["ix"] = true;
+      JsonDocument d;
+      if (!deserializeJson(d, h.getString(), DeserializationOption::Filter(f))) {
+        St n; n.on = d["on"] | false; n.bri = d["bri"] | 128;
+        JsonVariant sg = d["seg"][0]; n.fx = sg["fx"] | 0; n.sx = sg["sx"] | 128; n.ix = sg["ix"] | 128;
+        JsonVariant c0 = sg["col"][0];
+        for (int k = 0; k < 4; k++) n.c[k] = c0[k] | 0;
+        if (!fresh) { got = n; fresh = true; }
+        ok = true;
+      }
+    }
+    h.end();
+    fail = !ok; if (ok) okAt = millis() | 1;
+}
+void task(void*) {
+  while (run) { pollOnce(); for (int t = 0; t < 15 && run; t++) vTaskDelay(pdMS_TO_TICKS(100)); }
+  vTaskDelete(nullptr);
+}
+void start(const String& a) {
+  ip = a; haveLast = false; fresh = false; fail = false; okAt = 0;
+  if (!run && ip.length()) { run = true; if (xTaskCreate(task, "wled", 6144, nullptr, 1, nullptr) != pdPASS) run = false; }
+}
+void stop() { run = false; ip = ""; }
+// Hauptschleife: nur übernehmen, was sich am WLED-Gerät geändert hat (sonst darf man hier weiter selbst schalten)
+void loop() {
+  if (!fresh) return;
+  St n = got; fresh = false;
+  JsonDocument d;
+  if (!haveLast || n.on != last.on) d["state"] = n.on ? "ON" : "OFF";
+  if (!haveLast || n.bri != last.bri) d["brightness"] = n.bri ? n.bri : 1;
+  bool fxCh = !haveLast || n.fx != last.fx;
+  int k = mapFx(n.fx);
+  if (fxCh) d["effect"] = k >= 0 ? FX[k].id : "aus";
+  if (!haveLast || n.sx != last.sx) d["speed"] = 1 + n.sx * 99 / 255;
+  if (!haveLast || n.ix != last.ix) d["intensity"] = n.ix;
+  bool colOk = k <= 0 || FX[k].color;                         // Effekte mit eigenen Farben nicht auf Einfarbig umschalten
+  if (colOk && (!haveLast || memcmp(n.c, last.c, 4) || fxCh)) { JsonObject c = d["color"].to<JsonObject>(); c["r"] = n.c[0]; c["g"] = n.c[1]; c["b"] = n.c[2]; c["w"] = n.c[3]; }
+  last = n; haveLast = true;
+  if (d.size()) { applyAll(d.as<JsonVariantConst>()); wsKick(); }
+}
+void json(JsonObject o) { o["ip"] = ip; o["ok"] = okAt && !fail && millis() - okAt < 10000; }
+}  // namespace mirror
+
+// ---------- Wetter (Open-Meteo, kostenlos, ohne Anmeldung) ----------
+// Ort einmal in Koordinaten umrechnen, dann alle 15 Minuten Temperatur und Niederschlag holen. Läuft in einer eigenen Aufgabe.
+namespace wx {
+String place, err;                     // Anzeigename des Orts, letzter Fehler
+float lat = 0, lon = 0;
+volatile bool busy = false;
+String want;                           // neu gesuchter Ort (leer = nur Wetter holen)
+uint32_t at = 0, next = 0;
+String enc(const String& s) {
+  String o; const char* hx = "0123456789ABCDEF";
+  for (size_t i = 0; i < s.length(); i++) { uint8_t c = s[i];
+    if (isalnum(c) || c == '-' || c == '.') o += (char)c; else { o += '%'; o += hx[c >> 4]; o += hx[c & 15]; } }
+  return o;
+}
+bool get(const String& url, JsonDocument& d) {
+  HTTPClient h; h.setTimeout(6000);
+  if (!h.begin(url)) return false;
+  int code = h.GET();
+  bool ok = code == 200 && !deserializeJson(d, h.getString());
+  h.end();
+  return ok;
+}
+void task(void*) {
+  String e;
+  if (want.length()) {
+    JsonDocument g;
+    if (!get("http://geocoding-api.open-meteo.com/v1/search?count=1&language=de&name=" + enc(want), g)) e = "Wetterdienst nicht erreichbar";
+    else if (g["results"][0].isNull()) e = "Ort nicht gefunden";
+    else {
+      JsonVariant r = g["results"][0];
+      lat = r["latitude"] | 0.0f; lon = r["longitude"] | 0.0f;
+      place = String((const char*)(r["name"] | "")) + (r["country_code"].is<const char*>() ? String(", ") + (const char*)r["country_code"] : String());
+      prefs.putFloat("wxLat", lat); prefs.putFloat("wxLon", lon); prefs.putString("wxPlace", place);
+    }
+    want = "";
+  }
+  if (!e.length() && place.length()) {
+    JsonDocument f;
+    char ll[48]; snprintf(ll, sizeof ll, "latitude=%.3f&longitude=%.3f", lat, lon);
+    String u = String("http://api.open-meteo.com/v1/forecast?") + ll +
+               "&current=temperature_2m,precipitation,weather_code&hourly=precipitation_probability&forecast_hours=3&timezone=auto";
+    if (!get(u, f)) e = "Wetterdienst nicht erreichbar";
+    else {
+      wxTemp = f["current"]["temperature_2m"] | 15.0f;
+      int code = f["current"]["weather_code"] | 0; float pr = f["current"]["precipitation"] | 0.0f;
+      int prob = 0; for (JsonVariant v : f["hourly"]["precipitation_probability"].as<JsonArray>()) { int q = v | 0; if (q > prob) prob = q; }
+      bool snow = (code >= 71 && code <= 77) || code == 85 || code == 86;
+      bool rain = pr > 0.05f || (code >= 51 && code <= 67) || (code >= 80 && code <= 82) || code >= 95 || prob >= 60;
+      wxKind = snow ? 2 : rain ? 1 : 0; wxOk = true; at = millis() | 1;
+    }
+  }
+  err = e;
+  busy = false;
+  vTaskDelete(nullptr);
+}
+void start() {
+  if (busy || !wlanOk) return;
+  busy = true; next = millis() + 15UL * 60 * 1000;
+  if (xTaskCreate(task, "wetter", 8192, nullptr, 1, nullptr) != pdPASS) busy = false;
+}
+void load() { place = prefs.getString("wxPlace", ""); lat = prefs.getFloat("wxLat", 0); lon = prefs.getFloat("wxLon", 0); }
+void loop() { if (place.length() && wlanOk && (int32_t)(millis() - next) >= 0) start(); }
+void json(JsonObject o) {
+  o["place"] = place; o["busy"] = (bool)busy;
+  if (wxOk) { o["temp"] = roundf(wxTemp * 10) / 10; o["kind"] = wxKind; o["min"] = (millis() - at) / 60000; }
+  if (err.length()) o["err"] = err;
+}
+}  // namespace wx
 
 int ledCount() { return countAttached() * SEG_PER_PANEL; }
 
@@ -2285,7 +2665,7 @@ String backupJson() {
   JsonObject t = c["touch"].to<JsonObject>();
   t["on"] = cfg.touchOn; t["sens"] = cfg.touchSens; t["a1"] = cfg.tapA1; t["a2"] = cfg.tapA2;
   c["pAuto"] = cfg.panelAuto; c["zbOn"] = cfg.zbOn; c["name"] = cfg.name;
-  c["guard"] = cfg.guard; c["favs"] = fxFavs; c["onAnim"] = cfg.onAnim; c["tWave"] = cfg.touchWave; c["viewRot"] = cfg.viewRot; c["viewMir"] = cfg.viewMir;
+  c["guard"] = cfg.guard; c["favs"] = fxFavs; c["onAnim"] = cfg.onAnim; c["tWave"] = cfg.touchWave; c["dayc"] = cfg.daylight; c["fault"] = cfg.faultBlink; c["viewRot"] = cfg.viewRot; c["viewMir"] = cfg.viewMir;
   c["bootMode"] = cfg.bootMode; c["bootPre"] = cfg.bootPreset; c["syncOn"] = cfg.syncOn; c["syncGrp"] = cfg.syncGroup;
   JsonObject lh = d["lit"].to<JsonObject>();
   for (int i = 0; i < SLOTS; i++) if (P[i].used && P[i].litSec) lh[hex(P[i].chip)] = P[i].litSec;
@@ -2346,7 +2726,7 @@ const char* restoreBackup(JsonDocument& d) {
     prefs.putBool("pAuto", c["pAuto"] | true);
     if (HAS_ZIGBEE) prefs.putBool("zbOn", c["zbOn"] | false);
     if (c["name"].is<const char*>() && strlen(c["name"]) > 0) prefs.putString("name", (const char*)c["name"]);
-    prefs.putBool("guard", c["guard"] | true); prefs.putUInt("favs", c["favs"] | 0); prefs.putUChar("onAnim", c["onAnim"] | 2); prefs.putBool("tWave", c["tWave"] | true);
+    prefs.putBool("guard", c["guard"] | true); prefs.putUInt("favs", c["favs"] | 0); prefs.putUChar("onAnim", c["onAnim"] | 2); prefs.putBool("tWave", c["tWave"] | true); prefs.putBool("dayc", c["dayc"] | false); prefs.putBool("fault", c["fault"] | true);
     prefs.putUShort("viewRot", c["viewRot"] | 0); prefs.putBool("viewMir", c["viewMir"] | false);
     prefs.putUChar("bootMode", c["bootMode"] | 0); prefs.putChar("bootPre", c["bootPre"] | -1);
     prefs.putBool("syncOn", c["syncOn"] | false); prefs.putUChar("syncGrp", c["syncGrp"] | 1);
@@ -2875,6 +3255,7 @@ void otaLoop() {
 // Ein Befehl der App, egal ob über HTTP oder WebSocket. Liefert eine Fehlermeldung oder nullptr.
 const char* apiCall(const char* path, JsonDocument& d) {
   if (!strcmp(path, "/api/set")) {
+    kelvinToColor(d);
     const char* id = d["id"] | "";
     if (d["panelBri"].is<int>()) {                      // Helligkeit aller Panels auf einmal (auch der in der Ablage)
       uint8_t v = constrain(d["panelBri"].as<int>(), 1, 255);
@@ -2932,6 +3313,7 @@ const char* apiCall(const char* path, JsonDocument& d) {
   if (!strcmp(path, "/api/light")) {
     if (d["trans"].is<int>()) { cfg.transMs = constrain(d["trans"].as<int>(), 0, 10000); prefs.putUShort("trans", cfg.transMs); }
     if (d["onAnim"].is<int>()) { cfg.onAnim = constrain(d["onAnim"].as<int>(), 0, 3); prefs.putUChar("onAnim", cfg.onAnim); }
+    if (d["daylight"].is<bool>()) { cfg.daylight = d["daylight"]; prefs.putBool("dayc", cfg.daylight); outForce = true; }
     if (d["pwrMax"].is<int>()) { cfg.pwrMax = constrain(d["pwrMax"].as<int>(), 0, 60000); prefs.putUShort("pwrMax", cfg.pwrMax); measScale = 1; }
     if (d["pwrCh"].is<int>()) { cfg.pwrCh = constrain(d["pwrCh"].as<int>(), 1, 100); prefs.putUChar("pwrCh", cfg.pwrCh); }
     if (d["sda"].is<int>() || d["scl"].is<int>() || d["shunt"].is<int>()) {   // Stromsensor, gilt sofort
@@ -3055,6 +3437,35 @@ const char* apiCall(const char* path, JsonDocument& d) {
     return nullptr;
   }
   // Energie: {"action":"reset"} setzt alle Zähler zurück
+  // Wetter: {"place":"Wien"} sucht den Ort und holt das Wetter, {"place":""} löscht ihn, {} holt nur neu
+  // WLED nachahmen: {"ip":"192.168.1.70"} oder {"ip":""} zum Beenden
+  if (!strcmp(path, "/api/mirror")) {
+    String a = d["ip"] | "";
+    prefs.putString("wledIp", a);
+    if (a.length()) mirror::start(a); else mirror::stop();
+    if (a.length()) diag("Ahmt das WLED-Gerät %s nach", a.c_str()); else diag("WLED nachahmen aus");
+    return nullptr;
+  }
+  // Spiel: {"action":"start"} / {"action":"stop"}
+  if (!strcmp(path, "/api/game")) {
+    const char* a = d["action"] | "";
+    if (!strcmp(a, "start")) return game::start();
+    if (!strcmp(a, "stop")) { game::stop(); return nullptr; }
+    return "Unbekannte Aktion";
+  }
+  // Störungsanzeige: {"on":true}
+  if (!strcmp(path, "/api/fault")) { cfg.faultBlink = d["on"] | true; prefs.putBool("fault", cfg.faultBlink); return nullptr; }
+  if (!strcmp(path, "/api/weather")) {
+    if (!wlanOk) return "Kein WLAN";
+    if (wx::busy) return "Wetter wird gerade geholt";
+    if (d["place"].is<const char*>()) {
+      String pl = d["place"].as<const char*>(); pl.trim();
+      if (!pl.length()) { wx::place = ""; wxOk = false; wx::err = ""; prefs.remove("wxPlace"); return nullptr; }
+      wx::want = pl.substring(0, 60);
+    }
+    wx::start();
+    return nullptr;
+  }
   if (!strcmp(path, "/api/peers")) { if (!wlanOk) return "Kein WLAN"; peers::start(); return nullptr; }
   if (!strcmp(path, "/api/energy")) {
     if (strcmp(d["action"] | "", "reset")) return "Unbekannte Aktion";
@@ -3198,7 +3609,7 @@ void setupWeb() {
   server.on("/api/energy", HTTP_GET, [] { server.send(200, "application/json", energyJson()); });
   server.on("/api/peers", HTTP_GET, [] { server.send(200, "application/json", peers::json()); });
   // Befehle laufen über apiCall(), damit HTTP und WebSocket dasselbe tun
-  const char* cmds[] = {"/api/set", "/api/presets", "/api/effect", "/api/test", "/api/ota", "/api/light", "/api/diag", "/api/touch", "/api/panelfw", "/api/zigbee", "/api/name", "/api/identify", "/api/guard", "/api/swap", "/api/favs", "/api/view", "/api/signal", "/api/progress", "/api/sleep", "/api/boot", "/api/energy", "/api/peers", "/api/sync",
+  const char* cmds[] = {"/api/set", "/api/presets", "/api/effect", "/api/test", "/api/ota", "/api/light", "/api/diag", "/api/touch", "/api/panelfw", "/api/zigbee", "/api/name", "/api/identify", "/api/guard", "/api/swap", "/api/favs", "/api/view", "/api/signal", "/api/progress", "/api/sleep", "/api/boot", "/api/energy", "/api/peers", "/api/weather", "/api/game", "/api/fault", "/api/mirror", "/api/sync",
                         "/api/sim/new", "/api/sim/remove", "/api/sim/rotate", "/api/sim/attach", "/api/sim/detach", "/api/sim/tap"};
   for (const char* path : cmds) {
     server.on(path, HTTP_POST, [path] {
@@ -3359,6 +3770,7 @@ void onMqtt(char* topic, byte* payload, unsigned int len) {
   }
   JsonDocument d;
   if (deserializeJson(d, payload, len)) return;
+  kelvinToColor(d);
   String t(topic);                       // trilumag/<ID>/set
   String id = t.substring(9, t.lastIndexOf('/'));
   if (id == "alle") applyAll(d.as<JsonVariantConst>());
@@ -3549,6 +3961,8 @@ void setup() {
   otaBootCheck();
   guardBoot();
   fxLoad();
+  wx::load();
+  { String m = prefs.getString("wledIp", ""); if (m.length()) mirror::start(m); }
   presetsLoad();
   bootApply();                                      // nach Stromausfall: aus, an oder Preset (Einstellung)
   enLoad();
@@ -3570,7 +3984,7 @@ void setup() {
   netClient.setTimeout(800);       // ist der Broker nicht erreichbar, nicht 3 s lang hängen
   mqtt.setSocketTimeout(2);
   mqtt.setServer(cfg.mqttHost.c_str(), cfg.mqttPort);
-  mqtt.setBufferSize(1024);
+  mqtt.setBufferSize(1600);
   mqtt.setCallback(onMqtt);
 
   diag("Trilumag %s gestartet (%s, %s)", FW_VERSION, CHIP_FAMILY, cfg.bus ? "Bus" : "Simulation");
@@ -3611,6 +4025,8 @@ void loop() {
   if (fxDirty && millis() - fxDirtyAt > 5000) fxSave();
   zbLoop();
   peers::loop();
+  wx::loop();
+  mirror::loop();
   sleepLoop();
   litLoop();
   enLoop();
