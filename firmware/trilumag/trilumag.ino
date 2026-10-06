@@ -444,6 +444,7 @@ void begin() {
 void reconcile();
 void simChanged();
 bool timeOk();
+bool safeBoot = false;         // nach wiederholten Abstürzen beim Start: Netz-Nachahmen nicht starten
 uint32_t faultPanelAt = 0;     // wann zuletzt ein Panel nicht mehr geantwortet hat
 // Während Updates ruhen die Abfragen an Hue und WLED: zwei verschlüsselte Verbindungen gleichzeitig brauchen zu viel Speicher
 volatile bool netQuiet = false, hueInReq = false, wledInReq = false;
@@ -2041,7 +2042,7 @@ void swapCheck(int i) {
   a.edges = b.edges; prefs.putBool(("e" + hex(a.chip)).c_str(), a.edges);
   colorsDirty = true; colorsDirtyAt = millis();
   diag("Panel %s übernimmt die Einstellungen von %s", hex(a.chip).substring(4).c_str(), hex(b.chip).substring(4).c_str());
-  swapSlot = -1; swapDoneChip = a.chip; swapDoneAt = millis() | 1;
+  swapSlot = -1; swapDoneChip = a.chip; swapDoneAt = millis(); if (!swapDoneAt) swapDoneAt = 1;
   // Simulation: in echt hängen die Panels dahinter noch aneinander und melden sich über das neue wieder
   if (!cfg.bus) for (int k = 1; k < SLOTS; k++) if (swapKid[k]) {
     swapKid[k] = false;
@@ -2250,7 +2251,7 @@ String stateJson(bool meta) {
   f["r"] = fx.r; f["g"] = fx.g; f["b"] = fx.b; f["w"] = fx.w; f["usesColor"] = fxUsesColor();
   d["master"] = master; d["on"] = masterOn;
   if (swapActive()) { JsonObject w = d["swap"].to<JsonObject>(); w["id"] = hex(P[swapSlot].chip); w["left"] = (swapUntil - millis() + 999) / 1000; w["off"] = !P[swapSlot].attached; }
-  if (swapDoneAt && millis() - swapDoneAt < 15000) d["swapped"] = hex(swapDoneChip);
+  if (swapDoneAt && (int32_t)(millis() - swapDoneAt) < 15000) d["swapped"] = hex(swapDoneChip);
   { JsonArray cp = d["cpal"].to<JsonArray>();
     for (uint8_t i = 0; i < CPAL_MAX; i++) if (cpal[i].used) {
       JsonObject o = cp.add<JsonObject>(); o["id"] = palId(PAL_COUNT + i); o["name"] = cpal[i].name; o["slot"] = i;
@@ -2516,7 +2517,7 @@ int mapFx(int f) {
   }
 }
 void pollOnce() {
-    if (netQuiet) return;
+    if (netQuiet || !wlanOk) return;       // ohne WLAN (auch direkt nach dem Start) keine Verbindung versuchen
     wledInReq = true;
     HTTPClient h; h.setTimeout(2500);
     bool ok = false;
@@ -2628,7 +2629,7 @@ void start(const char* what) {
   if (xTaskCreate(work, "hue", 8192, nullptr, 1, nullptr) != pdPASS) busy = false;
 }
 void pollOnce() {
-  if (netQuiet) return;
+  if (netQuiet || !wlanOk) return;         // ohne WLAN (auch direkt nach dem Start) keine Verbindung versuchen
   hueInReq = true;
   static NetworkClientSecure pc; static bool pcInit = false; if (!pcInit) { pc.setInsecure(); pcInit = true; }
   static HTTPClient ph; ph.setReuse(true); ph.setTimeout(4000);           // Verbindung offen halten: nicht jede Sekunde neu verschlüsseln
@@ -2690,7 +2691,7 @@ void loop() {
 void load() {
   ip = prefs.getString("hueIp", ""); key = prefs.getString("hueKey", "");
   String l = prefs.getString("hueLight", "");
-  if (key.length() && l.length()) follow(l, prefs.getString("hueLName", ""));
+  if (key.length() && l.length() && !safeBoot) follow(l, prefs.getString("hueLName", ""));
 }
 void json(JsonObject o) {
   o["ip"] = ip; o["paired"] = key.length() > 0; o["busy"] = (bool)busy;
@@ -3389,8 +3390,14 @@ void guardBoot() {
   uint8_t code = rstMagic == 0x7121A600 ? rstCode : 0;
   rstMagic = 0; rstCode = 0;
   bootReason = reasonText(r, code);
-  if (r == ESP_RST_PANIC || r == ESP_RST_INT_WDT || r == ESP_RST_TASK_WDT || r == ESP_RST_WDT) prefs.putUInt("crashes", prefs.getUInt("crashes", 0) + 1);
+  bool crash = r == ESP_RST_PANIC || r == ESP_RST_INT_WDT || r == ESP_RST_TASK_WDT || r == ESP_RST_WDT;
+  if (crash) prefs.putUInt("crashes", prefs.getUInt("crashes", 0) + 1);
+  // mehrmals hintereinander gleich nach dem Start abgestürzt: diesmal ohne Hue- und WLED-Nachahmen starten
+  uint8_t early = crash ? prefs.getUChar("bootCrash", 0) + 1 : 0;
+  prefs.putUChar("bootCrash", early);
+  safeBoot = early >= 3;
   diag("Gestartet: %s", bootReason.c_str());
+  if (safeBoot) diag("Sicherer Start: Hue- und WLED-Nachahmen bleiben aus");
   // läuft die Hauptschleife eine Minute nicht mehr, neu starten (nur mit eingeschaltetem Wächter)
   static esp_timer_handle_t t = nullptr;
   esp_timer_create_args_t a = {};
@@ -3402,6 +3409,8 @@ void guardBoot() {
 // WLAN weg: nach 3 Minuten neu verbinden, nach 10 Minuten neu starten (nicht, solange jemand im Einrichtungs-WLAN ist)
 void guardLoop() {
   loopBeat = millis();
+  static bool bootOk = false;
+  if (!bootOk && millis() > 60000) { bootOk = true; if (prefs.getUChar("bootCrash", 0)) prefs.putUChar("bootCrash", 0); }   // eine Minute gelaufen: Start war in Ordnung
   static uint32_t lostAt = 0, lastMdns = 0; static bool retried = false;
   if (!cfg.guard) { lostAt = 0; return; }
   uint32_t now = millis();
@@ -4238,7 +4247,7 @@ void setup() {
   guardBoot();
   fxLoad();
   wx::load();
-  { String m = prefs.getString("wledIp", ""); if (m.length()) mirror::start(m); }
+  { String m = prefs.getString("wledIp", ""); if (m.length() && !safeBoot) mirror::start(m); }
   hueb::load();
   presetsLoad();
   bootApply();                                      // nach Stromausfall: aus, an oder Preset (Einstellung)
