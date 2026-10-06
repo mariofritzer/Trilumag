@@ -51,6 +51,7 @@
 #include "esp_system.h"
 #include "esp_ota_ops.h"
 #include "esp_timer.h"
+#include <HTTPClient.h>
 
 // ================= Voreinstellungen =================
 // Alles hier lässt sich später in der App ändern. Diese Werte gelten nur, solange nichts gespeichert ist.
@@ -2098,6 +2099,50 @@ void task(void*) {
   ready = true;
   vTaskDelete(nullptr);
 }
+// Update an andere Wände weitergeben: erst nach Updates suchen lassen, dann die Version installieren.
+// Zustand pro Wand: 1 wird geschickt, 2 installiert (Wand hat angenommen), 3 Fehler
+const uint8_t MAXU = 8;
+char upIp[MAXU][16]; volatile uint8_t upSt[MAXU]; uint8_t nUp = 0;
+String upVer; volatile bool pushing = false;
+int post(const char* ip, const String& body, String* reply) {
+  HTTPClient h; h.setTimeout(4000);
+  if (!h.begin(String("http://") + ip + "/api/ota")) return -1;
+  h.addHeader("Content-Type", "application/json");
+  int code = h.POST(body);
+  if (reply) *reply = code > 0 ? h.getString() : String();
+  h.end();
+  return code;
+}
+void pushTask(void*) {
+  for (uint8_t i = 0; i < nUp; i++) if (post(upIp[i], "{\"action\":\"check\"}", nullptr) != 200) upSt[i] = 3;
+  vTaskDelay(pdMS_TO_TICKS(8000));                            // die anderen holen sich die Versionsliste
+  for (uint8_t i = 0; i < nUp; i++) {
+    if (upSt[i] == 3) continue;
+    for (uint8_t t = 0; t < 5; t++) {                          // ältere Versionen kennen die Version erst nach der Suche
+      String r; int c = post(upIp[i], "{\"action\":\"install\",\"version\":\"" + upVer + "\"}", &r);
+      if (c == 200) { upSt[i] = 2; break; }
+      upSt[i] = 3;
+      if (r.indexOf("unbekannt") < 0) break;
+      vTaskDelay(pdMS_TO_TICKS(4000));
+    }
+  }
+  pushing = false;
+  vTaskDelete(nullptr);
+}
+bool push(const String& v, JsonArrayConst ips) {
+  if (pushing) return false;
+  nUp = 0;
+  for (JsonVariantConst x : ips) {
+    const char* ip = x | "";
+    if (nUp < MAXU && strlen(ip) > 6 && strlen(ip) < 16) { strcpy(upIp[nUp], ip); upSt[nUp] = 1; nUp++; }
+  }
+  if (!nUp) return false;
+  upVer = v; pushing = true;
+  if (xTaskCreate(pushTask, "peerupd", 6144, nullptr, 1, nullptr) != pdPASS) { pushing = false; return false; }
+  return true;
+}
+uint8_t pushState(const String& ip) { for (uint8_t i = 0; i < nUp; i++) if (ip == upIp[i]) return upSt[i]; return 0; }
+
 void start() {
   if (busy || !wlanOk) return;
   busy = true; ready = false;
@@ -2112,7 +2157,11 @@ String json() {
   JsonDocument d;
   d["busy"] = (bool)busy; d["ago"] = at ? (int32_t)((millis() - at) / 1000) : -1;
   JsonArray a = d["list"].to<JsonArray>();
-  for (uint8_t i = 0; i < nCur; i++) { JsonObject o = a.add<JsonObject>(); o["name"] = cur[i].name; o["host"] = cur[i].host; o["ip"] = cur[i].ip; o["ver"] = cur[i].ver; }
+  for (uint8_t i = 0; i < nCur; i++) {
+    JsonObject o = a.add<JsonObject>(); o["name"] = cur[i].name; o["host"] = cur[i].host; o["ip"] = cur[i].ip; o["ver"] = cur[i].ver;
+    if (uint8_t u = pushState(cur[i].ip)) { o["upd"] = u; o["updVer"] = upVer; }
+  }
+  d["pushing"] = (bool)pushing;
   String out; serializeJson(d, out); return out;
 }
 }  // namespace peers
@@ -2768,6 +2817,7 @@ void guardLoop() {
 bool otaCheckNow = false;
 bool otaLatestAfterCheck = false;     // Notfall-Seite: nach der Abfrage die neueste Version installieren
 String otaInstallVer;
+String otaWantVer, otaAfterPeers;      // erst nach der Suche bekannte Version; eigenes Update nach dem Weitergeben
 uint32_t otaNext = 0;
 const uint32_t OTA_EVERY = 6UL * 3600 * 1000;    // alle 6 Stunden nachsehen
 
@@ -2791,6 +2841,7 @@ void otaPush() { ws::broadcast("{\"t\":\"ota\",\"d\":" + otaJson() + "}"); }
 void otaLoop() {
   if (!wlanOk) return;
   uint32_t now = millis();
+  if (otaAfterPeers.length() && !peers::pushing) { otaInstallVer = otaAfterPeers; otaAfterPeers = ""; }   // erst die anderen, dann diese Wand
   if (!otaNext) otaNext = now + 15000;                         // erste Abfrage 15 s nach dem WLAN
   if ((int32_t)(now - otaNext) >= 0) { otaCheckNow = true; otaNext = now + OTA_EVERY; }
   if (otaCheckNow) {
@@ -2800,6 +2851,7 @@ void otaLoop() {
     otaPush(); wsForce = true;
     if (ok && cfg.autoUpdate && ota::cmp(ota::latest(), FW_VERSION) > 0 && ota::latest() != prefs.getString("otaBad", "")) otaInstallVer = ota::latest();
     if (ok && otaLatestAfterCheck && ota::latest() != FW_VERSION) otaInstallVer = ota::latest();
+    if (otaWantVer.length()) { if (ok) for (uint8_t k = 0; k < ota::count; k++) if (ota::list[k].v == otaWantVer) (peers::pushing ? otaAfterPeers : otaInstallVer) = otaWantVer; otaWantVer = ""; }
     otaLatestAfterCheck = false;
   }
   if (otaInstallVer.length()) {
@@ -2907,9 +2959,18 @@ const char* apiCall(const char* path, JsonDocument& d) {
     if (!strcmp(a, "install")) {
       if (!wlanOk) return "Kein WLAN";
       String v = d["version"] | "";
+      bool self = d["self"] | true;
       bool known = false;
       for (uint8_t k = 0; k < ota::count; k++) if (ota::list[k].v == v) known = true;
-      if (!known) return "Version unbekannt, bitte zuerst nach Updates suchen";
+      if (!known && !v.length()) return "Version unbekannt, bitte zuerst nach Updates suchen";
+      // auch auf anderen Trilumag im WLAN installieren: {"peers":["192.168.1.61",…]}
+      if (d["peers"].is<JsonArrayConst>() && d["peers"].size()) {
+        if (!peers::push(v, d["peers"].as<JsonArrayConst>())) return "Weitergeben läuft schon";
+        if (self && v != FW_VERSION) { if (known) otaAfterPeers = v; else { otaWantVer = v; otaCheckNow = true; } }
+        return nullptr;
+      }
+      if (!self) return nullptr;
+      if (!known) { otaWantVer = v; otaCheckNow = true; return nullptr; }   // erst nach Updates suchen, dann installieren
       otaInstallVer = v;
       return nullptr;
     }

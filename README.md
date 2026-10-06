@@ -104,6 +104,8 @@ Unter Optionen → WLAN lässt sich der WLAN-Wächter ein- und ausschalten (Stan
 
 Unter Optionen → Andere Trilumag sucht die App nach weiteren Wänden im selben WLAN (per mDNS) und listet sie mit Name, Adresse und Version auf. „Öffnen“ führt direkt zu deren Steuerungsseite. Laufen mehrere Wände, heißt nur eine davon `trilumag.local`, die anderen bekommen automatisch `trilumag-2.local` und so weiter; die Liste zeigt, welche welche ist.
 
+Unter Optionen → Updates lässt sich dann auswählen, auf welchen Wänden eine Version installiert wird: diese Wand und/oder gefundene andere. Die anderen holen sich die Version selbst von GitHub; ist diese Wand auch dabei, kommt sie zuletzt dran. Wände ab 0.7.21 lassen sich so aktualisieren.
+
 ## Panel tauschen
 
 In der App unter Wand das Panel antippen und „Tauschen“ wählen. Danach bleiben 5 Minuten Zeit: das alte Panel abklipsen und das neue an genau dieselbe Stelle setzen. Das neue übernimmt Farbe, Helligkeit und „Kanten einzeln“ des alten. Solange läuft unten in der App ein kleines Fenster mit der Restzeit und ✕ zum Abbrechen. Panels, die hinter dem alten hingen, gehen beim Abklipsen kurz aus und melden sich über das neue wieder; in der Simulation landen sie dazwischen in der Ablage und kommen danach von selbst an ihren Platz zurück.
@@ -139,6 +141,7 @@ Mit einem ESP32-C6 als Hauptpanel meldet sich Trilumag zusätzlich als Zigbee-3.
 | `POST /api/identify` | Panel finden: `{"id":"…"}`, das Panel blinkt 3 s weiß |
 | `POST /api/favs` | Favoriten: `{"effect":"lava","on":true}` |
 | `POST /api/swap` | Panel tauschen: `{"id":"altes Panel"}` startet, danach 5 Minuten Zeit; `{"stop":true}` bricht ab |
+| `POST /api/ota` | Updates: `{"action":"check"}`, `{"action":"install","version":"0.7.40"}`, auch für andere Wände: `"peers":["192.168.1.61"]`, ohne diese Wand: `"self":false` |
 | `POST /api/peers`, `GET /api/peers` | andere Trilumag im WLAN suchen (dauert etwa 3 s) und die Liste abholen |
 | `POST /api/guard` | WLAN-Wächter: `{"on":true}` |
 | `POST /api/sleep` | Sleep-Timer: `{"min":30}`, `0` beendet ihn |
