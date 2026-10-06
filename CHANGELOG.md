@@ -2,6 +2,12 @@
 
 Die Versionsnummer im Webinstaller und in der App setzt sich aus der Version in der Firmware und der Nummer des automatischen Builds zusammen, zum Beispiel **0.5.11** = Version 0.5, Build 11. Bis Build 9 hat der Build die Nummer immer als 0.2.x ausgegeben, die tatsächlichen Stände stehen deshalb unten mit beiden Nummern.
 
+## 0.7.49 · 6. Oktober 2026
+
+**Hue-Lampe nachahmen**
+- Die Karte zeigt jetzt, was die Bridge über die Lampe meldet: aus, oder an mit Helligkeit und Farbe bzw. Weißton.
+- Läuft die Lampe gerade im Hue Sync (Fernseher, PC), steht das dort; die Bridge gibt diese Farben nicht heraus. Die Wand bleibt dann, wie sie ist, statt auszugehen.
+
 ## 0.7.48 · 6. Oktober 2026
 
 **Hue-Lampe nachahmen**

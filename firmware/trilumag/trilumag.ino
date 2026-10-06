@@ -2571,6 +2571,7 @@ String bridges[4]; uint8_t nBr = 0;
 struct L { String id, name; }; L lights[40]; uint8_t nL = 0;
 struct St { bool on; uint8_t bri; bool ct; uint16_t mirek; float x, y; String fx; };
 St got, last; bool haveLast = false; uint32_t okAt = 0;
+volatile bool rOn = false, rSync = false, rHave = false; volatile uint8_t rBri = 0; volatile uint16_t rMirek = 0; volatile uint32_t rRgb = 0;   // was die Bridge zuletzt meldete (für die App)
 // CIE xy → RGB (hellster Kanal 255)
 void xyRgb(float x, float y, uint8_t* o) {
   if (y < 0.001f) y = 0.001f;
@@ -2624,7 +2625,7 @@ void start(const char* what) {
 void pollOnce() {
   String r; int c = req("GET", "/clip/v2/resource/light/" + light, "", r, true);
   JsonDocument f; JsonObject fd = f["data"][0].to<JsonObject>();
-  fd["on"] = true; fd["dimming"] = true; fd["color"]["xy"] = true; fd["color_temperature"] = true; fd["effects"]["status"] = true;
+  fd["on"] = true; fd["dimming"] = true; fd["color"]["xy"] = true; fd["color_temperature"] = true; fd["effects"]["status"] = true; fd["mode"] = true;
   JsonDocument d; bool ok = false;
   if (c == 200 && !deserializeJson(d, r, DeserializationOption::Filter(f))) {
     JsonVariant v = d["data"][0];
@@ -2632,7 +2633,10 @@ void pollOnce() {
     n.ct = v["color_temperature"]["mirek_valid"] | false; n.mirek = v["color_temperature"]["mirek"] | 366;
     n.x = v["color"]["xy"]["x"] | 0.4573f; n.y = v["color"]["xy"]["y"] | 0.41f;
     n.fx = (const char*)(v["effects"]["status"] | "no_effect");
-    if (!fresh) { got = n; fresh = true; }
+    bool sync = !strcmp(v["mode"] | "normal", "streaming");      // Hue Sync (Fernseher, PC): Farben kommen nicht über die Schnittstelle
+    uint8_t c[4]; if (n.ct) { kelvinRgbw(1000000 / (n.mirek ? n.mirek : 366), c); c[0] = fminf(255, c[0] + c[3]); c[1] = fminf(255, c[1] + c[3]); c[2] = fminf(255, c[2] + c[3]); } else xyRgb(n.x, n.y, c);
+    rOn = n.on; rBri = (uint8_t)((n.bri * 100 + 127) / 255); rMirek = n.ct ? n.mirek : 0; rRgb = ((uint32_t)c[0] << 16) | (c[1] << 8) | c[2]; rSync = sync; rHave = true;
+    if (!fresh && !sync) { got = n; fresh = true; }
     ok = true;
   }
   fail = !ok; if (ok) okAt = millis() | 1;
@@ -2679,7 +2683,10 @@ void load() {
 }
 void json(JsonObject o) {
   o["ip"] = ip; o["paired"] = key.length() > 0; o["busy"] = (bool)busy;
-  if (light.length()) { o["light"] = light; o["name"] = lname; o["ok"] = okAt && !fail && millis() - okAt < 10000; }
+  if (light.length()) {
+    o["light"] = light; o["name"] = lname; o["ok"] = okAt && !fail && millis() - okAt < 10000;
+    if (rHave) { JsonObject r = o["rep"].to<JsonObject>(); r["on"] = (bool)rOn; r["bri"] = rBri; if (rMirek) r["k"] = 1000000 / rMirek; char b[8]; snprintf(b, sizeof b, "#%06X", (unsigned)rRgb); r["rgb"] = b; r["sync"] = (bool)rSync; }
+  }
   if (err.length()) o["err"] = err;
 }
 String listJson() {
