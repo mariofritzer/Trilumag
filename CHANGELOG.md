@@ -2,6 +2,21 @@
 
 Die Versionsnummer im Webinstaller und in der App setzt sich aus der Version in der Firmware und der Nummer des automatischen Builds zusammen, zum Beispiel **0.5.11** = Version 0.5, Build 11. Bis Build 9 hat der Build die Nummer immer als 0.2.x ausgegeben, die tatsächlichen Stände stehen deshalb unten mit beiden Nummern.
 
+## 0.7.39 · 6. Oktober 2026
+
+**Andere Trilumag im WLAN**
+- Neu unter Optionen: „Andere Trilumag“ listet alle weiteren Wände im selben WLAN mit Name, Adresse und Version auf. „Öffnen“ führt direkt zu deren Steuerungsseite.
+- Wände mit älterer Firmware erscheinen unter ihrer Adresse (etwa „trilumag-2“), ab dieser Version mit ihrem Namen.
+
+**Wand**
+- Neue Karte „Alle Panels“: Helligkeit aller Panels auf einmal stellen. Neue Panels starten mit 100 % statt 71 %.
+- Ein feiner weißer Strich zwischen zwei Panels zeigt, über welche Kante der Bus zum vorigen Panel läuft.
+- Simulation: Panels lassen sich an Ort und Stelle drehen (der Punkt markiert Kante 1).
+- Simulation: Panels in der Ablage einzeln löschen (✕) oder die Ablage leeren.
+
+**App**
+- Der Name der Wand oben links wird auf schmalen Handys nicht mehr abgeschnitten; die Statuszeile daneben kürzt sich stattdessen.
+
 ## 0.7.37 · 5. Oktober 2026
 
 **WLAN-Wächter und Neustart-Grund**
