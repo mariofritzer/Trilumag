@@ -2,6 +2,13 @@
 
 Die Versionsnummer im Webinstaller und in der App setzt sich aus der Version in der Firmware und der Nummer des automatischen Builds zusammen, zum Beispiel **0.5.11** = Version 0.5, Build 11. Bis Build 9 hat der Build die Nummer immer als 0.2.x ausgegeben, die tatsächlichen Stände stehen deshalb unten mit beiden Nummern.
 
+## 0.7.42 · 6. Oktober 2026
+
+**Updates auf mehreren Wänden**
+- Unter Optionen → Updates wählst du jetzt aus, wo eine Version installiert wird: diese Wand und/oder die gefundenen anderen Trilumag im WLAN.
+- Die anderen Wände holen sich die passende Datei für ihren Chip selbst; diese Wand kommt zuletzt dran.
+- Neben jeder Wand steht, wie weit das Update ist. Funktioniert auch mit älteren Wänden ab etwa 0.7.21.
+
 ## 0.7.40 · 6. Oktober 2026
 
 **Malen**
