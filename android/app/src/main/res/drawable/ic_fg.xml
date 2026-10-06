@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- drei Dreiecke wie eine kleine Wand, im sicheren Bereich (66 von 108) -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp" android:height="108dp" android:viewportWidth="108" android:viewportHeight="108">
+    <path android:fillColor="#FF7A3C" android:pathData="M30,68 L42,47 L54,68 Z" />
+    <path android:fillColor="#6E8BFF" android:pathData="M43,46 L55,67 L67,46 Z" />
+    <path android:fillColor="#FFD24A" android:pathData="M56,68 L68,47 L80,68 Z" />
+    <path android:fillColor="#4FE0B0" android:pathData="M44,45 L56,45 L50,34.6 Z" />
+</vector>

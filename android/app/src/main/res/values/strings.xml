@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Trilumag</string>
+    <string name="searching">Suche Trilumag im WLAN …</string>
+    <string name="none_found">Keine Trilumag gefunden. Handy und Wand müssen im selben WLAN sein. Mit ＋ kannst du eine Wand über ihre IP-Adresse hinzufügen.</string>
+    <string name="unreachable">nicht erreichbar</string>
+    <string name="add_title">Wand über IP hinzufügen</string>
+    <string name="add_hint">z. B. 192.168.1.50</string>
+    <string name="ok">Hinzufügen</string>
+    <string name="cancel">Abbrechen</string>
+    <string name="remove">Entfernen</string>
+    <string name="remove_q">„%1$s“ aus der Liste entfernen?</string>
+    <string name="update_avail">Neue App-Version %1$s verfügbar</string>
+    <string name="update_btn">Herunterladen</string>
+    <string name="refresh">Neu suchen</string>
+    <string name="version">App %1$s</string>
+    <string name="saved_file">Gespeichert unter Downloads</string>
+    <string name="downloading">Lade herunter:</string>
+</resources>

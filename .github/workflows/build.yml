@@ -172,6 +172,39 @@ jobs:
         with:
           path: site
 
+  app:
+    # Android-App: Liste aller Trilumag im WLAN, Steuerung im Vollbild, meldet neue App-Versionen
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: "8.9"
+      - name: APK bauen
+        run: |
+          set -euo pipefail
+          BASE=$(grep -oP 'FW_VERSION = "\K[0-9]+\.[0-9]+' firmware/trilumag/trilumag.ino)
+          VERSION="${BASE}.${GITHUB_RUN_NUMBER}"
+          echo "VERSION=${VERSION}" >> "$GITHUB_ENV"
+          gradle -p android --no-daemon assembleRelease -PappVersionCode=${GITHUB_RUN_NUMBER} -PappVersionName=${VERSION}
+          cp android/app/build/outputs/apk/release/app-release.apk trilumag-app.apk
+          ls -l trilumag-app.apk
+      - name: APK zum Release legen
+        if: github.ref == 'refs/heads/main'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release upload "v${VERSION}" trilumag-app.apk --clobber
+      - uses: actions/upload-artifact@v4
+        if: github.ref != 'refs/heads/main'
+        with:
+          name: trilumag-app
+          path: trilumag-app.apk
+
   deploy:
     needs: build
     if: github.ref == 'refs/heads/main'

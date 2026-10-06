@@ -1,0 +1,37 @@
+plugins { id 'com.android.application' }
+
+// Version kommt aus der Build-Pipeline (gleich wie die Firmware, z. B. 0.7.51 / 51)
+def vCode = (project.findProperty('appVersionCode') ?: '1') as int
+def vName = (project.findProperty('appVersionName') ?: 'dev') as String
+
+android {
+    namespace 'at.trilumag.app'
+    compileSdk 34
+    defaultConfig {
+        applicationId 'at.trilumag.app'
+        minSdk 26
+        targetSdk 34
+        versionCode vCode
+        versionName vName
+    }
+    signingConfigs {
+        // fester Schlüssel im Repo, damit sich neue Versionen über die alte installieren lassen
+        release {
+            storeFile file('../trilumag.jks')
+            storePassword 'trilumag-app'
+            keyAlias 'trilumag'
+            keyPassword 'trilumag-app'
+        }
+    }
+    buildTypes {
+        release {
+            minifyEnabled false
+            signingConfig signingConfigs.release
+        }
+    }
+    buildFeatures { buildConfig true }
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_17
+        targetCompatibility JavaVersion.VERSION_17
+    }
+}

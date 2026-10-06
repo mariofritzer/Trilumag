@@ -12,3 +12,5 @@ firmware/panel/bootloader/*.bin
 firmware/panel/bootloader/*.hex
 firmware/panel/bootloader/*.lst
 firmware/panel/bootloader/*.map
+.gradle/
+android/local.properties
