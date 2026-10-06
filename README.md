@@ -110,6 +110,10 @@ Unter Optionen → Updates lässt sich dann auswählen, auf welchen Wänden eine
 
 Im Tab Farben stellt der Regler „Weißton“ Weiß zwischen 2200 K (warm) und 6500 K (kalt) ein; Home Assistant bekommt dafür den Farbtemperatur-Modus. Unter Optionen → Licht macht die „Tageslicht-Kurve“ alle Farben und Effekte abends wärmer und dunkler (ab 18 Uhr, nachts ganz warm auf 35 %, ab 6 Uhr wieder hell). Die Uhrzeit kommt per Internet.
 
+## Eigene Paletten
+
+Im Tab Effekte unter „Eigene Paletten“ lassen sich bis zu 4 Paletten mit 2 bis 6 Farben anlegen (als Vorlage gibt es „Rot-Gold-Weiß“). Sie stehen in der Palettenliste, in Home Assistant und in Presets wie die eingebauten.
+
 ## Wetter
 
 Der Effekt „Wetter“ zeigt die Außentemperatur als Farbe (blau = kalt, gelb = mild, rot = heiß), bei Regen laufen blaue Tropfen über die Wand, bei Schnee weiße. Den Ort trägst du unter Optionen → Wetter ein; die Daten kommen alle 15 Minuten von Open-Meteo, kostenlos und ohne Anmeldung.
@@ -167,6 +171,7 @@ Mit einem ESP32-C6 als Hauptpanel meldet sich Trilumag zusätzlich als Zigbee-3.
 | `POST /api/swap` | Panel tauschen: `{"id":"altes Panel"}` startet, danach 5 Minuten Zeit; `{"stop":true}` bricht ab |
 | `POST /api/ota` | Updates: `{"action":"check"}`, `{"action":"install","version":"0.7.40"}`, auch für andere Wände: `"peers":["192.168.1.61"]`, ohne diese Wand: `"self":false` |
 | `POST /api/peers`, `GET /api/peers` | andere Trilumag im WLAN suchen (dauert etwa 3 s) und die Liste abholen |
+| `POST /api/palette` | Eigene Palette: `{"action":"save","slot":0,"name":"Rot-Gold-Weiß","colors":["#FF0000","#FFB000","#FFFFFF"]}`, `{"action":"delete","slot":0}` |
 | `POST /api/weather` | Wetter: `{"place":"Wien"}` (Ort suchen und Wetter holen), `{"place":""}` löscht ihn |
 | `POST /api/game` | Spiel „Simon sagt“: `{"action":"start"}` / `{"action":"stop"}` |
 | `POST /api/mirror` | WLED nachahmen: `{"ip":"192.168.1.70"}`, `{"ip":""}` beendet es |

@@ -758,8 +758,40 @@ const PalDef PALS[] = {
   {"eis",             "Eis",             5, {0xFFFFFF, 0xC8F0FF, 0x64C8FF, 0x1E78FF, 0xE6FAFF}},
 };
 const uint8_t PAL_COUNT = sizeof(PALS) / sizeof(PALS[0]);
+// Eigene Paletten: 4 feste Plätze (eigen1 … eigen4) mit 2 bis 6 Farben, Index nach den eingebauten
+struct CPal { bool used; String name; uint8_t n; uint32_t c[6]; };
+const uint8_t CPAL_MAX = 4, PAL_ALL = PAL_COUNT + CPAL_MAX;
+CPal cpal[CPAL_MAX];
+bool palValid(uint8_t k) { return k < PAL_COUNT || (k < PAL_ALL && cpal[k - PAL_COUNT].used); }
+String palId(uint8_t k) { return k < PAL_COUNT ? String(PALS[k].id) : "eigen" + String(k - PAL_COUNT + 1); }
+String palName(uint8_t k) { return k < PAL_COUNT ? String(PALS[k].name) : palValid(k) ? cpal[k - PAL_COUNT].name : String("Standard"); }
+void cpalSave() {
+  JsonDocument d; JsonArray a = d.to<JsonArray>();
+  for (uint8_t i = 0; i < CPAL_MAX; i++) {
+    if (!cpal[i].used) { a.add(nullptr); continue; }
+    JsonObject o = a.add<JsonObject>(); o["n"] = cpal[i].name; JsonArray c = o["c"].to<JsonArray>();
+    for (uint8_t k = 0; k < cpal[i].n; k++) c.add(cpal[i].c[k]);
+  }
+  String s; serializeJson(d, s); prefs.putString("cpal", s);
+}
+void cpalLoad() {
+  String s = prefs.getString("cpal", "");
+  if (!s.length()) {                                   // zum Start eine Vorlage: Rot, Gold, Weiß
+    cpal[0].used = true; cpal[0].name = "Rot-Gold-Weiß"; cpal[0].n = 3; cpal[0].c[0] = 0xFF0000; cpal[0].c[1] = 0xFFB000; cpal[0].c[2] = 0xFFFFFF;
+    return;
+  }
+  JsonDocument d; if (deserializeJson(d, s)) return;
+  for (uint8_t i = 0; i < CPAL_MAX; i++) {
+    JsonVariant o = d[i]; cpal[i].used = o.is<JsonObject>();
+    if (!cpal[i].used) continue;
+    cpal[i].name = (const char*)(o["n"] | "Eigene"); cpal[i].n = 0;
+    for (JsonVariant v : o["c"].as<JsonArray>()) if (cpal[i].n < 6) cpal[i].c[cpal[i].n++] = v.as<uint32_t>();
+    if (cpal[i].n < 2) cpal[i].used = false;
+  }
+}
 int palFind(const char* key) {
   for (uint8_t k = 0; k < PAL_COUNT; k++) if (!strcasecmp(key, PALS[k].id) || !strcasecmp(key, PALS[k].name)) return k;
+  for (uint8_t k = PAL_COUNT; k < PAL_ALL; k++) if (palValid(k) && (!strcasecmp(key, palId(k).c_str()) || !strcasecmp(key, palName(k).c_str()))) return k;
   return -1;
 }
 bool fxUsesColor() { return fx.id && (fx.pal == 2 || (fx.pal == 0 && FX[fx.id].color)); }
@@ -838,10 +870,11 @@ void pcol(float t, float* c, uint8_t def) {   // def: PalDefault (als uint8_t, w
     for (int k = 0; k < 3; k++) stops[k] = st[k];
     n = 3;
   } else {
-    const PalDef& p = PALS[fx.pal < PAL_COUNT ? fx.pal : 1];
-    n = p.n;
+    const uint32_t* cs;
+    if (fx.pal >= PAL_COUNT && palValid(fx.pal)) { const CPal& q = cpal[fx.pal - PAL_COUNT]; n = q.n; cs = q.c; }
+    else { const PalDef& p = PALS[fx.pal < PAL_COUNT ? fx.pal : 1]; n = p.n; cs = p.c; }
     for (int k = 0; k < n; k++) {
-      tmp[k][0] = (p.c[k] >> 16) & 0xFF; tmp[k][1] = (p.c[k] >> 8) & 0xFF; tmp[k][2] = p.c[k] & 0xFF; tmp[k][3] = 0;
+      tmp[k][0] = (cs[k] >> 16) & 0xFF; tmp[k][1] = (cs[k] >> 8) & 0xFF; tmp[k][2] = cs[k] & 0xFF; tmp[k][3] = 0;
       stops[k] = tmp[k];
     }
   }
@@ -1510,8 +1543,9 @@ void fxSave() {
   fxDirty = false;
 }
 void fxLoad() {
+  cpalLoad();
   FxCfg f;
-  if (prefs.getBytes("fx2", &f, sizeof f) == sizeof f && f.id < FX_COUNT && f.pal < PAL_COUNT) fx = f;
+  if (prefs.getBytes("fx2", &f, sizeof f) == sizeof f && f.id < FX_COUNT && f.pal < PAL_ALL) fx = f;
   master = prefs.getUChar("master", 255); masterOn = prefs.getBool("mOn", true);
   fxDir = prefs.getUShort("fxDir", 0) % 360; fxSpin = prefs.getUChar("fxSpin", 0) % 3;
   prefs.getBytes("fxC2", fxC2, 4);
@@ -1530,7 +1564,7 @@ void applyFx(JsonVariantConst cmd) {
   if (cmd["spin"].is<int>()) { fxSpin = constrain(cmd["spin"].as<int>(), 0, 2); if (!fxSpin) fxSpinAng = 0; }
   if (cmd["brightness"].is<int>()) { master = constrain(cmd["brightness"].as<int>(), 1, 255); resendAll(); }
   if (cmd["palette"].is<const char*>()) { int p = palFind(cmd["palette"].as<const char*>()); if (p >= 0) fx.pal = p; }
-  else if (cmd["palette"].is<int>()) fx.pal = constrain(cmd["palette"].as<int>(), 0, PAL_COUNT - 1);
+  else if (cmd["palette"].is<int>()) { int p = cmd["palette"].as<int>(); if (p >= 0 && p < PAL_ALL && palValid(p)) fx.pal = p; }
   JsonVariantConst c = cmd["color"];
   if (!c.isNull()) { fx.r = c["r"] | fx.r; fx.g = c["g"] | fx.g; fx.b = c["b"] | fx.b; fx.w = c["w"] | fx.w; }
   int id = fx.id;
@@ -1664,7 +1698,7 @@ void publishExtras() {
     t["name"] = "Palette"; t["unique_id"] = "trilumag_palette_" + hex(P[0].chip);
     t["command_topic"] = "trilumag/palette/set"; t["state_topic"] = "trilumag/palette/state";
     JsonArray o = t["options"].to<JsonArray>();
-    for (uint8_t k = 0; k < PAL_COUNT; k++) o.add(PALS[k].name);
+    for (uint8_t k = 0; k < PAL_ALL; k++) if (palValid(k)) o.add(palName(k));
     t["icon"] = "mdi:palette";
     haDevice(t); haPublish("select", "palette", t); }
   publishPresetEntity();
@@ -1733,7 +1767,7 @@ void publishFx() {
   mqtt.publish("trilumag/alle/state", (const uint8_t*)buf, n, true);
   mqtt.publish("trilumag/tempo/state", String(fx.speed).c_str(), true);
   mqtt.publish("trilumag/intensitaet/state", String(fx.inten).c_str(), true);
-  mqtt.publish("trilumag/palette/state", PALS[fx.pal].name, true);
+  mqtt.publish("trilumag/palette/state", palName(fx.pal).c_str(), true);
   publishPresetState();
 }
 
@@ -1827,7 +1861,7 @@ bool presetLoad(int k) {
   colorsDirty = true; colorsDirtyAt = millis();
   JsonArray f = d["fx"];
   if (f.size() >= 8) {
-    fx.speed = f[1]; fx.pal = (uint8_t)f[2] < PAL_COUNT ? (uint8_t)f[2] : 0; fx.inten = f[3];
+    fx.speed = f[1]; fx.pal = palValid((uint8_t)f[2]) ? (uint8_t)f[2] : 0; fx.inten = f[3];
     fx.r = f[4]; fx.g = f[5]; fx.b = f[6]; fx.w = f[7];
     if (f.size() >= 10) { fxDir = (uint16_t)f[8] % 360; fxSpin = (uint8_t)f[9] % 3; }
     if (f.size() >= 14) for (int k = 0; k < 4; k++) fxC2[k] = f[10 + k];
@@ -2205,12 +2239,17 @@ String stateJson(bool meta) {
   d["ver"] = FW_VERSION;
   d["chip"] = CHIP_FAMILY;
   JsonObject f = d["fx"].to<JsonObject>();
-  f["id"] = FX[fx.id].id; f["speed"] = fx.speed; f["inten"] = fx.inten; f["pal"] = PALS[fx.pal].id; f["dir"] = fxDir; f["spin"] = fxSpin;
+  f["id"] = FX[fx.id].id; f["speed"] = fx.speed; f["inten"] = fx.inten; f["pal"] = palId(fx.pal); f["dir"] = fxDir; f["spin"] = fxSpin;
   { JsonObject c2 = f["c2"].to<JsonObject>(); c2["r"] = fxC2[0]; c2["g"] = fxC2[1]; c2["b"] = fxC2[2]; c2["w"] = fxC2[3]; }
   f["r"] = fx.r; f["g"] = fx.g; f["b"] = fx.b; f["w"] = fx.w; f["usesColor"] = fxUsesColor();
   d["master"] = master; d["on"] = masterOn;
   if (swapActive()) { JsonObject w = d["swap"].to<JsonObject>(); w["id"] = hex(P[swapSlot].chip); w["left"] = (swapUntil - millis() + 999) / 1000; w["off"] = !P[swapSlot].attached; }
   if (swapDoneAt && millis() - swapDoneAt < 15000) d["swapped"] = hex(swapDoneChip);
+  { JsonArray cp = d["cpal"].to<JsonArray>();
+    for (uint8_t i = 0; i < CPAL_MAX; i++) if (cpal[i].used) {
+      JsonObject o = cp.add<JsonObject>(); o["id"] = palId(PAL_COUNT + i); o["name"] = cpal[i].name; o["slot"] = i;
+      JsonArray c = o["c"].to<JsonArray>(); for (uint8_t k = 0; k < cpal[i].n; k++) { char b[8]; snprintf(b, sizeof b, "#%06X", (unsigned)cpal[i].c[k]); c.add(b); }
+    } }
   d["pfw"] = PANEL_FW_VERSION; d["pAuto"] = cfg.panelAuto;
   { JsonArray fv = d["favs"].to<JsonArray>(); for (uint8_t k = 0; k < FX_COUNT; k++) if (fxFavs & (1u << k)) fv.add(FX[k].id); }
   wallsync::json(d["sync"].to<JsonObject>());
@@ -2706,7 +2745,7 @@ String backupJson() {
   JsonObject t = c["touch"].to<JsonObject>();
   t["on"] = cfg.touchOn; t["sens"] = cfg.touchSens; t["a1"] = cfg.tapA1; t["a2"] = cfg.tapA2;
   c["pAuto"] = cfg.panelAuto; c["zbOn"] = cfg.zbOn; c["name"] = cfg.name;
-  c["guard"] = cfg.guard; c["favs"] = fxFavs; c["onAnim"] = cfg.onAnim; c["tWave"] = cfg.touchWave; c["dayc"] = cfg.daylight; c["fault"] = cfg.faultBlink; c["viewRot"] = cfg.viewRot; c["viewMir"] = cfg.viewMir;
+  c["guard"] = cfg.guard; c["favs"] = fxFavs; c["onAnim"] = cfg.onAnim; c["tWave"] = cfg.touchWave; c["dayc"] = cfg.daylight; c["fault"] = cfg.faultBlink; c["cpal"] = prefs.getString("cpal", ""); c["viewRot"] = cfg.viewRot; c["viewMir"] = cfg.viewMir;
   c["bootMode"] = cfg.bootMode; c["bootPre"] = cfg.bootPreset; c["syncOn"] = cfg.syncOn; c["syncGrp"] = cfg.syncGroup;
   JsonObject lh = d["lit"].to<JsonObject>();
   for (int i = 0; i < SLOTS; i++) if (P[i].used && P[i].litSec) lh[hex(P[i].chip)] = P[i].litSec;
@@ -2767,7 +2806,7 @@ const char* restoreBackup(JsonDocument& d) {
     prefs.putBool("pAuto", c["pAuto"] | true);
     if (HAS_ZIGBEE) prefs.putBool("zbOn", c["zbOn"] | false);
     if (c["name"].is<const char*>() && strlen(c["name"]) > 0) prefs.putString("name", (const char*)c["name"]);
-    prefs.putBool("guard", c["guard"] | true); prefs.putUInt("favs", c["favs"] | 0); prefs.putUChar("onAnim", c["onAnim"] | 2); prefs.putBool("tWave", c["tWave"] | true); prefs.putBool("dayc", c["dayc"] | false); prefs.putBool("fault", c["fault"] | true);
+    prefs.putBool("guard", c["guard"] | true); prefs.putUInt("favs", c["favs"] | 0); prefs.putUChar("onAnim", c["onAnim"] | 2); prefs.putBool("tWave", c["tWave"] | true); prefs.putBool("dayc", c["dayc"] | false); prefs.putBool("fault", c["fault"] | true); if (c["cpal"].is<const char*>()) prefs.putString("cpal", c["cpal"].as<const char*>());
     prefs.putUShort("viewRot", c["viewRot"] | 0); prefs.putBool("viewMir", c["viewMir"] | false);
     prefs.putUChar("bootMode", c["bootMode"] | 0); prefs.putChar("bootPre", c["bootPre"] | -1);
     prefs.putBool("syncOn", c["syncOn"] | false); prefs.putUChar("syncGrp", c["syncGrp"] | 1);
@@ -2785,7 +2824,7 @@ const char* restoreBackup(JsonDocument& d) {
   if (!fo.isNull()) {
     f.id = fo["id"] | 0; f.speed = fo["speed"] | 50; f.pal = fo["pal"] | 0; f.inten = fo["inten"] | 128;
     f.r = fo["r"] | 255; f.g = fo["g"] | 120; f.b = fo["b"] | 30; f.w = fo["w"] | 0;
-    if (f.id < FX_COUNT && f.pal < PAL_COUNT) prefs.putBytes("fx2", &f, sizeof f);
+    if (f.id < FX_COUNT && f.pal < PAL_ALL) prefs.putBytes("fx2", &f, sizeof f);
   }
   prefs.putUChar("master", d["master"] | 255); prefs.putBool("mOn", d["on"] | true);
   for (uint8_t k = 0; k < PRESET_MAX; k++) prefs.remove(presetKey(k).c_str());
@@ -3064,7 +3103,7 @@ void adopt(const Pkt& k) {
   applying = true;
   bool look = k.on != masterOn || k.master != master;
   masterOn = k.on; master = k.master;
-  fx.speed = k.speed; fx.inten = k.inten; fx.pal = k.pal < PAL_COUNT ? k.pal : 0; fx.r = k.r; fx.g = k.g; fx.b = k.b; fx.w = k.w;
+  fx.speed = k.speed; fx.inten = k.inten; fx.pal = palValid(k.pal) ? k.pal : 0; fx.r = k.r; fx.g = k.g; fx.b = k.b; fx.w = k.w;
   fxDir = k.dir % 360; fxSpin = k.spin % 3;
   if (k.fx < FX_COUNT && k.fx != fx.id) fxStart(k.fx);
   else { fxDirty = true; fxDirtyAt = millis(); fxLastFrame = 0; publishFx(); }
@@ -3479,6 +3518,33 @@ const char* apiCall(const char* path, JsonDocument& d) {
   }
   // Energie: {"action":"reset"} setzt alle Zähler zurück
   // Wetter: {"place":"Wien"} sucht den Ort und holt das Wetter, {"place":""} löscht ihn, {} holt nur neu
+  // Eigene Paletten: {"action":"save","slot":0,"name":"…","colors":["#FF0000","#FFB000","#FFFFFF"]} / {"action":"delete","slot":0}
+  if (!strcmp(path, "/api/palette")) {
+    const char* a = d["action"] | "";
+    int sl = d["slot"] | -1;
+    if (!strcmp(a, "save")) {
+      if (sl < 0) for (int i = 0; i < CPAL_MAX && sl < 0; i++) if (!cpal[i].used) sl = i;
+      if (sl < 0 || sl >= CPAL_MAX) return "Alle 4 eigenen Paletten belegt";
+      JsonArrayConst cs = d["colors"].as<JsonArrayConst>();
+      if (cs.size() < 2 || cs.size() > 6) return "Eine Palette braucht 2 bis 6 Farben";
+      String nm = d["name"] | ""; nm.trim(); if (!nm.length()) nm = "Eigene " + String(sl + 1); if (nm.length() > 24) nm = nm.substring(0, 24);
+      CPal& q = cpal[sl]; q.n = 0;
+      for (JsonVariantConst v : cs) { const char* h = v | "#000000"; q.c[q.n++] = strtoul(h[0] == '#' ? h + 1 : h, nullptr, 16) & 0xFFFFFF; }
+      q.name = nm; q.used = true; cpalSave();
+      if (d["use"] | false) fx.pal = PAL_COUNT + sl;
+      fxDirty = true; fxDirtyAt = millis(); fxLastFrame = 0;
+      if (mqtt.connected()) publishExtras();
+      publishFx(); return nullptr;
+    }
+    if (!strcmp(a, "delete")) {
+      if (sl < 0 || sl >= CPAL_MAX || !cpal[sl].used) return "Palette unbekannt";
+      cpal[sl].used = false; cpalSave();
+      if (fx.pal == PAL_COUNT + sl) { fx.pal = 0; fxDirty = true; fxDirtyAt = millis(); }
+      if (mqtt.connected()) publishExtras();
+      publishFx(); return nullptr;
+    }
+    return "Unbekannte Aktion";
+  }
   // WLED nachahmen: {"ip":"192.168.1.70"} oder {"ip":""} zum Beenden
   if (!strcmp(path, "/api/mirror")) {
     String a = d["ip"] | "";
@@ -3650,7 +3716,7 @@ void setupWeb() {
   server.on("/api/energy", HTTP_GET, [] { server.send(200, "application/json", energyJson()); });
   server.on("/api/peers", HTTP_GET, [] { server.send(200, "application/json", peers::json()); });
   // Befehle laufen über apiCall(), damit HTTP und WebSocket dasselbe tun
-  const char* cmds[] = {"/api/set", "/api/presets", "/api/effect", "/api/test", "/api/ota", "/api/light", "/api/diag", "/api/touch", "/api/panelfw", "/api/zigbee", "/api/name", "/api/identify", "/api/guard", "/api/swap", "/api/favs", "/api/view", "/api/signal", "/api/progress", "/api/sleep", "/api/boot", "/api/energy", "/api/peers", "/api/weather", "/api/game", "/api/fault", "/api/mirror", "/api/sync",
+  const char* cmds[] = {"/api/set", "/api/presets", "/api/effect", "/api/test", "/api/ota", "/api/light", "/api/diag", "/api/touch", "/api/panelfw", "/api/zigbee", "/api/name", "/api/identify", "/api/guard", "/api/swap", "/api/favs", "/api/view", "/api/signal", "/api/progress", "/api/sleep", "/api/boot", "/api/energy", "/api/peers", "/api/weather", "/api/game", "/api/fault", "/api/mirror", "/api/palette", "/api/sync",
                         "/api/sim/new", "/api/sim/remove", "/api/sim/rotate", "/api/sim/attach", "/api/sim/detach", "/api/sim/tap"};
   for (const char* path : cmds) {
     server.on(path, HTTP_POST, [path] {
