@@ -2,6 +2,19 @@
 
 Die Versionsnummer im Webinstaller und in der App setzt sich aus der Version in der Firmware und der Nummer des automatischen Builds zusammen, zum Beispiel **0.5.11** = Version 0.5, Build 11. Bis Build 9 hat der Build die Nummer immer als 0.2.x ausgegeben, die tatsächlichen Stände stehen deshalb unten mit beiden Nummern.
 
+## 0.7.47 · 6. Oktober 2026
+
+**Eigene Paletten**
+- Im Tab Effekte bis zu 4 eigene Paletten mit 2 bis 6 Farben anlegen, ändern und löschen. Als Vorlage gibt es „Rot-Gold-Weiß“.
+- Sie stehen in der Palettenliste, in Home Assistant und in Presets wie die eingebauten.
+
+**Kanten einzeln**
+- Der Komet läuft in jedem Panel alle drei Kanten nacheinander ab und springt dann von der letzten Kante ins Nachbarpanel.
+- Einschalt-Animation, Fortschritt und die Welle beim Antippen laufen ebenfalls Kante für Kante.
+
+**App**
+- Farbwechsel, Weißton, Ein/Aus und Presets blenden auch in der Vorschau weich über, so wie an der Wand.
+
 ## 0.7.45 · 6. Oktober 2026
 
 **Licht**
