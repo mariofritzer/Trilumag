@@ -767,7 +767,7 @@ const uint32_t FX_FRAME_MS = 40;
 
 float fxPhase = 0, fxA[SLOTS * 3], fxB[SLOTS * 3], fxT[SLOTS * 3];   // Zustand pro Punkt (Panel oder Kante)
 float fxFlash = 0, fxFlashX = 0, fxFlashY = 0;      // Gewitter: aktueller Blitz
-int fxHead = 0, fxHeadE = 0, fxInPanel = 0; float fxStep = 0; int fxBeat = -1;  // Komet: Kopf (Panel, Kante); Disco: Takt
+int fxHead = 0, fxHeadE = 0; uint8_t fxPlan[3], fxPlanN = 0, fxPlanP = 0; float fxStep = 0; int fxBeat = -1;  // Komet: Kopf (Panel, Kante); Disco: Takt
 float fwX = 0, fwY = 0, fwT = 9, fwH = 0;          // Feuerwerk: Mitte, Alter und Farbe der aktuellen Rakete
 float wxTemp = 15; uint8_t wxKind = 0; bool wxOk = false;   // Wetter: Temperatur, 0 trocken, 1 Regen, 2 Schnee
 uint16_t fxDir = 0;            // Richtung der Effekte in Grad (Lauflicht, Wellen, Lava …)
@@ -899,38 +899,41 @@ void fxCompute() {
     int n = 0, pick = 0; for (int i = 0; i < SLOTS; i++) if (P[i].used && P[i].attached && frand() * (++n) < 1) pick = i;
     effXY(P[pick].x * 0.5f, P[pick].y * 0.866f, fxFlashX, fxFlashY); fxFlash = 0.7f + 0.3f * frand();
   }
-  // Komet: der Kopf wandert zu einem Nachbarn weiter
-  // Panels mit "Kanten einzeln": der Kopf läuft Kante für Kante durchs Panel und über die Kante ins nächste
+  // Komet: der Kopf wandert zu einem Nachbarn weiter.
+  // Panels mit "Kanten einzeln": alle drei Kanten nacheinander (im oder gegen den Uhrzeigersinn, je nachdem wo es
+  // weitergeht), dann von der letzten Kante hinüber ins Nachbarpanel, z. B. 1-2, 1-3, 2-1, 2-2, 2-3, 3-1 …
   if (fx.id == 14) {
-    if (!P[fxHead].used || !P[fxHead].attached) { fxHead = 0; fxHeadE = 0; }
-    if (!P[fxHead].edges) fxHeadE = 0;
+    if (!P[fxHead].used || !P[fxHead].attached) { fxHead = 0; fxHeadE = 0; fxPlanN = 0; }
+    if (!P[fxHead].edges) { fxHeadE = 0; fxPlanN = 0; }
     fxStep += dt * rate * 4;
     while (fxStep >= 1) {
       fxStep -= 1;
-      int cj[6], ce[6], n = 0;
       const Panel& h = P[fxHead];
-      if (h.edges) for (int k = 1; k < 3; k++) { cj[n] = fxHead; ce[n] = (fxHeadE + k) % 3; n++; }   // weiter im selben Panel
+      if (h.edges && fxPlanP < fxPlanN) { fxHeadE = fxPlan[fxPlanP++]; fxA[fxHead * 3 + fxHeadE] = 1; continue; }   // nächste Kante im Panel
+      // hinüber: aus Kanten-Panels über die zuletzt leuchtende Kante, sonst über irgendeine
+      int cj[3], ce[3], n = 0;
       for (uint8_t e = 0; e < 3; e++) {
-        if (h.edges && e != fxHeadE) continue;                    // aus einem Kanten-Panel nur über die leuchtende Kante hinaus
+        if (h.edges && e != fxHeadE) continue;
         Dir w = worldDir(h, e); int nx, ny; neighbor(h.x, h.y, w, nx, ny); int j = findAt(nx, ny);
         if (j < 0) continue;
         int ej = P[j].edges ? edgeFacing(j, opposite(w)) : 0; if (ej < 0) ej = 0;
         cj[n] = j; ce[n] = ej; n++;
       }
-      // erst die anderen Kanten des Panels, dann über die leuchtende Kante hinüber; führt dort nichts weiter,
-      // zu einer Kante mit Nachbarn; sonst zufällig, bevorzugt noch dunkle Punkte
-      auto hasNb = [&](int e) { int nx, ny; neighbor(h.x, h.y, worldDir(h, e), nx, ny); return findAt(nx, ny) >= 0; };
-      int pick = -1;
-      if (h.edges && fxInPanel < 2) { for (int k = 0; k < n; k++) if (cj[k] == fxHead && fxA[cj[k] * 3 + ce[k]] < 0.5f) { pick = k; break; } }
-      if (pick < 0) {                                            // hinüber
-        int fr[6], m = 0, all[6], a = 0;
-        for (int k = 0; k < n; k++) if (cj[k] != fxHead) { all[a++] = k; if (fxA[cj[k] * 3 + ce[k]] < 0.5f) fr[m++] = k; }
-        if (m) pick = fr[(int)(frand() * m) % m]; else if (a) pick = all[(int)(frand() * a) % a];
+      int fr[3], m = 0; for (int k = 0; k < n; k++) if (fxA[cj[k] * 3 + ce[k]] < 0.5f) fr[m++] = k;
+      int pick = m ? fr[(int)(frand() * m) % m] : n ? (int)(frand() * n) % n : -1;
+      if (pick < 0) {                                           // hier geht es nicht weiter: erst die anderen Kanten
+        if (h.edges) { fxPlan[0] = (fxHeadE + 1) % 3; fxPlan[1] = (fxHeadE + 2) % 3; fxPlanN = 2; fxPlanP = 0; }
+        fxA[fxHead * 3 + fxHeadE] = 1; continue;
       }
-      if (pick < 0) for (int k = 0; k < n; k++) if (cj[k] == fxHead && hasNb(ce[k])) { pick = k; break; }   // zur Ausgangskante
-      if (pick < 0 && n) pick = (int)(frand() * n) % n;
-      if (pick >= 0) { fxInPanel = cj[pick] == fxHead ? fxInPanel + 1 : 0; fxHead = cj[pick]; fxHeadE = ce[pick]; }
-      fxA[fxHead * 3 + fxHeadE] = 1;
+      fxHead = cj[pick]; fxHeadE = ce[pick]; fxA[fxHead * 3 + fxHeadE] = 1; fxPlanN = fxPlanP = 0;
+      const Panel& q = P[fxHead];
+      if (q.edges) {                                             // Reihenfolge im neuen Panel festlegen
+        auto nb = [&](int e) { int nx, ny; neighbor(q.x, q.y, worldDir(q, e), nx, ny); return findAt(nx, ny) >= 0; };
+        int e0 = fxHeadE, fw = (e0 + 2) % 3, bw = (e0 + 1) % 3;     // vorwärts endet bei e0+2, rückwärts bei e0+1
+        bool f = nb(fw), b = nb(bw), dirF = f && b ? frand() < 0.5f : f ? true : b ? false : frand() < 0.5f;
+        fxPlan[0] = dirF ? (e0 + 1) % 3 : (e0 + 2) % 3; fxPlan[1] = dirF ? fw : bw; fxPlanN = 2;
+        if (!f && !b) fxPlan[fxPlanN++] = e0;                       // Sackgasse: zurück zur Eingangskante
+      }
     }
     float dec = dt * rate * (2.2f - 1.6f * fx.inten / 255.0f);
     for (int s = 0; s < SLOTS * 3; s++) if (s != fxHead * 3 + fxHeadE) fxA[s] = fmaxf(0, fxA[s] - dec);
