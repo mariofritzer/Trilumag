@@ -1088,12 +1088,12 @@ float powerScale = 1, measScale = 1;
 // ---------- Spiel "Simon sagt" ----------
 // Die Wand zeigt eine Folge von Panels, man tippt sie nach; jede Runde ein Panel mehr.
 namespace game {
-enum Ph : uint8_t { OFF, SHOW, INPUT, FAIL, WIN };
-Ph ph = OFF;
+enum Ph : uint8_t { G_OFF, G_SHOW, G_INPUT, G_FAIL, G_WIN };   // nicht INPUT: das ist ein Arduino-Makro
+Ph ph = G_OFF;
 int8_t pan[SLOTS]; uint8_t nPan = 0;      // mitspielende Panels (mit Sensor, ohne Hauptpanel)
 uint8_t seq[100]; uint8_t len = 0, pos = 0, best = 0;
 uint32_t t0 = 0; int8_t lit = -1; uint32_t litUntil = 0;
-bool active() { return ph != OFF; }
+bool active() { return ph != G_OFF; }
 uint16_t stepMs() { return len < 12 ? 650 - len * 30 : 290; }
 void hueOf(uint8_t k, uint8_t* c) {
   float h = (float)k / nPan * 6; int s = (int)h; float f = h - s, q = 1 - f; float r, g, b;
@@ -1101,7 +1101,7 @@ void hueOf(uint8_t k, uint8_t* c) {
                    case 3: r = 0; g = q; b = 1; break; case 4: r = f; g = 0; b = 1; break; default: r = 1; g = 0; b = q; }
   c[0] = r * 255; c[1] = g * 255; c[2] = b * 255; c[3] = 0;
 }
-void next() { if (len < sizeof seq) seq[len++] = esp_random() % nPan; pos = 0; ph = SHOW; t0 = millis(); }
+void next() { if (len < sizeof seq) seq[len++] = esp_random() % nPan; pos = 0; ph = G_SHOW; t0 = millis(); }
 const char* start() {
   nPan = 0;
   for (int i = 1; i < SLOTS; i++) if (P[i].used && P[i].attached && P[i].state != DARK && (P[i].caps & 1)) pan[nPan++] = i;
@@ -1112,45 +1112,45 @@ const char* start() {
   diag("Spiel gestartet");
   return nullptr;
 }
-void stop() { ph = OFF; lit = -1; outForce = true; }
+void stop() { ph = G_OFF; lit = -1; outForce = true; }
 void over() {
   uint8_t score = len ? len - 1 : 0;
   if (score > best) { best = score; prefs.putUChar("simon", best); }
   diag("Spiel vorbei: %u Runden geschafft", score);
-  ph = FAIL; t0 = millis();
+  ph = G_FAIL; t0 = millis();
 }
 void tap(int slot) {
-  if (ph != INPUT) return;
+  if (ph != G_INPUT) return;
   int8_t k = -1; for (uint8_t j = 0; j < nPan; j++) if (pan[j] == slot) k = j;
   if (k < 0) return;
   lit = k; litUntil = millis() + 250;
   if (k != seq[pos]) { over(); return; }
-  if (++pos >= len) { ph = WIN; t0 = millis(); }
+  if (++pos >= len) { ph = G_WIN; t0 = millis(); }
   else t0 = millis();                                      // Zeit für den nächsten Tipp läuft neu
 }
 // läuft mit jedem Bild: Ablauf weiterschalten und die Wand zeichnen
 void draw(uint8_t TG[][3][4]) {
-  if (ph == OFF) return;
+  if (ph == G_OFF) return;
   uint32_t now = millis();
   int32_t t = (int32_t)(now - t0);
-  if (ph == SHOW && t >= 0 && t / (stepMs() + 180) >= len) { ph = INPUT; t0 = now; }
-  if (ph == INPUT && t > 8000) over();                      // 8 s ohne Tipp: vorbei
-  if (ph == WIN && t > 700) { next(); t0 = now + 300; }
-  if (ph == FAIL && t > 1800) { stop(); return; }
+  if (ph == G_SHOW && t >= 0 && t / (stepMs() + 180) >= len) { ph = G_INPUT; t0 = now; }
+  if (ph == G_INPUT && t > 8000) over();                      // 8 s ohne Tipp: vorbei
+  if (ph == G_WIN && t > 700) { next(); t0 = now + 300; }
+  if (ph == G_FAIL && t > 1800) { stop(); return; }
   t = (int32_t)(now - t0);
   for (int i = 0; i < SLOTS; i++) for (int e = 0; e < 3; e++) for (int c = 0; c < 4; c++) TG[i][e][c] = 0;
   for (uint8_t j = 0; j < nPan; j++) {
     uint8_t c[4]; hueOf(j, c); float k = 0.08f;
-    if (ph == SHOW && t >= 0) { uint16_t st = stepMs(); int n = t / (st + 180); if (n < len && seq[n] == j && t % (st + 180) < st) k = 1; }
-    if (ph == INPUT && lit == j && now < litUntil) k = 1;
-    if (ph == WIN) k = 0.5f + 0.5f * ((t / 120) % 2);
-    if (ph == FAIL) { c[0] = 255; c[1] = c[2] = c[3] = 0; k = (t / 250) % 2 ? 0.1f : 1; }
+    if (ph == G_SHOW && t >= 0) { uint16_t st = stepMs(); int n = t / (st + 180); if (n < len && seq[n] == j && t % (st + 180) < st) k = 1; }
+    if (ph == G_INPUT && lit == j && now < litUntil) k = 1;
+    if (ph == G_WIN) k = 0.5f + 0.5f * ((t / 120) % 2);
+    if (ph == G_FAIL) { c[0] = 255; c[1] = c[2] = c[3] = 0; k = (t / 250) % 2 ? 0.1f : 1; }
     for (int e = 0; e < 3; e++) for (int ch = 0; ch < 4; ch++) TG[pan[j]][e][ch] = c[ch] * k;
   }
   // Hauptpanel zeigt die Runde: weiß, je weiter, desto heller
-  for (int e = 0; e < 3; e++) TG[0][e][3] = ph == FAIL ? 0 : 20 + (len > 20 ? 200 : len * 10);
+  for (int e = 0; e < 3; e++) TG[0][e][3] = ph == G_FAIL ? 0 : 20 + (len > 20 ? 200 : len * 10);
 }
-uint8_t level() { return len ? len - (ph == SHOW || ph == WIN ? 1 : 0) : 0; }
+uint8_t level() { return len ? len - (ph == G_SHOW || ph == G_WIN ? 1 : 0) : 0; }
 void json(JsonObject o) { o["on"] = active(); o["level"] = level(); o["ph"] = (int)ph; o["best"] = best ? best : prefs.getUChar("simon", 0); }
 }  // namespace game
 
