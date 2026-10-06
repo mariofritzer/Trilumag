@@ -2,6 +2,12 @@
 
 Die Versionsnummer im Webinstaller und in der App setzt sich aus der Version in der Firmware und der Nummer des automatischen Builds zusammen, zum Beispiel **0.5.11** = Version 0.5, Build 11. Bis Build 9 hat der Build die Nummer immer als 0.2.x ausgegeben, die tatsächlichen Stände stehen deshalb unten mit beiden Nummern.
 
+## 0.7.40 · 6. Oktober 2026
+
+**Malen**
+- Die Karte „Malen“ ist in den Tab Farben umgezogen. Gemalt wird auf der Vorschau oben; sie bleibt beim Malen unter der Kopfzeile stehen, damit Farben und Wand gleichzeitig zu sehen sind.
+- Beim Wechsel in einen anderen Tab schaltet sich Malen von selbst aus.
+
 ## 0.7.39 · 6. Oktober 2026
 
 **Andere Trilumag im WLAN**
