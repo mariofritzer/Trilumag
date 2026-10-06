@@ -2995,6 +2995,20 @@ const char* apiCall(const char* path, JsonDocument& d) {
     return nullptr;
   }
   if (!strcmp(path, "/api/sim/new")) return simNewPanel() < 0 ? "Ablage voll" : nullptr;
+  // Panels aus der Ablage löschen: {"id":"…"} oder {"all":true}
+  if (!strcmp(path, "/api/sim/remove")) {
+    bool all = d["all"] | false; int one = all ? -1 : findChip(parseHex(d["id"] | "0"));
+    if (!all && (one <= 0 || P[one].attached)) return "Panel nicht in der Ablage";
+    for (int i = 1; i < SLOTS; i++) {
+      if (!P[i].used || P[i].attached || (!all && i != one)) continue;
+      String h = hex(P[i].chip);
+      for (const char* k : {"c", "e", "n", "h", "f"}) prefs.remove((k + h).c_str());   // Farbe, Kanten, Zähler, Stunden, Firmware
+      if (swapSlot == i) swapSlot = -1;
+      P[i] = Panel();
+    }
+    simChanged();
+    return nullptr;
+  }
   if (!strcmp(path, "/api/sim/attach")) {
     int i = findChip(parseHex(d["id"] | "0")), par = findChip(parseHex(d["parent"] | "0"));
     return simAttach(i, par, d["edge"] | 9) ? nullptr : "Anklipsen nicht möglich";
@@ -3057,7 +3071,7 @@ void setupWeb() {
   server.on("/api/energy", HTTP_GET, [] { server.send(200, "application/json", energyJson()); });
   // Befehle laufen über apiCall(), damit HTTP und WebSocket dasselbe tun
   const char* cmds[] = {"/api/set", "/api/presets", "/api/effect", "/api/test", "/api/ota", "/api/light", "/api/diag", "/api/touch", "/api/panelfw", "/api/zigbee", "/api/name", "/api/identify", "/api/guard", "/api/swap", "/api/favs", "/api/view", "/api/signal", "/api/progress", "/api/sleep", "/api/boot", "/api/energy", "/api/sync",
-                        "/api/sim/new", "/api/sim/attach", "/api/sim/detach", "/api/sim/tap"};
+                        "/api/sim/new", "/api/sim/remove", "/api/sim/attach", "/api/sim/detach", "/api/sim/tap"};
   for (const char* path : cmds) {
     server.on(path, HTTP_POST, [path] {
       JsonDocument d;
