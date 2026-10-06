@@ -54,6 +54,15 @@ Die App hält wie WLED eine feste Verbindung (WebSocket auf Port 81). Das Hauptp
 
 Updates über den Webinstaller behalten WLAN, Einstellungen, Farben und Presets. Nur „Gerät löschen“ beim Installieren setzt alles zurück.
 
+## Android-App
+
+Die App `trilumag-app.apk` liegt bei jedem Release (ab 0.7.50) und lässt sich direkt laden: <https://github.com/mariofritzer/Trilumag/releases/latest/download/trilumag-app.apk>. Beim ersten Installieren fragt Android, ob der Browser Apps installieren darf; das einmal erlauben.
+
+- Beim Start sucht die App alle Trilumag im WLAN und zeigt sie als Liste mit Namen, Farbe, Ein/Aus-Schalter und Helligkeitsregler, ähnlich wie die WLED-App.
+- Antippen öffnet die gewohnte Steuerung im Vollbild. ＋ fügt eine Wand über ihre IP-Adresse hinzu, langes Drücken entfernt sie aus der Liste.
+- Die App sieht selbst bei GitHub nach (höchstens alle drei Stunden) und zeigt oben einen Hinweis, wenn eine neuere App-Version da ist.
+- Sicherungen und das Wandbild werden unter Downloads gespeichert.
+
 ## Effekte und Paletten
 
 Effekte laufen immer über die ganze Wand: Einfarbig, Regenbogen, Regenbogenwelle, Atmen, Farbwechsel, Funkeln, Ausbreiten (Wellen vom Hauptpanel nach außen), Feuer und Polarlicht. Die **Intensität** ändert je nach Effekt die Streuung, die Tiefe des Atmens, wie oft es funkelt, die Breite der Wellen oder wie stark das Feuer flackert.
