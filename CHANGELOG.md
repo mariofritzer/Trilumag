@@ -2,6 +2,13 @@
 
 Die Versionsnummer im Webinstaller und in der App setzt sich aus der Version in der Firmware und der Nummer des automatischen Builds zusammen, zum Beispiel **0.5.11** = Version 0.5, Build 11. Bis Build 9 hat der Build die Nummer immer als 0.2.x ausgegeben, die tatsächlichen Stände stehen deshalb unten mit beiden Nummern.
 
+## 0.7.57 · 7. Oktober 2026
+
+**Android-App 1.0**
+- Die App hat jetzt eine eigene Versionsnummer, unabhängig von der Firmware, und sie steht im Dateinamen: `trilumag-app-1.0.apk`.
+- Eine neue APK gibt es nur noch, wenn sich an der App wirklich etwas ändert; die App meldet sich also nicht mehr bei jedem Firmware-Release.
+- Ältere Apps finden diese Version noch einmal unter dem alten Namen und bieten sie zum Installieren an.
+
 ## 0.7.55 · 7. Oktober 2026
 
 **Android-App**
