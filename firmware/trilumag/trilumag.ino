@@ -778,7 +778,8 @@ CPal xpal;
 bool palValid(uint8_t k) { return k < PAL_COUNT || (k < PAL_ALL && cpal[k - PAL_COUNT].used) || (k == PAL_X && xpal.used); }
 String palId(uint8_t k) { return k < PAL_COUNT ? String(PALS[k].id) : k == PAL_X ? String("mitgenommen") : "eigen" + String(k - PAL_COUNT + 1); }
 String palName(uint8_t k) { return k < PAL_COUNT ? String(PALS[k].name) : !palValid(k) ? String("Standard") : k == PAL_X ? xpal.name : cpal[k - PAL_COUNT].name; }
-const CPal* palCustom(uint8_t k) { return k == PAL_X ? (xpal.used ? &xpal : nullptr) : (k >= PAL_COUNT && k < PAL_ALL && cpal[k - PAL_COUNT].used) ? &cpal[k - PAL_COUNT] : nullptr; }
+namespace pl { const CPal* custom(uint8_t k) { return k == PAL_X ? (xpal.used ? &xpal : nullptr) : (k >= PAL_COUNT && k < PAL_ALL && cpal[k - PAL_COUNT].used) ? &cpal[k - PAL_COUNT] : nullptr; } }   // im Namensraum: sonst setzt Arduino den Prototyp vor CPal
+#define palCustom pl::custom
 // Farben einer anderen Wand übernehmen: gibt es dieselben schon als eigene Palette, die nehmen, sonst als mitgenommene
 void palAdopt(uint8_t n, const uint32_t* c, const String& name);
 void cpalSave() {
