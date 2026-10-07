@@ -67,13 +67,14 @@ public class MainActivity extends Activity {
     final ArrayDeque<NsdServiceInfo> resolveQueue = new ArrayDeque<>(); boolean resolving;
     SharedPreferences prefs;
     boolean visible;
+    LinearLayout root; Updater updater;
 
     int dp(float v) { return (int) TypedValue.applyDimension(TypedValue.COMPLEX_UNIT_DIP, v, getResources().getDisplayMetrics()); }
 
     @Override protected void onCreate(Bundle b) {
         super.onCreate(b);
         prefs = getSharedPreferences("walls", MODE_PRIVATE);
-        LinearLayout root = new LinearLayout(this); root.setOrientation(LinearLayout.VERTICAL);
+        root = new LinearLayout(this); root.setOrientation(LinearLayout.VERTICAL);
         root.setBackgroundColor(getColor(R.color.bg));
 
         // Kopfzeile: Titel, Neu suchen, Hinzufügen
@@ -134,7 +135,8 @@ public class MainActivity extends Activity {
         return b;
     }
 
-    @Override protected void onResume() { super.onResume(); visible = true; startDiscovery(); pollAll(); }
+    @Override protected void onResume() { super.onResume(); visible = true; startDiscovery(); pollAll(); if (updater != null) updater.onResume(); }
+    @Override public void onBackPressed() { if (updater != null && updater.isActive()) return; super.onBackPressed(); }   // während des Updates nicht wegdrücken
     @Override protected void onPause() { super.onPause(); visible = false; stopDiscovery(); }
 
     // ---------- Wände im WLAN finden (mDNS, Dienst _wled._tcp; Trilumag erkennt man am Eintrag "tl") ----------
@@ -353,7 +355,7 @@ public class MainActivity extends Activity {
 
     void showUpdate(String v, String url) {
         updateText.setText(getString(R.string.update_avail, v));
-        updateBtn.setOnClickListener(x -> startActivity(new Intent(Intent.ACTION_VIEW, Uri.parse(url))));
+        updateBtn.setOnClickListener(x -> { if (updater == null || !updater.isActive()) { updater = new Updater(this, root, v, url); updater.start(); } });
         updateBox.setVisibility(View.VISIBLE);
     }
 

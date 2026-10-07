@@ -60,7 +60,7 @@ Die App `trilumag-app.apk` liegt bei jedem Release (ab 0.7.51) und lässt sich d
 
 - Beim Start sucht die App alle Trilumag im WLAN und zeigt sie als Liste mit Namen, Farbe, Ein/Aus-Schalter und Helligkeitsregler, ähnlich wie die WLED-App.
 - Antippen öffnet die gewohnte Steuerung im Vollbild. ＋ fügt eine Wand über ihre IP-Adresse hinzu, langes Drücken entfernt sie aus der Liste.
-- Die App sieht selbst bei GitHub nach (höchstens alle drei Stunden) und zeigt oben einen Hinweis, wenn eine neuere App-Version da ist.
+- Die App sieht selbst bei GitHub nach (höchstens alle drei Stunden) und zeigt oben einen Hinweis, wenn eine neuere App-Version da ist. „Installieren“ lädt sie in der App herunter und installiert sie; dahinter wird alles unscharf, davor stehen Fortschritt und der aktuelle Schritt. Beim ersten Mal fragt Android, ob Trilumag Apps installieren darf.
 - Sicherungen und das Wandbild werden unter Downloads gespeichert.
 
 ## Effekte und Paletten
