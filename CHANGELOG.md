@@ -2,6 +2,13 @@
 
 Die Versionsnummer im Webinstaller und in der App setzt sich aus der Version in der Firmware und der Nummer des automatischen Builds zusammen, zum Beispiel **0.5.11** = Version 0.5, Build 11. Bis Build 9 hat der Build die Nummer immer als 0.2.x ausgegeben, die tatsächlichen Stände stehen deshalb unten mit beiden Nummern.
 
+## 0.7.55 · 7. Oktober 2026
+
+**Android-App**
+- „Installieren“ beim Hinweis auf eine neue App-Version lädt sie jetzt in der App herunter und installiert sie selbst. Dahinter wird alles unscharf, davor stehen Fortschritt (Prozent und MB) und der aktuelle Schritt.
+- Beim ersten Mal fragt Android, ob Trilumag Apps installieren darf; danach geht es von selbst weiter.
+- Diese Version noch einmal wie bisher über den Browser installieren, ab dann klappt es in der App.
+
 ## 0.7.53 · 7. Oktober 2026
 
 **Absturz beim Start behoben**
