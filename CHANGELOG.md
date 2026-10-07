@@ -2,6 +2,20 @@
 
 Die Versionsnummer im Webinstaller und in der App setzt sich aus der Version in der Firmware und der Nummer des automatischen Builds zusammen, zum Beispiel **0.5.11** = Version 0.5, Build 11. Bis Build 9 hat der Build die Nummer immer als 0.2.x ausgegeben, die tatsächlichen Stände stehen deshalb unten mit beiden Nummern.
 
+## 0.7.67 · 7. Oktober 2026
+
+**Raum: mehrere Wände zusammen**
+- Neu unter Optionen → Andere Trilumag → „Raum einrichten“ (in der Android-App über ⌂): Grundriss von oben mit verschiebbaren Ecken, dazu jede Raumwand von vorne mit den echten Panel-Formen und ihren aktuellen Farben.
+- Raumhöhe einstellbar: Regler oben, oder in der Ansicht von vorne die Decke ziehen.
+- Der Raum liegt auf allen Wänden gleich und wird automatisch weitergegeben; klipst man Panels ab oder an, zieht die Wand ihren Eintrag selbst nach.
+- Raum-Effekte: Raum-Komet, Raum-Regenbogen und Raum-Welle laufen über alle Wände entlang der Raumwände. Helligkeit, Tempo, Intensität und Palette gehen an alle Wände.
+
+**Mehrere Wände**
+- Eigene Paletten werden mit ihren Farben mitgenommen, auch im Gleichtakt. Die andere Wand legt sie als „mitgenommene“ Palette ab und ändert ihre eigenen nicht.
+
+**Android-App 1.1.0**
+- Knopf ⌂ oben öffnet den Raum.
+
 ## 0.7.63 · 7. Oktober 2026
 
 **Firmware-Update**
