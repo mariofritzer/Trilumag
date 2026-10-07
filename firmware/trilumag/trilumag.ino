@@ -979,7 +979,7 @@ String geoJson() {
     const uint8_t* c = CUR[i][0]; char b[8];
     auto cl = [](int v) { return v > 255 ? 255 : v; };
     snprintf(b, sizeof b, "#%02X%02X%02X", cl(c[0] + c[3]), cl(c[1] + c[3]), cl(c[2] + c[3]));
-    JsonArray q = a.add<JsonArray>(); q.add(roundf((vx - mx) * 100) / 100); q.add(roundf((vy - my) * 100) / 100); q.add(ang); q.add(b);
+    JsonArray q = a.add<JsonArray>(); q.add(roundf((vx - mx) * 100) / 100); q.add(roundf((vy - my) * 100) / 100); q.add(ang); q.add(b); q.add(P[i].edges ? 1 : 0);
   }
   String s; serializeJson(d, s); return s;
 }
@@ -1064,9 +1064,39 @@ const char* save(JsonVariantConst lay, bool fwd) {
   if (fwd) { JsonDocument f; f["action"] = "save"; f["fwd"] = false; f["layout"] = lay; String b; serializeJson(f, b); fanout("/api/room", b); }
   return nullptr;
 }
+// Abgleich: jede Minute bei den anderen Wänden nachsehen, ob sie denselben Raum haben (z. B. nach einem Update
+// oder wenn eine Wand beim Speichern aus war). Älteren schicken wir unseren, einen neueren übernehmen wir.
+volatile bool healing = false; String healNew;
+void healTask(void*) {
+  String ips[MAXD]; uint8_t n = 0; double v0 = ver; String mine = raw;
+  for (uint8_t i = 0; i < nD; i++) if ((int)i != me && dev[i].ip.length() > 6) ips[n++] = dev[i].ip;
+  for (uint8_t i = 0; i < n && !netQuiet && !otaBusy; i++) {
+    HTTPClient h; h.setTimeout(2500); String r;
+    if (h.begin("http://" + ips[i] + "/api/room") && h.GET() == 200) r = h.getString();
+    h.end();
+    if (!r.length()) continue;
+    JsonDocument f; f["layout"]["v"] = true; JsonDocument d;
+    if (deserializeJson(d, r, DeserializationOption::Filter(f))) continue;
+    double v = d["layout"]["v"] | 0.0;
+    if (v < v0) {
+      HTTPClient p; p.setTimeout(3000);
+      if (p.begin("http://" + ips[i] + "/api/room")) { p.addHeader("Content-Type", "application/json"); p.POST("{\"action\":\"save\",\"fwd\":false,\"layout\":" + mine + "}"); }
+      p.end();
+    } else if (v > v0 && !healNew.length()) {
+      JsonDocument full; if (!deserializeJson(full, r) && full["layout"].is<JsonObject>()) serializeJson(full["layout"], healNew);
+    }
+  }
+  healing = false;
+  vTaskDelete(nullptr);
+}
 // eigene Panels geändert (abgeklipst, gedreht …): den eigenen Eintrag im Raum nachziehen und weitergeben
 void loop() {
-  static uint32_t last = 0;
+  static uint32_t last = 0, lastHeal = 0;
+  if (healNew.length() && !healing) { JsonDocument d; String js = healNew; healNew = ""; if (!deserializeJson(d, js)) save(d.as<JsonVariantConst>(), false); }
+  if (me >= 0 && wlanOk && !healing && !sending && !netQuiet && !otaBusy && nD > 1 && (!lastHeal || millis() - lastHeal > 60000)) {
+    lastHeal = millis() | 1; healing = true;
+    if (xTaskCreate(healTask, "raumabgl", 6144, nullptr, 1, nullptr) != pdPASS) healing = false;
+  }
   if (me < 0 || millis() - last < 5000) return;
   last = millis();
   uint32_t g = geoSig(); if (dev[me].g == g) return;
@@ -1083,87 +1113,136 @@ void loop() {
 // Sekunden seit Mitternacht (gemeinsame Uhr über das Internet), ohne Uhrzeit die Laufzeit
 double tsec() { if (timeOk()) { struct timeval tv; gettimeofday(&tv, nullptr); return (double)(tv.tv_sec % 86400) + tv.tv_usec / 1e6; } return millis() / 1000.0; }
 // vor jedem Bild: Mitte der eigenen Panels; ohne Raum wirkt der Effekt nur auf dieser Wand
-// ----- Raum-Komet: ein Kopf irrt von Panel zu Panel durch alle Wände -----
-// Alle Wände bauen aus demselben Raum dasselbe Netz aus Panels und rechnen denselben Weg:
-// Schritt n hängt nur vom Raum und von der Uhrzeit ab, darum sind alle im Gleichschritt, ohne etwas zu senden.
-const uint16_t MAXN = 240, BLK = 20000;
-float nu[MAXN], nh[MAXN]; uint8_t ndev[MAXN], nnb[MAXN]; uint16_t nb[MAXN][4]; int32_t lastV[MAXN];
-uint16_t nN = 0; int16_t ownMap[SLOTS];
+// ----- Raum-Komet: wie der Komet einer Wand, aber über alle Wände im Raum -----
+// Alle Wände bauen aus demselben Raum dasselbe Netz und rechnen denselben Weg: Schritt n hängt nur vom Raum und
+// von der Uhrzeit ab, darum gibt es genau einen Kopf, ohne dass etwas gesendet wird.
+// Panels mit "Kanten einzeln": alle drei Kanten nacheinander, dann über die zuletzt leuchtende Kante hinüber.
+const uint16_t MAXU = 160, MAXN = 480;
+const int32_t BLK = 20000;
+struct Unit { float u, h, a; uint16_t n0; bool ed; uint8_t dv; int16_t acU[3]; int8_t acS[3]; int16_t jmp[2]; };
+Unit un[MAXU]; uint16_t nU = 0;
+uint16_t nodeU[MAXN]; int8_t nodeS[MAXN]; int32_t lastV[MAXN]; uint16_t nN = 0;
+int16_t ownU[SLOTS], ownE[SLOTS][3];
 uint32_t gSig = 0; bool gRoom = false;
-int32_t curStep = -1; uint16_t head = 0;
+int32_t curStep = -1; uint16_t head = 0; uint8_t plan[3], planN = 0, planP = 0;
 uint32_t mix(uint32_t a, uint32_t b) { uint32_t h = a * 2654435761u ^ (b + 0x9E3779B9u + (a << 6) + (a >> 2)); h ^= h >> 15; h *= 2246822519u; h ^= h >> 13; return h; }
-void link(uint16_t a, uint16_t b) {
-  if (a == b) return;
-  for (uint8_t k = 0; k < nnb[a]; k++) if (nb[a][k] == b) return;
-  if (nnb[a] < 4 && nnb[b] < 4) { nb[a][nnb[a]++] = b; nb[b][nnb[b]++] = a; }
+// Kantenmitte s: der Schwerpunkt liegt 0,144 hinter der Rastermitte (weg von der Spitze), die Kantenmitten 0,289 um ihn herum
+void sideMid(const Unit& q, int s, float& u, float& h) {
+  float t = q.a * 0.01745329f, a = (q.a + 60 + 120 * s) * 0.01745329f;
+  float x = -0.1443f * cosf(t) + 0.2887f * cosf(a), y = -0.1443f * sinf(t) + 0.2887f * sinf(a);
+  u = q.u + x * S; h = q.h - y * S;
 }
-void addNode(float u, float h, uint8_t dv) { if (nN < MAXN) { nu[nN] = u; nh[nN] = h; ndev[nN] = dv; nnb[nN] = 0; nN++; } }
-// Nachbarn innerhalb einer Wand: im Raster liegen Nachbarn 0,5 (seitlich) oder 0,866 (oben/unten) auseinander, alle anderen mindestens 1
+void addUnit(float u, float h, float a, bool ed, uint8_t dv) {
+  if (nU >= MAXU || nN + (ed ? 3 : 1) > MAXN) return;
+  Unit& q = un[nU]; q.u = u; q.h = h; q.a = a; q.ed = ed; q.dv = dv; q.n0 = nN;
+  for (int s = 0; s < 3; s++) { q.acU[s] = -1; q.acS[s] = -1; } q.jmp[0] = q.jmp[1] = -1;
+  for (int s = 0; s < (ed ? 3 : 1); s++) { nodeU[nN] = nU; nodeS[nN] = ed ? s : -1; nN++; }
+  nU++;
+}
+// Nachbarn in einer Wand: zwei Panels teilen eine Kante, wenn die Kantenmitten aufeinander liegen
 void linkWithin(uint16_t a0, uint16_t a1) {
-  float lim = 0.93f * S;
-  for (uint16_t i = a0; i < a1; i++) for (uint16_t j = i + 1; j < a1; j++) if (hypotf(nu[i] - nu[j], nh[i] - nh[j]) < lim) link(i, j);
+  for (uint16_t i = a0; i < a1; i++) for (int s = 0; s < 3; s++) {
+    float u1, h1; sideMid(un[i], s, u1, h1);
+    for (uint16_t j = a0; j < a1; j++) if (j != i) for (int t = 0; t < 3; t++) {
+      float u2, h2; sideMid(un[j], t, u2, h2);
+      if (fabsf(u1 - u2) + fabsf(h1 - h2) < 0.15f * S) { un[i].acU[s] = j; un[i].acS[s] = t; }
+    }
+  }
+}
+void jump(uint16_t a, uint16_t b) {
+  if (a == b) return;
+  for (int k = 0; k < 2; k++) if (un[a].jmp[k] == (int16_t)b) return;
+  for (int k = 0; k < 2; k++) if (un[a].jmp[k] < 0) { un[a].jmp[k] = b; break; }
+  for (int k = 0; k < 2; k++) if (un[b].jmp[k] < 0) { un[b].jmp[k] = a; break; }
+}
+void addP(JsonArrayConst p, float u0, float h0, uint8_t dv) {
+  for (JsonVariantConst q : p) addUnit(u0 + (q[0] | 0.0f) * S, h0 - (q[1] | 0.0f) * S, q[2] | 270.0f, (q[4] | 0) != 0, dv);
 }
 void graph() {
-  nN = 0; curStep = -1; for (int i = 0; i < SLOTS; i++) ownMap[i] = -1;
+  nU = nN = 0; curStep = -1;
+  for (int i = 0; i < SLOTS; i++) { ownU[i] = -1; ownE[i][0] = ownE[i][1] = ownE[i][2] = -1; }
   float mx, my, bw, bh; ownBox(mx, my, bw, bh);
-  gRoom = me >= 0;
-  JsonDocument d;
-  if (gRoom && !deserializeJson(d, raw)) {
-    uint16_t first[MAXD], cnt[MAXD]; float lo[MAXD];
-    uint8_t k = 0;
+  JsonDocument d; uint16_t first[MAXD], cnt[MAXD]; float lo[MAXD]; uint8_t k = 0;
+  gRoom = me >= 0 && !deserializeJson(d, raw);
+  float ou = 0, oh = 0;                                     // wo die eigene Wand im Raum liegt
+  if (gRoom) {
     for (JsonVariant v : d["d"].as<JsonArray>()) {
       if (k >= nD) break;
-      const Dev& e = dev[k]; first[k] = nN; lo[k] = 1e9;
-      if (e.w < nC) for (JsonVariant q : v["p"].as<JsonArray>()) {
-        float u = U[e.w] + e.x + (q[0] | 0.0f) * S, h = e.y - (q[1] | 0.0f) * S;
-        addNode(u, h, k); lo[k] = fminf(lo[k], u);
-      }
-      cnt[k] = nN - first[k]; linkWithin(first[k], nN); k++;
+      const Dev& e = dev[k]; first[k] = nU;
+      if (e.w < nC) addP(v["p"].as<JsonArrayConst>(), U[e.w] + e.x, e.y, k);
+      cnt[k] = nU - first[k]; lo[k] = 1e9; for (uint16_t q = first[k]; q < nU; q++) lo[k] = fminf(lo[k], un[q].u);
+      linkWithin(first[k], nU); k++;
     }
     // die Wände der Reihe nach entlang der Raumwände verbinden: rechtes Ende der einen mit dem linken der nächsten
     uint8_t ord[MAXD], n = 0; for (uint8_t i = 0; i < k; i++) if (cnt[i]) ord[n++] = i;
     for (uint8_t i = 0; i < n; i++) for (uint8_t j = i + 1; j < n; j++) if (lo[ord[j]] < lo[ord[i]]) { uint8_t t = ord[i]; ord[i] = ord[j]; ord[j] = t; }
     for (uint8_t i = 0; n > 1 && i < n; i++) {
       uint8_t A = ord[i], B = ord[(i + 1) % n]; float wrap = i + 1 == n ? Ptot : 0;
-      uint16_t a = first[A]; for (uint16_t q = first[A]; q < first[A] + cnt[A]; q++) if (nu[q] > nu[a]) a = q;
+      uint16_t a = first[A]; for (uint16_t q = first[A]; q < first[A] + cnt[A]; q++) if (un[q].u > un[a].u) a = q;
       uint16_t b = first[B]; float best = 1e9;
-      for (uint16_t q = first[B]; q < first[B] + cnt[B]; q++) { float c = (nu[q] + wrap - lo[B]) + 0.5f * fabsf(nh[q] - nh[a]); if (c < best) { best = c; b = q; } }
-      link(a, b);
+      for (uint16_t q = first[B]; q < first[B] + cnt[B]; q++) { float c = (un[q].u + wrap - lo[B]) + 0.5f * fabsf(un[q].h - un[a].h); if (c < best) { best = c; b = q; } }
+      jump(a, b);
     }
-    // eigene Panels den Knoten dieser Wand zuordnen (nächster Punkt)
-    for (int i = 0; i < SLOTS; i++) if (P[i].used && P[i].attached && cnt[me]) {
-      float vx, vy; viewXY(P[i].x * 0.5f, P[i].y * 0.866f, vx, vy);
-      float u = U[dev[me].w] + dev[me].x + (vx - mx) * S, h = dev[me].y - (vy - my) * S, bd = 1e9; int bi = -1;
-      for (uint16_t q = first[me]; q < first[me] + cnt[me]; q++) { float dd = hypotf(nu[q] - u, nh[q] - h); if (dd < bd) { bd = dd; bi = q; } }
-      if (bd < 0.4f * S) ownMap[i] = bi;
+    ou = U[dev[me].w] + dev[me].x; oh = dev[me].y;
+  } else {                                                  // ohne Raum: nur die eigenen Panels
+    JsonDocument g; deserializeJson(g, geoJson());
+    addP(g["p"].as<JsonArrayConst>(), 0, 0, 0); linkWithin(0, nU);
+  }
+  // eigene Panels und Kanten den Knoten zuordnen (nächster Punkt)
+  uint16_t a0 = gRoom ? first[me] : 0, a1 = gRoom ? first[me] + cnt[me] : nU;
+  for (int i = 0; i < SLOTS; i++) if (P[i].used && P[i].attached) {
+    float vx, vy; viewXY(P[i].x * 0.5f, P[i].y * 0.866f, vx, vy);
+    float u = ou + (vx - mx) * S, h = oh - (vy - my) * S, bd = 1e9; int bi = -1;
+    for (uint16_t q = a0; q < a1; q++) { float dd = fabsf(un[q].u - u) + fabsf(un[q].h - h); if (dd < bd) { bd = dd; bi = q; } }
+    if (bi < 0 || bd > 0.4f * S) continue;
+    ownU[i] = bi;
+    if (un[bi].ed) for (int e = 0; e < 3; e++) {
+      float px, py, dd2; edgePos(i, e, px, py, dd2); viewXY(px, py, vx, vy);
+      float eu = ou + (vx - mx) * S, eh = oh - (vy - my) * S, b2 = 1e9;
+      for (int s = 0; s < 3; s++) { float su, sh; sideMid(un[bi], s, su, sh); float x = fabsf(su - eu) + fabsf(sh - eh); if (x < b2) { b2 = x; ownE[i][e] = un[bi].n0 + s; } }
     }
-  } else {                                               // ohne Raum: nur die eigenen Panels
-    gRoom = false;
-    for (int i = 0; i < SLOTS; i++) if (P[i].used && P[i].attached && nN < MAXN) {
-      float vx, vy; viewXY(P[i].x * 0.5f, P[i].y * 0.866f, vx, vy);
-      ownMap[i] = nN; addNode((vx - mx) * S, -(vy - my) * S, 0);
-    }
-    linkWithin(0, nN);
   }
   gSig = geoSig() ^ (uint32_t)ver;
 }
-// Weg bis Schritt t: jeder Schritt geht zum am längsten nicht besuchten Nachbarn
+int32_t seen(uint16_t q) { int32_t m = -1000000; const Unit& x = un[q]; for (int s = 0; s < (x.ed ? 3 : 1); s++) { if (lastV[x.n0 + s] > m) m = lastV[x.n0 + s]; } return m; }
+bool onward(uint16_t q, int s) { return un[q].acU[s] >= 0 || un[q].jmp[0] >= 0; }
+int32_t onwardSeen(uint16_t q, int s) { int16_t t = un[q].acU[s] >= 0 ? un[q].acU[s] : un[q].jmp[0]; return t >= 0 ? seen(t) : 0x7FFFFFFF; }
+// ein Schritt des Kopfes (wie fxCompute beim Komet einer Wand)
+void step() {
+  uint16_t Q = nodeU[head]; const Unit& q = un[Q];
+  if (q.ed && planP < planN) { head = q.n0 + plan[planP++]; return; }        // nächste Kante im Panel
+  int16_t cu[5]; int8_t cs[5]; uint8_t n = 0;
+  if (q.ed) { int s = nodeS[head]; if (q.acU[s] >= 0) { cu[n] = q.acU[s]; cs[n] = q.acS[s]; n++; } }
+  else for (int s = 0; s < 3; s++) if (q.acU[s] >= 0) { cu[n] = q.acU[s]; cs[n] = q.acS[s]; n++; }
+  for (int k = 0; k < 2; k++) if (q.jmp[k] >= 0) { cu[n] = q.jmp[k]; cs[n] = -1; n++; }      // hinüber zur nächsten Wand
+  if (!n) {
+    if (q.ed) { int s = nodeS[head]; plan[0] = (s + 1) % 3; plan[1] = (s + 2) % 3; planN = 2; planP = 0; return; }   // erst die anderen Kanten
+    head = mix(curStep, 7) % nN; planN = planP = 0; return;
+  }
+  int pick = 0; int32_t best = 0x7FFFFFFF; uint32_t tie = 0;
+  for (int k = 0; k < n; k++) { int32_t v = seen(cu[k]); uint32_t r = mix(curStep, cu[k]); if (v < best || (v == best && r > tie)) { best = v; tie = r; pick = k; } }
+  uint16_t R = cu[pick]; const Unit& r = un[R]; int t = cs[pick];
+  if (t < 0) {                                              // Sprung: Eingang ist die Kante, die zur alten Wand zeigt
+    float bd = 1e9; for (int s = 0; s < 3; s++) { float su, sh; sideMid(r, s, su, sh); float x = fabsf(su - q.u) + fabsf(sh - q.h); if (x < bd) { bd = x; t = s; } }
+  }
+  planN = planP = 0;
+  if (!r.ed) { head = r.n0; return; }
+  head = r.n0 + t;
+  int fwE = (t + 2) % 3, bwE = (t + 1) % 3;                 // vorwärts endet bei t+2, rückwärts bei t+1
+  bool f = onward(R, fwE), b = onward(R, bwE), dirF;
+  if (f && b) { int32_t sf = onwardSeen(R, fwE), sb = onwardSeen(R, bwE); dirF = sf != sb ? sf < sb : (mix(curStep, R) & 1); }
+  else dirF = f ? true : b ? false : (mix(curStep, R) & 1);
+  plan[0] = dirF ? (t + 1) % 3 : (t + 2) % 3; plan[1] = dirF ? fwE : bwE; planN = 2;
+  if (!f && !b) plan[planN++] = t;                          // Sackgasse: zurück zur Eingangskante
+}
 void walkTo(int32_t t) {
   if (!nN) return;
   int32_t b0 = t - t % BLK;
-  if (curStep < 0 || t < curStep || curStep < b0) {      // neu: ab Blockanfang durchrechnen
+  if (curStep < 0 || t < curStep || curStep < b0) {         // neu: ab Blockanfang durchrechnen
     for (uint16_t i = 0; i < nN; i++) lastV[i] = -1000000;
-    head = mix(b0, nN) % nN; curStep = b0; lastV[head] = curStep;
+    head = un[mix(b0, nU) % nU].n0; planN = planP = 0; curStep = b0; lastV[head] = curStep;
   }
-  while (curStep < t) {
-    uint16_t nx = head; int32_t best = 0x7FFFFFFF; uint32_t tie = 0;
-    for (uint8_t k = 0; k < nnb[head]; k++) {
-      uint16_t c = nb[head][k]; uint32_t r = mix(curStep, c);
-      if (lastV[c] < best || (lastV[c] == best && r > tie)) { best = lastV[c]; tie = r; nx = c; }
-    }
-    if (!nnb[head]) nx = mix(curStep, 7) % nN;           // einzelnes Panel ohne Nachbarn: woanders weiter
-    head = nx; curStep++; lastV[head] = curStep;
-  }
+  while (curStep < t) { step(); curStep++; lastV[head] = curStep; }
 }
 float stepF = 0;
 void frame() {
@@ -1176,12 +1255,15 @@ void frame() {
     walkTo((int32_t)stepF);
   }
 }
-// Helligkeit eines eigenen Panels beim Raum-Kometen (1 = Kopf); tail = Schritte bis dunkel
-float comet(int i, float tail, bool& isHead) {
-  int16_t n = ownMap[i]; isHead = false;
-  if (n < 0 || !nN) return 0;
+// Helligkeit eines eigenen Panels oder einer Kante beim Raum-Kometen (1 = Kopf); tail = Schritte bis dunkel
+float comet(int i, int e, float tail, bool& isHead) {
+  isHead = false; int16_t q = ownU[i];
+  if (q < 0 || !nN) return 0;
+  int n = -1; int32_t lv;
+  if (un[q].ed && e >= 0 && ownE[i][e] >= 0) { n = ownE[i][e]; lv = lastV[n]; }
+  else { lv = seen(q); for (int s = 0; s < (un[q].ed ? 3 : 1); s++) if (un[q].n0 + s == head) n = head; if (n < 0) n = un[q].n0; }
   isHead = n == head;
-  float age = stepF - lastV[n];
+  float age = stepF - lv;
   if (age < 1) return 1;
   return fmaxf(0, 1 - (age - 1) / tail);
 }
@@ -1434,7 +1516,7 @@ void fxCompute() {
         }
         case 24: {                                             // Raum-Komet: irrt wie der Komet durch alle Wände im Raum
           float ik = 1 - K, tail = 4 / (0.1f + 2.4f * ik * ik);   // Intensität = Schweiflänge wie beim Komet
-          bool hd; float b = room::comet(i, tail, hd);
+          bool hd; float b = room::comet(i, p.edges ? e : -1, tail, hd);
           pcol((float)fmod(room::stepF * 0.0075, 1.0), c, D_COLOR);
           mul(c, 0.02f + 0.98f * powf(b, 1.6f));
           if (hd) c[3] = fminf(255, c[3] + 120);
@@ -4113,9 +4195,13 @@ const char* apiCall(const char* path, JsonDocument& d) {
     bool fwd = d["fwd"] | true;
     if (!strcmp(a, "save")) { if (!d["layout"].is<JsonObjectConst>()) return "Raum fehlt"; return room::save(d["layout"].as<JsonVariantConst>(), fwd); }
     if (!strcmp(a, "fx")) {
+      if (d["layout"].is<JsonObjectConst>()) room::save(d["layout"].as<JsonVariantConst>(), false);   // Raum gleich mitgeschickt
       JsonDocument f; f.set(d["fx"]);
       if (const char* e = apiCall("/api/effect", f)) return e;
-      if (fwd) { JsonObject o = f.as<JsonObject>(); palCarry(o); String b; serializeJson(f, b); room::fanout("/api/effect", b); }
+      if (fwd) {
+        JsonObject o = f.as<JsonObject>(); palCarry(o); String b; serializeJson(f, b);
+        room::fanout("/api/room", "{\"action\":\"fx\",\"fwd\":false,\"fx\":" + b + (room::raw.length() ? ",\"layout\":" + room::raw : String()) + "}");
+      }
       return nullptr;
     }
     return "Unbekannte Aktion";

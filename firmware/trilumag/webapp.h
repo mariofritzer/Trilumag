@@ -1369,7 +1369,7 @@ function rFront(sv,w){const L=rLen(w),H=R0.h,m=Math.max(30,L*.05);sv.setAttribut
   R0.d.filter(d=>d.w===w).forEach(d=>{const g=RG[d.id],pts=(g&&!g.off&&g.p.length?g.p:d.p)||[],S=R0.s,on=rSel&&rSel.t==='d'&&rSel.id===d.id;
     const G=rEl('g',{transform:`translate(${d.x},${H-d.y}) scale(${S})`,class:'hd'},sv);
     rEl('rect',{x:-d.bw/S/2,y:-d.bh/S/2,width:d.bw/S,height:d.bh/S,fill:'transparent',stroke:on?'#fff':'none','stroke-width':1.5*k/S,'stroke-dasharray':`${4*k/S} ${3*k/S}`},G);
-    pts.forEach(q=>{const a=q[2]*Math.PI/180,v=[0,1,2].map(j=>[q[0]+r*Math.cos(a+j*2.0944),q[1]+r*Math.sin(a+j*2.0944)]);
+    pts.forEach(q=>{const a=q[2]*Math.PI/180,cx=q[0]-.1443*Math.cos(a),cy=q[1]-.1443*Math.sin(a),v=[0,1,2].map(j=>[cx+r*Math.cos(a+j*2.0944),cy+r*Math.sin(a+j*2.0944)]);
       rEl('polygon',{points:v.map(z=>z.join(',')).join(' '),fill:q[3]||'#555',stroke:'#000','stroke-width':.04},G);});
     const t=rEl('text',{x:0,y:-d.bh/S/2-.3,'text-anchor':'middle',class:'dn','font-size':13*k/S,'stroke-width':3*k/S,'pointer-events':'none'},G);t.textContent=rName(d);
     G.addEventListener('pointerdown',e=>rStart(e,{t:'f',id:d.id}));});

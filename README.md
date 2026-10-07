@@ -124,7 +124,7 @@ Unter Optionen → Andere Trilumag → „Raum einrichten“ (in der Android-App
 - **Jede Raumwand von vorne:** so, wie man im Raum davor steht, mit den echten Panel-Formen und ihren aktuellen Farben. Wände frei an ihre Stelle und Höhe ziehen.
 - **Maße:** Raumhöhe und Seitenlänge eines Panels in cm.
 - Der Raum liegt auf allen Wänden gleich: wo man ihn ändert, wird er an alle anderen weitergegeben. Klipst man an einer Wand Panels ab oder an, zieht sie ihren Eintrag selbst nach.
-- **Raum-Effekte:** Der Raum-Komet irrt wie der normale Komet von Panel zu Panel und springt am Ende einer Wand zur nächsten Wand im Raum. Raum-Regenbogen und Raum-Welle laufen entlang der Raumwände über alle Wände. Jede Wand rechnet selbst mit ihrer Stelle im Raum und der Uhrzeit aus dem Internet, es werden keine Bilder verschickt. Lange Lücken zwischen den Wänden werden dabei kurz. Helligkeit, Tempo, Intensität und Palette gehen an alle Wände, eigene Paletten mit ihren Farben.
+- **Raum-Effekte:** Der Raum-Komet läuft wie der Komet einer Wand: Panel für Panel, bei „Kanten einzeln“ Kante für Kante, und springt am Ende einer Wand zur nächsten Wand im Raum. Es gibt genau einen Kopf für alle Wände. Raum-Regenbogen und Raum-Welle laufen entlang der Raumwände über alle Wände. Jede Wand rechnet selbst mit ihrer Stelle im Raum und der Uhrzeit aus dem Internet, es werden keine Bilder verschickt. Lange Lücken zwischen den Wänden werden dabei kurz. Helligkeit, Tempo, Intensität und Palette gehen an alle Wände, eigene Paletten mit ihren Farben.
 - Die anderen Wände brauchen dafür mindestens dieselbe Version.
 
 Auch der Gleichtakt (unter „Mehrere Wände“) nimmt jetzt eigene Paletten mit ihren Farben mit; die andere Wand legt sie als „mitgenommene“ Palette ab, ohne ihre eigenen zu ändern.
