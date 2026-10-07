@@ -35,4 +35,7 @@
     <string name="version">App %1$s</string>
     <string name="saved_file">Saved to Downloads</string>
     <string name="downloading">Downloading:</string>
+    <string name="upd_searching">Looking for a new app version …</string>
+    <string name="upd_current">The app is up to date.</string>
+    <string name="upd_noconn">GitHub can’t be reached right now.</string>
 </resources>

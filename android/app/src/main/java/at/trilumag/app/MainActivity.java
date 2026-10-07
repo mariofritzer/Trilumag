@@ -111,6 +111,7 @@ public class MainActivity extends Activity {
         inner.addView(hint);
         TextView ver = new TextView(this); ver.setTextColor(Color.parseColor("#555555")); ver.setTextSize(12); ver.setPadding(dp(6), dp(24), dp(6), 0);
         ver.setText(getString(R.string.version, BuildConfig.VERSION_NAME));
+        ver.setOnClickListener(v -> { android.widget.Toast.makeText(this, R.string.upd_searching, android.widget.Toast.LENGTH_SHORT).show(); checkUpdate(true); });   // Antippen: sofort nachsehen
         inner.addView(ver);
         sv.addView(inner);
         root.addView(sv, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, 0, 1));
@@ -126,7 +127,6 @@ public class MainActivity extends Activity {
             }
         } catch (Exception ignored) { }
         nsd = (NsdManager) getSystemService(Context.NSD_SERVICE);
-        checkUpdate();
     }
 
     Button flatButton(String s) {
@@ -135,7 +135,7 @@ public class MainActivity extends Activity {
         return b;
     }
 
-    @Override protected void onResume() { super.onResume(); visible = true; startDiscovery(); pollAll(); if (updater != null) updater.onResume(); }
+    @Override protected void onResume() { super.onResume(); visible = true; startDiscovery(); pollAll(); if (updater != null) updater.onResume(); checkUpdate(false); }
     @Override public void onBackPressed() { if (updater != null && updater.isActive()) return; super.onBackPressed(); }   // während des Updates nicht wegdrücken
     @Override protected void onPause() { super.onPause(); visible = false; stopDiscovery(); }
 
@@ -327,15 +327,15 @@ public class MainActivity extends Activity {
 
     // ---------- Gibt es eine neuere App? (Releases auf GitHub mit einer Datei trilumag-app-<Version>.apk) ----------
     static final java.util.regex.Pattern APK = java.util.regex.Pattern.compile("^trilumag-app-([0-9][0-9.]*)\\.apk$");
-    void checkUpdate() {
+    void checkUpdate(boolean force) {
         long last = prefs.getLong("appChecked", 0);
         String known = prefs.getString("appVer", "");
         String knownUrl = prefs.getString("appUrl", "");
         if (!known.isEmpty() && newer(known, BuildConfig.VERSION_NAME)) showUpdate(known, knownUrl);
-        if (System.currentTimeMillis() - last < 3 * 3600 * 1000L) return;     // höchstens alle 3 Stunden nachsehen
+        if (!force && System.currentTimeMillis() - last < 3600 * 1000L) return;     // sonst höchstens einmal pro Stunde nachsehen
         pool.execute(() -> {
             String r = http("GET", "https://api.github.com/repos/" + REPO + "/releases?per_page=100", null, 10000);
-            if (r == null) return;
+            if (r == null) { if (force) ui.post(() -> android.widget.Toast.makeText(this, R.string.upd_noconn, android.widget.Toast.LENGTH_SHORT).show()); return; }
             try {
                 JSONArray a = new JSONArray(r);
                 String best = null, bestUrl = null;
@@ -352,6 +352,7 @@ public class MainActivity extends Activity {
                 String v = best, u = bestUrl;
                 prefs.edit().putLong("appChecked", System.currentTimeMillis()).putString("appVer", v).putString("appUrl", u).apply();
                 if (newer(v, BuildConfig.VERSION_NAME)) ui.post(() -> showUpdate(v, u));
+                else if (force) ui.post(() -> android.widget.Toast.makeText(this, R.string.upd_current, android.widget.Toast.LENGTH_SHORT).show());
             } catch (Exception ignored) { }
         });
     }

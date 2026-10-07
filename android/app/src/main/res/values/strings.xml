@@ -36,4 +36,7 @@
     <string name="version">App %1$s</string>
     <string name="saved_file">Gespeichert unter Downloads</string>
     <string name="downloading">Lade herunter:</string>
+    <string name="upd_searching">Suche nach einer neuen App-Version …</string>
+    <string name="upd_current">Die App ist aktuell.</string>
+    <string name="upd_noconn">GitHub ist gerade nicht erreichbar.</string>
 </resources>
