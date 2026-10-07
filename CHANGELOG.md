@@ -2,6 +2,15 @@
 
 Die Versionsnummer im Webinstaller und in der App setzt sich aus der Version in der Firmware und der Nummer des automatischen Builds zusammen, zum Beispiel **0.5.11** = Version 0.5, Build 11. Bis Build 9 hat der Build die Nummer immer als 0.2.x ausgegeben, die tatsächlichen Stände stehen deshalb unten mit beiden Nummern.
 
+## 0.7.53 · 7. Oktober 2026
+
+**Absturz beim Start behoben**
+- War eine Hue-Lampe oder ein WLED-Gerät zum Nachahmen gewählt, fragte die Wand es schon beim Start ab, bevor das WLAN lief, und startete deshalb immer wieder neu. Jetzt wird erst mit WLAN abgefragt.
+- Neu: sicherer Start. Stürzt die Wand dreimal hintereinander gleich beim Start ab, startet sie ohne Hue- und WLED-Nachahmen und vermerkt das im Protokoll.
+
+**Panel tauschen**
+- Die Meldung „Tausch erledigt“ kam in seltenen Fällen nicht in der App an.
+
 ## 0.7.51 · 6. Oktober 2026
 
 **Android-App**
