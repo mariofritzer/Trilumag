@@ -1,9 +1,9 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- drei Dreiecke wie eine kleine Wand, im sicheren Bereich (66 von 108) -->
+<!-- vier gleich große Dreiecke als großes Dreieck, im sicheren Bereich (66 von 108) -->
 <vector xmlns:android="http://schemas.android.com/apk/res/android"
     android:width="108dp" android:height="108dp" android:viewportWidth="108" android:viewportHeight="108">
-    <path android:fillColor="#FF7A3C" android:pathData="M30,68 L42,47 L54,68 Z" />
-    <path android:fillColor="#6E8BFF" android:pathData="M43,46 L55,67 L67,46 Z" />
-    <path android:fillColor="#FFD24A" android:pathData="M56,68 L68,47 L80,68 Z" />
-    <path android:fillColor="#4FE0B0" android:pathData="M44,45 L56,45 L50,34.6 Z" />
+    <path android:fillColor="#FF7A3C" android:pathData="M30.25,74.93 L41.50,55.44 L52.75,74.93 Z" />
+    <path android:fillColor="#6E8BFF" android:pathData="M42.75,54.72 L54.00,74.21 L65.25,54.72 Z" />
+    <path android:fillColor="#FFD24A" android:pathData="M55.25,74.93 L66.50,55.44 L77.75,74.93 Z" />
+    <path android:fillColor="#4FE0B0" android:pathData="M42.75,53.28 L65.25,53.28 L54.00,33.79 Z" />
 </vector>

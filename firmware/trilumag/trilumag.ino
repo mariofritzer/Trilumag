@@ -448,10 +448,11 @@ bool safeBoot = false;         // nach wiederholten Abstürzen beim Start: Netz-
 uint32_t faultPanelAt = 0;     // wann zuletzt ein Panel nicht mehr geantwortet hat
 // Während Updates ruhen die Abfragen an Hue und WLED: zwei verschlüsselte Verbindungen gleichzeitig brauchen zu viel Speicher
 volatile bool netQuiet = false, hueInReq = false, wledInReq = false;
+volatile bool otaBusy = false;   // Installation läuft: alle Verbindungen nach außen getrennt (MQTT, Hue, WLED, Wetter, Suche)
 void netQuietOn() { netQuiet = true; for (int i = 0; i < 600 && (hueInReq || wledInReq); i++) delay(10); }
 namespace wx { extern String place, err; extern volatile bool busy; void json(JsonObject o); }
 namespace mirror { extern String ip; void json(JsonObject o); }
-namespace hueb { void json(JsonObject o); }
+namespace hueb { void json(JsonObject o); void closeConn(); }
 extern bool outForce, testMode;
 void transition();
 bool placePanel(int i, int parent, uint8_t edge, uint8_t own);
@@ -1690,6 +1691,10 @@ void haPublish(const char* comp, const char* key, JsonDocument& d) {
 // Tempo, Intensität, Palette und Presets als eigene Einträge in Home Assistant
 void publishPresetEntity();
 void publishExtras() {
+  { JsonDocument t;                    // zeigt „Update läuft“, solange die Wand eine neue Firmware installiert
+    t["name"] = "Status"; t["unique_id"] = "trilumag_status_" + hex(P[0].chip);
+    t["state_topic"] = "trilumag/bridge/status"; t["icon"] = "mdi:update"; t["entity_category"] = "diagnostic";
+    haDevice(t); t.remove("availability_topic"); haPublish("sensor", "status", t); }
   { JsonDocument t;
     t["name"] = "Effekt-Tempo"; t["unique_id"] = "trilumag_tempo_" + hex(P[0].chip);
     t["command_topic"] = "trilumag/tempo/set"; t["state_topic"] = "trilumag/tempo/state";
@@ -2473,7 +2478,7 @@ bool push(const String& v, JsonArrayConst ips) {
 uint8_t pushState(const String& ip) { for (uint8_t i = 0; i < nUp; i++) if (ip == upIp[i]) return upSt[i]; return 0; }
 
 void start() {
-  if (busy || !wlanOk) return;
+  if (busy || !wlanOk || netQuiet || otaBusy) return;
   busy = true; ready = false;
   if (xTaskCreate(task, "peers", 6144, nullptr, 1, nullptr) != pdPASS) busy = false;
 }
@@ -2628,13 +2633,15 @@ void start(const char* what) {
   want = what; busy = true;
   if (xTaskCreate(work, "hue", 8192, nullptr, 1, nullptr) != pdPASS) busy = false;
 }
+NetworkClientSecure* pc = nullptr;        // offene Verbindung zur Bridge
+void closeConn() { if (pc) pc->stop(); }  // vor Updates: Speicher der Verschlüsselung freigeben
 void pollOnce() {
   if (netQuiet || !wlanOk) return;         // ohne WLAN (auch direkt nach dem Start) keine Verbindung versuchen
   hueInReq = true;
-  static NetworkClientSecure pc; static bool pcInit = false; if (!pcInit) { pc.setInsecure(); pcInit = true; }
+  if (!pc) { pc = new NetworkClientSecure(); pc->setInsecure(); }
   static HTTPClient ph; ph.setReuse(true); ph.setTimeout(4000);           // Verbindung offen halten: nicht jede Sekunde neu verschlüsseln
   String r; int c = -1;
-  if (ph.begin(pc, "https://" + ip + "/clip/v2/resource/light/" + light)) { ph.addHeader("hue-application-key", key.c_str()); c = ph.GET(); r = c > 0 ? ph.getString() : String(); ph.end(); }
+  if (ph.begin(*pc, "https://" + ip + "/clip/v2/resource/light/" + light)) { ph.addHeader("hue-application-key", key.c_str()); c = ph.GET(); r = c > 0 ? ph.getString() : String(); ph.end(); }
   hueInReq = false;
   JsonDocument f; JsonObject fd = f["data"][0].to<JsonObject>();
   fd["on"] = true; fd["dimming"] = true; fd["color"]["xy"] = true; fd["color_temperature"] = true; fd["effects"]["status"] = true; fd["mode"] = true;
@@ -2765,7 +2772,7 @@ void task(void*) {
   vTaskDelete(nullptr);
 }
 void start() {
-  if (busy || !wlanOk) return;
+  if (busy || !wlanOk || netQuiet || otaBusy) return;
   busy = true; next = millis() + 15UL * 60 * 1000;
   if (xTaskCreate(task, "wetter", 8192, nullptr, 1, nullptr) != pdPASS) busy = false;
 }
@@ -3434,6 +3441,17 @@ void guardLoop() {
 }
 
 // ---------- Online-Updates ----------
+// Vor der Installation alle Verbindungen nach außen trennen: laufende Abfragen abwarten, MQTT sauber abmelden
+void mqttStatus(const char* s);
+void otaQuiet(bool on) {
+  if (!on) { otaBusy = false; netQuiet = false; logf("[OTA] Verbindungen wieder frei\n"); return; }
+  otaBusy = true; netQuietOn();
+  for (int i = 0; i < 800 && (wx::busy || peers::busy); i++) delay(10);     // Wetter oder Suche fertig laufen lassen
+  hueb::closeConn();
+  if (mqtt.connected()) { mqttStatus("Update läuft"); mqtt.loop(); delay(50); mqtt.disconnect(); }
+  netClient.stop();
+  logf("[OTA] Verbindungen getrennt (MQTT, Hue, WLED, Wetter, Suche)\n");
+}
 bool otaCheckNow = false;
 bool otaLatestAfterCheck = false;     // Notfall-Seite: nach der Abfrage die neueste Version installieren
 String otaInstallVer;
@@ -3481,9 +3499,9 @@ void otaLoop() {
     logf("[OTA] installiere %s …\n", v.c_str());
     saveColors(); fxSave(); if (simDirty) simSave();           // nichts verlieren
     prefs.putString("otaTry", v);                              // nach dem Neustart prüfen, ob sie wirklich läuft
-    netQuietOn();
+    otaQuiet(true);
     bool ok = ota::install(v);
-    netQuiet = false;
+    if (!ok) otaQuiet(false);                                  // sonst startet sie gleich neu
     if (!ok) prefs.remove("otaTry");
     otaPush();
     if (ok) {
@@ -3949,13 +3967,14 @@ void setupWeb() {
     if (u.status == UPLOAD_FILE_START) {
       logf("[OTA] Datei-Upload %s\n", u.filename.c_str());
       saveColors(); fxSave(); if (simDirty) simSave();
+      otaQuiet(true);
       Update.begin(UPDATE_SIZE_UNKNOWN);
     } else if (u.status == UPLOAD_FILE_WRITE) {
       Update.write(u.buf, u.currentSize);
     } else if (u.status == UPLOAD_FILE_END) {
-      Update.end(true);
+      if (!Update.end(true)) otaQuiet(false);
     } else if (u.status == UPLOAD_FILE_ABORTED) {
-      Update.abort();
+      Update.abort(); otaQuiet(false);
     }
   });
   server.on("/api/config", HTTP_GET, [] { server.send(200, "application/json", configJson()); });
@@ -4062,8 +4081,9 @@ void onMqtt(char* topic, byte* payload, unsigned int len) {
   else { int i = findChip(parseHex(id.c_str())); if (i >= 0) applyCommand(i, d.as<JsonVariantConst>()); }
 }
 
+void mqttStatus(const char* s) { if (mqtt.connected()) mqtt.publish("trilumag/bridge/status", s, true); }
 void mqttLoop() {
-  if (!cfg.mqttOn || !cfg.mqttHost.length() || !wlanOk) return;
+  if (!cfg.mqttOn || !cfg.mqttHost.length() || !wlanOk || otaBusy) return;
   if (mqtt.connected()) {
     mqtt.loop();
     static uint32_t lastPwr = 0;
@@ -4078,6 +4098,7 @@ void mqttLoop() {
   if (mqtt.connect(cid.c_str(), u, pw, "trilumag/bridge/avail", 0, true, "offline")) {
     logf("[MQTT] verbunden\n");
     mqtt.publish("trilumag/bridge/avail", "online", true);
+    mqttStatus("Bereit");
     mqtt.subscribe("trilumag/+/set");
     publishAllLight();
     publishFx();

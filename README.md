@@ -83,6 +83,7 @@ In der App unter Optionen „MQTT aktiv“ einschalten und die Adresse des Broke
 - **„Alle Panels“:** Ein/Aus, Gesamthelligkeit, Farbe und die Effektliste.
 - **Schieberegler:** „Effekt-Tempo“ und „Effekt-Intensität“.
 - **Auswahlen:** „Palette“ und „Preset“.
+- **Status** (Diagnose): „Bereit“ oder „Update läuft“. Während die Wand eine neue Firmware installiert, trennt sie alle Verbindungen nach außen (MQTT, Hue, WLED, Wetter, Suche nach anderen Wänden) und verbindet sich nach dem Neustart von selbst wieder.
 
 ## Signale und Fortschritt (Home Assistant)
 
