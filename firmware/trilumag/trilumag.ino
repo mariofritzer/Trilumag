@@ -1077,15 +1077,113 @@ void loop() {
     float mx, my2, bw, bh; ownBox(mx, my2, bw, bh);
     v["p"] = geo["p"]; v["bw"] = roundf(bw * S); v["bh"] = roundf(bh * S); v["g"] = g; v["ip"] = WiFi.localIP().toString(); v["n"] = cfg.name;
   }
-  d["v"] = fmax(ver + 1, nowV());
+  d["v"] = (uint64_t)fmax(ver + 1, nowV());           // als ganze Zahl: Millisekunden passen nicht genau in eine Kommazahl
   save(d.as<JsonVariantConst>(), true);
 }
 // Sekunden seit Mitternacht (gemeinsame Uhr über das Internet), ohne Uhrzeit die Laufzeit
 double tsec() { if (timeOk()) { struct timeval tv; gettimeofday(&tv, nullptr); return (double)(tv.tv_sec % 86400) + tv.tv_usec / 1e6; } return millis() / 1000.0; }
 // vor jedem Bild: Mitte der eigenen Panels; ohne Raum wirkt der Effekt nur auf dieser Wand
+// ----- Raum-Komet: ein Kopf irrt von Panel zu Panel durch alle Wände -----
+// Alle Wände bauen aus demselben Raum dasselbe Netz aus Panels und rechnen denselben Weg:
+// Schritt n hängt nur vom Raum und von der Uhrzeit ab, darum sind alle im Gleichschritt, ohne etwas zu senden.
+const uint16_t MAXN = 240, BLK = 20000;
+float nu[MAXN], nh[MAXN]; uint8_t ndev[MAXN], nnb[MAXN]; uint16_t nb[MAXN][4]; int32_t lastV[MAXN];
+uint16_t nN = 0; int16_t ownMap[SLOTS];
+uint32_t gSig = 0; bool gRoom = false;
+int32_t curStep = -1; uint16_t head = 0;
+uint32_t mix(uint32_t a, uint32_t b) { uint32_t h = a * 2654435761u ^ (b + 0x9E3779B9u + (a << 6) + (a >> 2)); h ^= h >> 15; h *= 2246822519u; h ^= h >> 13; return h; }
+void link(uint16_t a, uint16_t b) {
+  if (a == b) return;
+  for (uint8_t k = 0; k < nnb[a]; k++) if (nb[a][k] == b) return;
+  if (nnb[a] < 4 && nnb[b] < 4) { nb[a][nnb[a]++] = b; nb[b][nnb[b]++] = a; }
+}
+void addNode(float u, float h, uint8_t dv) { if (nN < MAXN) { nu[nN] = u; nh[nN] = h; ndev[nN] = dv; nnb[nN] = 0; nN++; } }
+// Nachbarn innerhalb einer Wand: im Raster liegen Nachbarn 0,5 (seitlich) oder 0,866 (oben/unten) auseinander, alle anderen mindestens 1
+void linkWithin(uint16_t a0, uint16_t a1) {
+  float lim = 0.93f * S;
+  for (uint16_t i = a0; i < a1; i++) for (uint16_t j = i + 1; j < a1; j++) if (hypotf(nu[i] - nu[j], nh[i] - nh[j]) < lim) link(i, j);
+}
+void graph() {
+  nN = 0; curStep = -1; for (int i = 0; i < SLOTS; i++) ownMap[i] = -1;
+  float mx, my, bw, bh; ownBox(mx, my, bw, bh);
+  gRoom = me >= 0;
+  JsonDocument d;
+  if (gRoom && !deserializeJson(d, raw)) {
+    uint16_t first[MAXD], cnt[MAXD]; float lo[MAXD];
+    uint8_t k = 0;
+    for (JsonVariant v : d["d"].as<JsonArray>()) {
+      if (k >= nD) break;
+      const Dev& e = dev[k]; first[k] = nN; lo[k] = 1e9;
+      if (e.w < nC) for (JsonVariant q : v["p"].as<JsonArray>()) {
+        float u = U[e.w] + e.x + (q[0] | 0.0f) * S, h = e.y - (q[1] | 0.0f) * S;
+        addNode(u, h, k); lo[k] = fminf(lo[k], u);
+      }
+      cnt[k] = nN - first[k]; linkWithin(first[k], nN); k++;
+    }
+    // die Wände der Reihe nach entlang der Raumwände verbinden: rechtes Ende der einen mit dem linken der nächsten
+    uint8_t ord[MAXD], n = 0; for (uint8_t i = 0; i < k; i++) if (cnt[i]) ord[n++] = i;
+    for (uint8_t i = 0; i < n; i++) for (uint8_t j = i + 1; j < n; j++) if (lo[ord[j]] < lo[ord[i]]) { uint8_t t = ord[i]; ord[i] = ord[j]; ord[j] = t; }
+    for (uint8_t i = 0; n > 1 && i < n; i++) {
+      uint8_t A = ord[i], B = ord[(i + 1) % n]; float wrap = i + 1 == n ? Ptot : 0;
+      uint16_t a = first[A]; for (uint16_t q = first[A]; q < first[A] + cnt[A]; q++) if (nu[q] > nu[a]) a = q;
+      uint16_t b = first[B]; float best = 1e9;
+      for (uint16_t q = first[B]; q < first[B] + cnt[B]; q++) { float c = (nu[q] + wrap - lo[B]) + 0.5f * fabsf(nh[q] - nh[a]); if (c < best) { best = c; b = q; } }
+      link(a, b);
+    }
+    // eigene Panels den Knoten dieser Wand zuordnen (nächster Punkt)
+    for (int i = 0; i < SLOTS; i++) if (P[i].used && P[i].attached && cnt[me]) {
+      float vx, vy; viewXY(P[i].x * 0.5f, P[i].y * 0.866f, vx, vy);
+      float u = U[dev[me].w] + dev[me].x + (vx - mx) * S, h = dev[me].y - (vy - my) * S, bd = 1e9; int bi = -1;
+      for (uint16_t q = first[me]; q < first[me] + cnt[me]; q++) { float dd = hypotf(nu[q] - u, nh[q] - h); if (dd < bd) { bd = dd; bi = q; } }
+      if (bd < 0.4f * S) ownMap[i] = bi;
+    }
+  } else {                                               // ohne Raum: nur die eigenen Panels
+    gRoom = false;
+    for (int i = 0; i < SLOTS; i++) if (P[i].used && P[i].attached && nN < MAXN) {
+      float vx, vy; viewXY(P[i].x * 0.5f, P[i].y * 0.866f, vx, vy);
+      ownMap[i] = nN; addNode((vx - mx) * S, -(vy - my) * S, 0);
+    }
+    linkWithin(0, nN);
+  }
+  gSig = geoSig() ^ (uint32_t)ver;
+}
+// Weg bis Schritt t: jeder Schritt geht zum am längsten nicht besuchten Nachbarn
+void walkTo(int32_t t) {
+  if (!nN) return;
+  int32_t b0 = t - t % BLK;
+  if (curStep < 0 || t < curStep || curStep < b0) {      // neu: ab Blockanfang durchrechnen
+    for (uint16_t i = 0; i < nN; i++) lastV[i] = -1000000;
+    head = mix(b0, nN) % nN; curStep = b0; lastV[head] = curStep;
+  }
+  while (curStep < t) {
+    uint16_t nx = head; int32_t best = 0x7FFFFFFF; uint32_t tie = 0;
+    for (uint8_t k = 0; k < nnb[head]; k++) {
+      uint16_t c = nb[head][k]; uint32_t r = mix(curStep, c);
+      if (lastV[c] < best || (lastV[c] == best && r > tie)) { best = lastV[c]; tie = r; nx = c; }
+    }
+    if (!nnb[head]) nx = mix(curStep, 7) % nN;           // einzelnes Panel ohne Nachbarn: woanders weiter
+    head = nx; curStep++; lastV[head] = curStep;
+  }
+}
+float stepF = 0;
 void frame() {
   float bw, bh; ownBox(ocx, ocy, bw, bh);
   if (me < 0) { Lc = fmaxf(1, bw * S); }
+  if (fx.id == 24) {
+    if (gSig != (geoSig() ^ (uint32_t)ver) || (me >= 0) != gRoom) graph();
+    float rate = powf(4.0f, (fx.speed - 50) / 50.0f);
+    stepF = (float)fmod(tsec() * 4 * rate, 2000000.0);
+    walkTo((int32_t)stepF);
+  }
+}
+// Helligkeit eines eigenen Panels beim Raum-Kometen (1 = Kopf); tail = Schritte bis dunkel
+float comet(int i, float tail, bool& isHead) {
+  int16_t n = ownMap[i]; isHead = false;
+  if (n < 0 || !nN) return 0;
+  isHead = n == head;
+  float age = stepF - lastV[n];
+  if (age < 1) return 1;
+  return fmaxf(0, 1 - (age - 1) / tail);
 }
 // Stelle eines Punkts dieser Wand auf der Effekt-Strecke (cm)
 float at(float px, float py) {
@@ -1174,12 +1272,8 @@ void fxCompute() {
     for (int s = 0; s < SLOTS * 3; s++) if (s != fxHead * 3 + fxHeadE) fxA[s] = fmaxf(0, fxA[s] - dec);
   }
   // Raum-Effekte: gemeinsame Uhr und Stelle im Raum
-  double rT = 0; float rHead = 0;
-  if (fx.id >= 24) {
-    room::frame(); rT = room::tsec();
-    float S = room::S, L = fmaxf(1, room::Lc);
-    rHead = (float)fmod(rT * S * 3 * rate, (double)L);     // Komet: 3 Panels pro Sekunde bei Tempo 50
-  }
+  double rT = 0;
+  if (fx.id >= 24) { room::frame(); rT = room::tsec(); }
   int beat = (int)(fxPhase * 2);                  // Disco: zweimal pro Takt neue Farben
   bool newBeat = beat != fxBeat; fxBeat = beat;
 
@@ -1338,13 +1432,12 @@ void fxCompute() {
           }
           break;
         }
-        case 24: {                                             // Raum-Komet: wandert über alle Wände im Raum
-          float S = room::S, L = fmaxf(1, room::Lc);
-          float d = rHead - room::at(px, py); if (d < 0) d += L;
-          float tail = S * (1 + 10 * K), b = d < 0.35f * S ? 1 : d < tail ? powf(1 - d / tail, 1.6f) : 0;
-          if (fx.pal == 0) pcol(0, c, D_COLOR); else pcol(room::at(px, py) / (S * 8), c, D_HUE);
-          mul(c, 0.02f + 0.98f * b);
-          if (d < 0.35f * S) c[3] = fminf(255, c[3] + 120);
+        case 24: {                                             // Raum-Komet: irrt wie der Komet durch alle Wände im Raum
+          float ik = 1 - K, tail = 4 / (0.1f + 2.4f * ik * ik);   // Intensität = Schweiflänge wie beim Komet
+          bool hd; float b = room::comet(i, tail, hd);
+          pcol((float)fmod(room::stepF * 0.0075, 1.0), c, D_COLOR);
+          mul(c, 0.02f + 0.98f * powf(b, 1.6f));
+          if (hd) c[3] = fminf(255, c[3] + 120);
           break;
         }
         case 25: {                                             // Raum-Regenbogen: Farben ziehen durch den ganzen Raum

@@ -1018,7 +1018,7 @@ function pvPoint(id,i,ph,dt,s){const u=i/(PVN-1),K=st.fx.inten/255,dep=Math.abs(
       const c=st.fx.pal!=='standard'?mul(pvCol(.1,'c'),.12):[2,6,34,0];return[c[0]+170*f,c[1]+170*f,c[2]+255*f,c[3]+255*f];}
     case'kerzen':{A[i]+=(R()-A[i])*Math.min(1,dt*6);B[i]+=(A[i]-B[i])*Math.min(1,dt*3);const h=1-(.15+.5*K)*(1-B[i]);return st.fx.pal==='standard'?[255*h,105*h*h,12*h,70*h*h]:mul(pvCol(B[i]*.3,'f'),h);}
     case'disco':{if(s.nb&&R()<.3+.7*K)A[i]=R();return pvCol(A[i],'h');}
-    case'komet':{if(i===0){s.st=(s.st||0)+dt*4;while(s.st>=1){s.st--;s.hd=((s.hd||0)+1)%PVN;A[s.hd]=1;}}if(i!==s.hd)A[i]=Math.max(0,A[i]-dt*(.1+2.4*(1-K)**2));const c=mul(pvCol(ph*.03,'c'),.02+.98*Math.pow(A[i],1.6));if(i===s.hd)c[3]=Math.min(255,c[3]+120);return c;}
+    case'raum-komet':case'komet':{if(i===0){s.st=(s.st||0)+dt*4;while(s.st>=1){s.st--;s.hd=((s.hd||0)+1)%PVN;A[s.hd]=1;}}if(i!==s.hd)A[i]=Math.max(0,A[i]-dt*(.1+2.4*(1-K)**2));const c=mul(pvCol(ph*.03,'c'),.02+.98*Math.pow(A[i],1.6));if(i===s.hd)c[3]=Math.min(255,c[3]+120);return c;}
     case'lava':{const sv=.5+.5*Math.sin(u*4+ph*.35+1.5*Math.sin(-ph*.25));return mul(pvCol(sv*.5+ph*.02,'f'),.2+.8*Math.pow(sv,1+2*K));}
     case'verlauf':{const t=u*(.6+1.4*K)+(st.fx.speed>1?ph*.02:0);if(st.fx.pal!=='standard')return pvCol(t*.5,'c');
       let m=t-Math.floor(t);m=m<.5?m*2:2-m*2;m=m*m*(3-2*m);const a=[st.fx.r,st.fx.g,st.fx.b,st.fx.w],c2=st.fx.c2||{r:0,g:80,b:255,w:0},b=[c2.r,c2.g,c2.b,c2.w];return a.map((v,k)=>v+(b[k]-v)*m);}
@@ -1033,7 +1033,6 @@ function pvPoint(id,i,ph,dt,s){const u=i/(PVN-1),K=st.fx.inten/255,dep=Math.abs(
     case'wetter':{const w=st.wx||{},tc=tempCol(w.temp??15),br=.55+.15*Math.sin(ph*.5-u*2),c=tc.map(v=>v*br);
       if(w.kind){A[i]=Math.max(0,A[i]-dt*2.5);if(R()<dt*(.2+1.2*K))A[i]=1;const a=A[i]*A[i];
         if(w.kind===1){c[0]*=1-a;c[1]=c[1]*(1-a)+90*a;c[2]=c[2]*(1-a)+255*a;}else{c[0]+=120*a;c[1]+=120*a;c[2]+=140*a;c[3]+=220*a;}}return c;}
-    case'raum-komet':{const h=(ph*.45)%1.5,d=h-u,b=d<0?0:d<.08?1:Math.pow(Math.max(0,1-d/(.15+.8*K)),1.6);return mul(st.fx.pal==='standard'?pvCol(0,'c'):pvCol(u*.5,'h'),.02+.98*b);}
     case'raum-regenbogen':return pvCol(u*(.3+1.2*K)-ph*.15,'h');
     case'raum-welle':{const b=.5+.5*Math.sin(6.2832*(u*(.6+1.6*K)-ph*.25));return mul(pvCol(u*.2,'c'),.05+.95*b*b);}
     default:return[st.fx.r,st.fx.g,st.fx.b,st.fx.w];}}
