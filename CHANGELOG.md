@@ -2,6 +2,12 @@
 
 Die Versionsnummer im Webinstaller und in der App setzt sich aus der Version in der Firmware und der Nummer des automatischen Builds zusammen, zum Beispiel **0.5.11** = Version 0.5, Build 11. Bis Build 9 hat der Build die Nummer immer als 0.2.x ausgegeben, die tatsächlichen Stände stehen deshalb unten mit beiden Nummern.
 
+## 0.7.61 · 7. Oktober 2026
+
+**Android-App 1.0.1**
+- Neuer Knopf „Nach Update suchen“ ganz unten neben der App-Version: sagt „Die App ist aktuell“ oder zeigt das Update an.
+- Die App sieht bei jedem Öffnen nach einer neuen Version (auch aus dem Hintergrund), höchstens einmal pro Stunde.
+
 ## 0.7.57 · 7. Oktober 2026
 
 **Android-App 1.0**
