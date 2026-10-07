@@ -28,6 +28,7 @@
    - Partition Scheme: "Minimal SPIFFS (1.9MB APP with OTA)", sonst passen Online-Updates nicht
 */
 
+#include <sys/time.h>
 #include <WiFi.h>
 #include <WebServer.h>
 #include <ESPmDNS.h>
@@ -746,6 +747,9 @@ const FxDef FX[] = {
   {"feuerwerk",   "Feuerwerk",       false},
   {"matrix",      "Matrix",          false},
   {"wetter",      "Wetter",          false},
+  {"raum-komet",  "Raum-Komet",      true},     // laufen über alle Wände im Raum
+  {"raum-regenbogen", "Raum-Regenbogen", false},
+  {"raum-welle",  "Raum-Welle",      true},
 };
 const uint8_t FX_COUNT = sizeof(FX) / sizeof(FX[0]);
 
@@ -768,9 +772,15 @@ const uint8_t PAL_COUNT = sizeof(PALS) / sizeof(PALS[0]);
 struct CPal { bool used; String name; uint8_t n; uint32_t c[6]; };
 const uint8_t CPAL_MAX = 4, PAL_ALL = PAL_COUNT + CPAL_MAX;
 CPal cpal[CPAL_MAX];
-bool palValid(uint8_t k) { return k < PAL_COUNT || (k < PAL_ALL && cpal[k - PAL_COUNT].used); }
-String palId(uint8_t k) { return k < PAL_COUNT ? String(PALS[k].id) : "eigen" + String(k - PAL_COUNT + 1); }
-String palName(uint8_t k) { return k < PAL_COUNT ? String(PALS[k].name) : palValid(k) ? cpal[k - PAL_COUNT].name : String("Standard"); }
+// Mitgenommene Palette: kommt mit den Farben von einer anderen Wand (Gleichtakt, Raum-Effekt), ohne die eigenen zu ändern
+const uint8_t PAL_X = PAL_ALL;
+CPal xpal;
+bool palValid(uint8_t k) { return k < PAL_COUNT || (k < PAL_ALL && cpal[k - PAL_COUNT].used) || (k == PAL_X && xpal.used); }
+String palId(uint8_t k) { return k < PAL_COUNT ? String(PALS[k].id) : k == PAL_X ? String("mitgenommen") : "eigen" + String(k - PAL_COUNT + 1); }
+String palName(uint8_t k) { return k < PAL_COUNT ? String(PALS[k].name) : !palValid(k) ? String("Standard") : k == PAL_X ? xpal.name : cpal[k - PAL_COUNT].name; }
+const CPal* palCustom(uint8_t k) { return k == PAL_X ? (xpal.used ? &xpal : nullptr) : (k >= PAL_COUNT && k < PAL_ALL && cpal[k - PAL_COUNT].used) ? &cpal[k - PAL_COUNT] : nullptr; }
+// Farben einer anderen Wand übernehmen: gibt es dieselben schon als eigene Palette, die nehmen, sonst als mitgenommene
+void palAdopt(uint8_t n, const uint32_t* c, const String& name);
 void cpalSave() {
   JsonDocument d; JsonArray a = d.to<JsonArray>();
   for (uint8_t i = 0; i < CPAL_MAX; i++) {
@@ -780,7 +790,27 @@ void cpalSave() {
   }
   String s; serializeJson(d, s); prefs.putString("cpal", s);
 }
+void palAdopt(uint8_t n, const uint32_t* c, const String& name) {
+  if (n < 2) return; if (n > 6) n = 6;
+  for (uint8_t i = 0; i < CPAL_MAX; i++) if (cpal[i].used && cpal[i].n == n && !memcmp(cpal[i].c, c, n * 4)) { fx.pal = PAL_COUNT + i; return; }
+  if (!(xpal.used && xpal.n == n && !memcmp(xpal.c, c, n * 4) && xpal.name == name)) {
+    xpal.used = true; xpal.n = n; memcpy(xpal.c, c, n * 4); xpal.name = name.length() ? name.substring(0, 24) : String("Mitgenommen");
+    JsonDocument d; d["n"] = xpal.name; JsonArray a = d["c"].to<JsonArray>(); for (uint8_t k = 0; k < n; k++) a.add(c[k]);
+    String s; serializeJson(d, s); prefs.putString("xpal", s);
+  }
+  fx.pal = PAL_X;
+}
+// Farben der aktuellen Palette als Liste (nur eigene und mitgenommene), damit andere Wände sie übernehmen können
+bool palCarry(JsonObject o) {
+  const CPal* q = palCustom(fx.pal); if (!q) return false;
+  JsonArray a = o["palColors"].to<JsonArray>(); for (uint8_t k = 0; k < q->n; k++) a.add(q->c[k]);
+  o["palName"] = q->name; return true;
+}
 void cpalLoad() {
+  { JsonDocument d; String x = prefs.getString("xpal", "");
+    if (x.length() && !deserializeJson(d, x)) { xpal.n = 0; xpal.name = (const char*)(d["n"] | "Mitgenommen");
+      for (JsonVariant v : d["c"].as<JsonArray>()) if (xpal.n < 6) xpal.c[xpal.n++] = v.as<uint32_t>();
+      xpal.used = xpal.n >= 2; } }
   String s = prefs.getString("cpal", "");
   if (!s.length()) {                                   // zum Start eine Vorlage: Rot, Gold, Weiß
     cpal[0].used = true; cpal[0].name = "Rot-Gold-Weiß"; cpal[0].n = 3; cpal[0].c[0] = 0xFF0000; cpal[0].c[1] = 0xFFB000; cpal[0].c[2] = 0xFFFFFF;
@@ -877,7 +907,7 @@ void pcol(float t, float* c, uint8_t def) {   // def: PalDefault (als uint8_t, w
     n = 3;
   } else {
     const uint32_t* cs;
-    if (fx.pal >= PAL_COUNT && palValid(fx.pal)) { const CPal& q = cpal[fx.pal - PAL_COUNT]; n = q.n; cs = q.c; }
+    if (const CPal* q = palCustom(fx.pal)) { n = q->n; cs = q->c; }
     else { const PalDef& p = PALS[fx.pal < PAL_COUNT ? fx.pal : 1]; n = p.n; cs = p.c; }
     for (int k = 0; k < n; k++) {
       tmp[k][0] = (cs[k] >> 16) & 0xFF; tmp[k][1] = (cs[k] >> 8) & 0xFF; tmp[k][2] = cs[k] & 0xFF; tmp[k][3] = 0;
@@ -900,6 +930,170 @@ void tempColor(float t, float* c) {
   c[0] = 255; c[1] = 30; c[2] = 0; c[3] = 0;
 }
 void mul(float* c, float k) { for (int i = 0; i < 4; i++) c[i] *= k; }
+
+
+// ---------- Raum: mehrere Wände im Grundriss ----------
+// Der Grundriss (Ecken von oben, in cm, im Uhrzeigersinn) und wo jede Wand hängt, liegt auf allen Wänden gleich.
+// Raum-Effekte rechnen mit der Stelle im Raum (abgewickelt entlang der Raumwände) und der gemeinsamen Uhrzeit:
+// so laufen sie über alle Wände, ohne dass dafür Bilder verschickt werden.
+const char* apiCall(const char* path, JsonDocument& d);
+namespace room {
+const uint8_t MAXC = 16, MAXD = 12;
+struct Dev { String id, name, ip; uint8_t w = 0; float x = 0, y = 0, bw = 0, bh = 0; uint32_t g = 0; };
+float cx[MAXC], cy[MAXC], U[MAXC + 1]; uint8_t nC = 0;
+Dev dev[MAXD]; uint8_t nD = 0;
+float H = 250, S = 23, Ptot = 0;
+double ver = 0;
+String raw;                         // der Grundriss so, wie ihn die App geschickt hat
+int me = -1;                        // diese Wand im Raum (-1: nicht aufgestellt)
+// Abbildung "Stelle im Raum" → "Effekt-Strecke": lange Lücken zwischen den Wänden werden kurz
+struct Seg { float u0, c0, len, k; };
+Seg seg[2 * MAXD + 2]; uint8_t nS = 0; float Lc = 0, uStart = 0;
+float ocx = 0, ocy = 0;             // Mitte der eigenen Panels (Wandansicht), pro Bild
+
+// eigene Panels: Mitte der Mittelpunkte und Größe (Seitenlänge 1), wie die Wand hängt
+void ownBox(float& mx, float& my, float& bw, float& bh) {
+  float x0 = 1e9, x1 = -1e9, y0 = 1e9, y1 = -1e9;
+  for (int i = 0; i < SLOTS; i++) if (P[i].used && P[i].attached) {
+    float vx, vy; viewXY(P[i].x * 0.5f, P[i].y * 0.866f, vx, vy);
+    x0 = fminf(x0, vx); x1 = fmaxf(x1, vx); y0 = fminf(y0, vy); y1 = fmaxf(y1, vy);
+  }
+  if (x0 > x1) { mx = my = 0; bw = bh = 1; return; }
+  mx = (x0 + x1) / 2; my = (y0 + y1) / 2; bw = x1 - x0 + 1; bh = y1 - y0 + 1.16f;
+}
+uint32_t geoSig() {
+  uint32_t h = 2166136261u ^ cfg.viewRot ^ (cfg.viewMir << 9);
+  for (int i = 0; i < SLOTS; i++) if (P[i].used && P[i].attached) h = (h ^ (uint32_t)(P[i].x * 131 + P[i].y * 7 + P[i].rot * 3 + P[i].edges)) * 16777619u;
+  return h ? h : 1;
+}
+// Geometrie dieser Wand für die App: Panels mit Mitte, Winkel der Spitze und aktueller Farbe
+String geoJson() {
+  JsonDocument d; float mx, my, bw, bh; ownBox(mx, my, bw, bh);
+  d["id"] = hex(P[0].chip); d["n"] = cfg.name; d["ip"] = WiFi.localIP().toString(); d["ver"] = FW_VERSION; d["g"] = geoSig();
+  d["bw"] = bw; d["bh"] = bh;
+  JsonArray a = d["p"].to<JsonArray>();
+  for (int i = 0; i < SLOTS; i++) if (P[i].used && P[i].attached) {
+    float vx, vy; viewXY(P[i].x * 0.5f, P[i].y * 0.866f, vx, vy);
+    int ang = (isUp(P[i].x, P[i].y) ? 270 : 90) + cfg.viewRot; if (cfg.viewMir) ang = 180 - ang; ang = ((ang % 360) + 360) % 360;
+    const uint8_t* c = CUR[i][0]; char b[8];
+    auto cl = [](int v) { return v > 255 ? 255 : v; };
+    snprintf(b, sizeof b, "#%02X%02X%02X", cl(c[0] + c[3]), cl(c[1] + c[3]), cl(c[2] + c[3]));
+    JsonArray q = a.add<JsonArray>(); q.add(roundf((vx - mx) * 100) / 100); q.add(roundf((vy - my) * 100) / 100); q.add(ang); q.add(b);
+  }
+  String s; serializeJson(d, s); return s;
+}
+void build() {
+  // Wandlängen und wo jede Raumwand in der Abwicklung beginnt
+  Ptot = 0;
+  for (uint8_t i = 0; i < nC; i++) { U[i] = Ptot; uint8_t j = (i + 1) % nC; Ptot += hypotf(cx[j] - cx[i], cy[j] - cy[i]); }
+  U[nC] = Ptot;
+  // belegte Stücke, sortiert und zusammengefasst
+  float a[MAXD], b[MAXD]; uint8_t n = 0;
+  for (uint8_t i = 0; i < nD; i++) if (dev[i].w < nC) { a[n] = U[dev[i].w] + dev[i].x - dev[i].bw / 2; b[n] = a[n] + fmaxf(1, dev[i].bw); n++; }
+  for (uint8_t i = 0; i < n; i++) for (uint8_t j = i + 1; j < n; j++) if (a[j] < a[i]) { float t = a[i]; a[i] = a[j]; a[j] = t; t = b[i]; b[i] = b[j]; b[j] = t; }
+  uint8_t m = 0; for (uint8_t i = 0; i < n; i++) { if (m && a[i] <= b[m - 1]) b[m - 1] = fmaxf(b[m - 1], b[i]); else { a[m] = a[i]; b[m] = b[i]; m++; } }
+  nS = 0; Lc = 0;
+  if (!m || Ptot <= 0) return;
+  uStart = a[0];
+  float G = 1.5f * S;                                   // längere Lücken werden so kurz wie 1,5 Panels
+  for (uint8_t i = 0; i < m; i++) {
+    seg[nS++] = {a[i], Lc, b[i] - a[i], 1}; Lc += b[i] - a[i];
+    float nx = i + 1 < m ? a[i + 1] : a[0] + Ptot, g = nx - b[i];
+    if (g > 0) { float cg = fminf(g, G); seg[nS++] = {b[i], Lc, g, cg / g}; Lc += cg; }
+  }
+}
+// Stelle im Raum (cm entlang der Wände) → Stelle auf der Effekt-Strecke (0 … Lc)
+float cu(float u) {
+  if (!nS) return u;
+  while (u < uStart) u += Ptot; while (u >= uStart + Ptot) u -= Ptot;
+  for (uint8_t i = 0; i < nS; i++) if (u < seg[i].u0 + seg[i].len || i == nS - 1) return seg[i].c0 + fminf(u - seg[i].u0, seg[i].len) * seg[i].k;
+  return 0;
+}
+bool parse(const String& js) {
+  JsonDocument d; if (deserializeJson(d, js)) return false;
+  nC = 0; for (JsonVariant c : d["c"].as<JsonArray>()) if (nC < MAXC) { cx[nC] = c[0] | 0.0f; cy[nC] = c[1] | 0.0f; nC++; }
+  H = d["h"] | 250.0f; S = constrain(d["s"] | 23.0f, 5.0f, 100.0f); ver = d["v"] | 0.0;
+  nD = 0; me = -1; String my = hex(P[0].chip);
+  for (JsonVariant v : d["d"].as<JsonArray>()) {
+    if (nD >= MAXD) break;
+    Dev& e = dev[nD]; e = Dev();
+    e.id = (const char*)(v["id"] | ""); e.name = (const char*)(v["n"] | ""); e.ip = (const char*)(v["ip"] | "");
+    e.w = v["w"] | 0; e.x = v["x"] | 0.0f; e.y = v["y"] | 0.0f; e.bw = v["bw"] | 0.0f; e.bh = v["bh"] | 0.0f; e.g = v["g"] | 0u;
+    if (e.id == my) me = nD;
+    nD++;
+  }
+  if (nC < 3) { nC = 0; nD = 0; me = -1; }
+  build();
+  return true;
+}
+void load() { size_t n = prefs.getBytesLength("room"); if (n && n < 16000) { char* b = (char*)malloc(n + 1); if (b) { prefs.getBytes("room", b, n); b[n] = 0; raw = b; free(b); parse(raw); } } }
+void store() { prefs.putBytes("room", raw.c_str(), raw.length()); }
+
+// an die anderen Wände im Raum schicken (der Reihe nach, im Hintergrund)
+String qPath, qBody; volatile bool sending = false, again = false;
+void sendTask(void*) {
+  do {
+    again = false;
+    String path = qPath, body = qBody; String ips[MAXD]; uint8_t n = 0;
+    for (uint8_t i = 0; i < nD; i++) if ((int)i != me && dev[i].ip.length() > 6) ips[n++] = dev[i].ip;
+    for (uint8_t i = 0; i < n && !netQuiet && !otaBusy; i++) {
+      HTTPClient h; h.setTimeout(2500);
+      if (h.begin("http://" + ips[i] + path)) { h.addHeader("Content-Type", "application/json"); h.POST(body); }
+      h.end();
+    }
+  } while (again);
+  sending = false;
+  vTaskDelete(nullptr);
+}
+void fanout(const char* path, const String& body) {
+  qPath = path; qBody = body;
+  if (sending) { again = true; return; }
+  sending = true;
+  if (xTaskCreate(sendTask, "raum", 6144, nullptr, 1, nullptr) != pdPASS) sending = false;
+}
+double nowV() { if (timeOk()) { struct timeval tv; gettimeofday(&tv, nullptr); return (double)tv.tv_sec * 1000 + tv.tv_usec / 1000; } return millis(); }
+// neuen Grundriss übernehmen (nur, wenn er neuer ist) und auf Wunsch an die anderen weitergeben
+const char* save(JsonVariantConst lay, bool fwd) {
+  double v = lay["v"] | 0.0;
+  if (v < ver) return nullptr;                          // älterer Stand: ignorieren
+  String js; serializeJson(lay, js);
+  if (js.length() > 15000) return "Raum zu groß";
+  if (!parse(js)) return "Raum unlesbar";
+  raw = js; store();
+  if (fwd) { JsonDocument f; f["action"] = "save"; f["fwd"] = false; f["layout"] = lay; String b; serializeJson(f, b); fanout("/api/room", b); }
+  return nullptr;
+}
+// eigene Panels geändert (abgeklipst, gedreht …): den eigenen Eintrag im Raum nachziehen und weitergeben
+void loop() {
+  static uint32_t last = 0;
+  if (me < 0 || millis() - last < 5000) return;
+  last = millis();
+  uint32_t g = geoSig(); if (dev[me].g == g) return;
+  JsonDocument d; if (deserializeJson(d, raw)) return;
+  String my = hex(P[0].chip);
+  for (JsonVariant v : d["d"].as<JsonArray>()) if (my == (const char*)(v["id"] | "")) {
+    JsonDocument geo; deserializeJson(geo, geoJson());
+    float mx, my2, bw, bh; ownBox(mx, my2, bw, bh);
+    v["p"] = geo["p"]; v["bw"] = roundf(bw * S); v["bh"] = roundf(bh * S); v["g"] = g; v["ip"] = WiFi.localIP().toString(); v["n"] = cfg.name;
+  }
+  d["v"] = fmax(ver + 1, nowV());
+  save(d.as<JsonVariantConst>(), true);
+}
+// Sekunden seit Mitternacht (gemeinsame Uhr über das Internet), ohne Uhrzeit die Laufzeit
+double tsec() { if (timeOk()) { struct timeval tv; gettimeofday(&tv, nullptr); return (double)(tv.tv_sec % 86400) + tv.tv_usec / 1e6; } return millis() / 1000.0; }
+// vor jedem Bild: Mitte der eigenen Panels; ohne Raum wirkt der Effekt nur auf dieser Wand
+void frame() {
+  float bw, bh; ownBox(ocx, ocy, bw, bh);
+  if (me < 0) { Lc = fmaxf(1, bw * S); }
+}
+// Stelle eines Punkts dieser Wand auf der Effekt-Strecke (cm)
+float at(float px, float py) {
+  float vx, vy; viewXY(px, py, vx, vy);
+  if (me < 0) return (vx - ocx) * S + Lc / 2;
+  return cu(U[dev[me].w] + dev[me].x + (vx - ocx) * S);
+}
+String json() { return "{\"me\":\"" + hex(P[0].chip) + "\",\"layout\":" + (raw.length() ? raw : String("null")) + "}"; }
+}  // namespace room
 
 void fxReset() {
   for (int i = 0; i < SLOTS * 3; i++) { fxA[i] = frand(); fxB[i] = frand(); fxT[i] = frand(); }
@@ -977,6 +1171,13 @@ void fxCompute() {
     float ik = 1 - fx.inten / 255.0f;                         // Intensität = Schweiflänge: 0 kurz … 255 sehr lang
     float dec = dt * rate * (0.1f + 2.4f * ik * ik);
     for (int s = 0; s < SLOTS * 3; s++) if (s != fxHead * 3 + fxHeadE) fxA[s] = fmaxf(0, fxA[s] - dec);
+  }
+  // Raum-Effekte: gemeinsame Uhr und Stelle im Raum
+  double rT = 0; float rHead = 0;
+  if (fx.id >= 24) {
+    room::frame(); rT = room::tsec();
+    float S = room::S, L = fmaxf(1, room::Lc);
+    rHead = (float)fmod(rT * S * 3 * rate, (double)L);     // Komet: 3 Panels pro Sekunde bei Tempo 50
   }
   int beat = (int)(fxPhase * 2);                  // Disco: zweimal pro Takt neue Farben
   bool newBeat = beat != fxBeat; fxBeat = beat;
@@ -1135,6 +1336,24 @@ void fxCompute() {
             else { c[0] += 120 * a; c[1] += 120 * a; c[2] += 140 * a; c[3] += 220 * a; }
           }
           break;
+        }
+        case 24: {                                             // Raum-Komet: wandert über alle Wände im Raum
+          float S = room::S, L = fmaxf(1, room::Lc);
+          float d = rHead - room::at(px, py); if (d < 0) d += L;
+          float tail = S * (1 + 10 * K), b = d < 0.35f * S ? 1 : d < tail ? powf(1 - d / tail, 1.6f) : 0;
+          if (fx.pal == 0) pcol(0, c, D_COLOR); else pcol(room::at(px, py) / (S * 8), c, D_HUE);
+          mul(c, 0.02f + 0.98f * b);
+          if (d < 0.35f * S) c[3] = fminf(255, c[3] + 120);
+          break;
+        }
+        case 25: {                                             // Raum-Regenbogen: Farben ziehen durch den ganzen Raum
+          float W = room::S * (3 + 25 * (1 - K));
+          pcol(room::at(px, py) / W - (float)fmod(rT * rate * 0.15, 1000.0), c, D_HUE); break;
+        }
+        case 26: {                                             // Raum-Welle: helle Wellen laufen durch den Raum
+          float W = room::S * (4 + 20 * (1 - K)), uu = room::at(px, py);
+          float b = 0.5f + 0.5f * sinf(6.2831853f * (uu / W - (float)fmod(rT * rate * 0.25, 1000.0)));
+          pcol(uu / (W * 4), c, D_COLOR); mul(c, 0.05f + 0.95f * b * b); break;
         }
       }
       float k = p.on ? masterK() / 255.0f : 0;
@@ -1552,7 +1771,7 @@ void fxSave() {
 void fxLoad() {
   cpalLoad();
   FxCfg f;
-  if (prefs.getBytes("fx2", &f, sizeof f) == sizeof f && f.id < FX_COUNT && f.pal < PAL_ALL) fx = f;
+  if (prefs.getBytes("fx2", &f, sizeof f) == sizeof f && f.id < FX_COUNT && f.pal <= PAL_X) { fx = f; if (!palValid(fx.pal)) fx.pal = 0; }
   master = prefs.getUChar("master", 255); masterOn = prefs.getBool("mOn", true);
   fxDir = prefs.getUShort("fxDir", 0) % 360; fxSpin = prefs.getUChar("fxSpin", 0) % 3;
   prefs.getBytes("fxC2", fxC2, 4);
@@ -1570,7 +1789,11 @@ void applyFx(JsonVariantConst cmd) {
   if (cmd["direction"].is<int>()) fxDir = ((cmd["direction"].as<int>() % 360) + 360) % 360;
   if (cmd["spin"].is<int>()) { fxSpin = constrain(cmd["spin"].as<int>(), 0, 2); if (!fxSpin) fxSpinAng = 0; }
   if (cmd["brightness"].is<int>()) { master = constrain(cmd["brightness"].as<int>(), 1, 255); resendAll(); }
-  if (cmd["palette"].is<const char*>()) { int p = palFind(cmd["palette"].as<const char*>()); if (p >= 0) fx.pal = p; }
+  if (cmd["palColors"].is<JsonArrayConst>()) {           // Farben von einer anderen Wand: genau diese verwenden
+    uint32_t c[6]; uint8_t n = 0;
+    for (JsonVariantConst v : cmd["palColors"].as<JsonArrayConst>()) if (n < 6) c[n++] = v.as<uint32_t>();
+    palAdopt(n, c, cmd["palName"] | "");
+  } else if (cmd["palette"].is<const char*>()) { int p = palFind(cmd["palette"].as<const char*>()); if (p >= 0) fx.pal = p; }
   else if (cmd["palette"].is<int>()) { int p = cmd["palette"].as<int>(); if (p >= 0 && p < PAL_ALL && palValid(p)) fx.pal = p; }
   JsonVariantConst c = cmd["color"];
   if (!c.isNull()) { fx.r = c["r"] | fx.r; fx.g = c["g"] | fx.g; fx.b = c["b"] | fx.b; fx.w = c["w"] | fx.w; }
@@ -1945,7 +2168,7 @@ void applyAll(JsonVariantConst cmd) {
   if (!strcmp(st, "ON") && !masterOn) { masterOn = true; wake = true; }
   if (*st && !sleepFiring) sleepCancel();          // Ein/Aus von Hand beendet den Sleep-Timer
   if (cmd["brightness"].is<int>()) { master = constrain(cmd["brightness"].as<int>(), 1, 255); wake = true; }
-  if (!cmd["effect"].isNull() || !cmd["speed"].isNull() || !cmd["palette"].isNull() || !cmd["intensity"].isNull() || !cmd["direction"].isNull() || !cmd["spin"].isNull() || !cmd["color2"].isNull()) {
+  if (!cmd["effect"].isNull() || !cmd["speed"].isNull() || !cmd["palette"].isNull() || !cmd["palColors"].isNull() || !cmd["intensity"].isNull() || !cmd["direction"].isNull() || !cmd["spin"].isNull() || !cmd["color2"].isNull()) {
     JsonDocument d; d.set(cmd); d.remove("color"); d.remove("brightness");
     applyFx(d.as<JsonVariantConst>());
   }
@@ -2262,6 +2485,10 @@ String stateJson(bool meta) {
       JsonObject o = cp.add<JsonObject>(); o["id"] = palId(PAL_COUNT + i); o["name"] = cpal[i].name; o["slot"] = i;
       JsonArray c = o["c"].to<JsonArray>(); for (uint8_t k = 0; k < cpal[i].n; k++) { char b[8]; snprintf(b, sizeof b, "#%06X", (unsigned)cpal[i].c[k]); c.add(b); }
     } }
+  if (fx.pal == PAL_X && xpal.used) {
+    JsonObject o = d["xpal"].to<JsonObject>(); o["id"] = palId(PAL_X); o["name"] = xpal.name;
+    JsonArray c = o["c"].to<JsonArray>(); for (uint8_t k = 0; k < xpal.n; k++) { char b[8]; snprintf(b, sizeof b, "#%06X", (unsigned)xpal.c[k]); c.add(b); }
+  }
   d["pfw"] = PANEL_FW_VERSION; d["pAuto"] = cfg.panelAuto;
   { JsonArray fv = d["favs"].to<JsonArray>(); for (uint8_t k = 0; k < FX_COUNT; k++) if (fxFavs & (1u << k)) fv.add(FX[k].id); }
   wallsync::json(d["sync"].to<JsonObject>());
@@ -2983,7 +3210,7 @@ const char* restoreBackup(JsonDocument& d) {
   if (!fo.isNull()) {
     f.id = fo["id"] | 0; f.speed = fo["speed"] | 50; f.pal = fo["pal"] | 0; f.inten = fo["inten"] | 128;
     f.r = fo["r"] | 255; f.g = fo["g"] | 120; f.b = fo["b"] | 30; f.w = fo["w"] | 0;
-    if (f.id < FX_COUNT && f.pal < PAL_ALL) prefs.putBytes("fx2", &f, sizeof f);
+    if (f.id < FX_COUNT && f.pal <= PAL_X) prefs.putBytes("fx2", &f, sizeof f);
   }
   prefs.putUChar("master", d["master"] | 255); prefs.putBool("mOn", d["on"] | true);
   for (uint8_t k = 0; k < PRESET_MAX; k++) prefs.remove(presetKey(k).c_str());
@@ -3219,7 +3446,9 @@ const uint16_t PORT = 21330;
 struct __attribute__((packed)) Pkt {
   char magic[4]; uint8_t ver, group, on, master, fx, speed, inten, pal, r, g, b, w, spin;
   uint16_t dir; uint32_t chip, seq; float phase; char name[24];
+  uint8_t pn; uint32_t pc[6]; char pname[24];         // ab Version 3: Farben einer eigenen Palette, damit alle Wände dieselben zeigen
 };
+uint32_t palSig() { const CPal* q = palCustom(fx.pal); uint32_t h = 0; if (q) for (uint8_t k = 0; k < q->n; k++) h = h * 16777619u ^ q->c[k]; return h; }
 struct Peer { uint32_t chip = 0, seen = 0; String name, ip; uint8_t group = 0; };
 const uint8_t MAXP = 8;
 Peer peers[MAXP];
@@ -3229,7 +3458,7 @@ uint32_t seq = 0, lastSig = 0, lastBeat = 0;
 
 uint32_t sig() {
   return ((uint32_t)masterOn << 31) ^ ((uint32_t)master << 23) ^ ((uint32_t)fx.id << 17) ^ ((uint32_t)fx.speed << 10) ^ ((uint32_t)fx.inten * 2654435761u) ^
-         ((uint32_t)fx.pal << 3) ^ ((uint32_t)fx.r * 40503u + fx.g * 52711u + fx.b * 17u + fx.w * 7u) ^ ((uint32_t)fxDir * 977u) ^ ((uint32_t)fxSpin << 29);
+         ((uint32_t)fx.pal << 3) ^ ((uint32_t)fx.r * 40503u + fx.g * 52711u + fx.b * 17u + fx.w * 7u) ^ ((uint32_t)fxDir * 977u) ^ ((uint32_t)fxSpin << 29) ^ palSig();
 }
 bool timeMaster() {                                  // kleinste Chip-ID der Gruppe gibt den Takt vor
   for (const Peer& p : peers) if (p.chip && millis() - p.seen < 5000 && p.group == cfg.syncGroup && p.chip < P[0].chip) return false;
@@ -3238,7 +3467,8 @@ bool timeMaster() {                                  // kleinste Chip-ID der Gru
 void send() {
   if (!started) return;
   Pkt k; memset(&k, 0, sizeof k);
-  memcpy(k.magic, "TLSY", 4); k.ver = 2; k.dir = fxDir; k.spin = fxSpin; k.group = cfg.syncGroup;
+  memcpy(k.magic, "TLSY", 4); k.ver = 3;
+  if (const CPal* q = palCustom(fx.pal)) { k.pn = q->n; memcpy(k.pc, q->c, q->n * 4); strncpy(k.pname, q->name.c_str(), sizeof k.pname - 1); } k.dir = fxDir; k.spin = fxSpin; k.group = cfg.syncGroup;
   k.on = masterOn; k.master = master; k.fx = fx.id; k.speed = fx.speed; k.inten = fx.inten; k.pal = fx.pal;
   k.r = fx.r; k.g = fx.g; k.b = fx.b; k.w = fx.w; k.chip = P[0].chip; k.seq = seq; k.phase = fxPhase;
   strncpy(k.name, cfg.name.c_str(), sizeof k.name - 1);
@@ -3253,8 +3483,13 @@ void begin() {
 }
 void stop() { if (started) { udp.stop(); started = false; } for (Peer& p : peers) p = Peer(); }
 
+bool palDiffers(const Pkt& k) {
+  const CPal* q = palCustom(fx.pal);
+  if (k.pn < 2) return q != nullptr || k.pal != fx.pal;      // eingebaute Palette: Nummer vergleichen
+  return !q || q->n != k.pn || memcmp(q->c, k.pc, k.pn * 4);
+}
 bool differs(const Pkt& k) {
-  return k.on != masterOn || k.master != master || k.fx != fx.id || k.speed != fx.speed || k.inten != fx.inten || k.pal != fx.pal ||
+  return palDiffers(k) || k.on != masterOn || k.master != master || k.fx != fx.id || k.speed != fx.speed || k.inten != fx.inten ||
          k.r != fx.r || k.g != fx.g || k.b != fx.b || k.w != fx.w || k.dir != fxDir || k.spin != fxSpin;
 }
 // Zustand einer anderen Wand übernehmen, ohne ihn selbst wieder zu senden
@@ -3262,7 +3497,9 @@ void adopt(const Pkt& k) {
   applying = true;
   bool look = k.on != masterOn || k.master != master;
   masterOn = k.on; master = k.master;
-  fx.speed = k.speed; fx.inten = k.inten; fx.pal = palValid(k.pal) ? k.pal : 0; fx.r = k.r; fx.g = k.g; fx.b = k.b; fx.w = k.w;
+  fx.speed = k.speed; fx.inten = k.inten; if (k.pn >= 2) { char nm[25]; memcpy(nm, k.pname, 24); nm[24] = 0; palAdopt(k.pn, k.pc, nm); }
+  else fx.pal = k.pal < PAL_COUNT ? k.pal : 0;
+  fx.r = k.r; fx.g = k.g; fx.b = k.b; fx.w = k.w;
   fxDir = k.dir % 360; fxSpin = k.spin % 3;
   if (k.fx < FX_COUNT && k.fx != fx.id) fxStart(k.fx);
   else { fxDirty = true; fxDirtyAt = millis(); fxLastFrame = 0; publishFx(); }
@@ -3282,7 +3519,7 @@ void loop() {
     Pkt k;
     if (n != (int)sizeof k) { udp.flush(); continue; }
     udp.read((uint8_t*)&k, sizeof k);
-    if (memcmp(k.magic, "TLSY", 4) || k.ver != 2 || k.chip == P[0].chip) continue;
+    if (memcmp(k.magic, "TLSY", 4) || k.ver != 3 || k.chip == P[0].chip) continue;
     int slot = -1, old = 0;
     for (int i = 0; i < MAXP; i++) { if (peers[i].chip == k.chip) { slot = i; break; } if (peers[i].seen < peers[old].seen) old = i; }
     if (slot < 0) { slot = old; if (peers[slot].chip == 0 || now - peers[slot].seen > 30000) diag("Wand „%.*s“ gefunden (Gruppe %u)", 24, k.name, k.group); }
@@ -3776,6 +4013,19 @@ const char* apiCall(const char* path, JsonDocument& d) {
     return nullptr;
   }
   // Gleichtakt: {"on":true,"group":1}
+  // Raum: {"action":"save","layout":{…}} / {"action":"fx","fx":{"effect":"raum-komet",…}} – geht an alle Wände im Raum
+  if (!strcmp(path, "/api/room")) {
+    const char* a = d["action"] | "";
+    bool fwd = d["fwd"] | true;
+    if (!strcmp(a, "save")) { if (!d["layout"].is<JsonObjectConst>()) return "Raum fehlt"; return room::save(d["layout"].as<JsonVariantConst>(), fwd); }
+    if (!strcmp(a, "fx")) {
+      JsonDocument f; f.set(d["fx"]);
+      if (const char* e = apiCall("/api/effect", f)) return e;
+      if (fwd) { JsonObject o = f.as<JsonObject>(); palCarry(o); String b; serializeJson(f, b); room::fanout("/api/effect", b); }
+      return nullptr;
+    }
+    return "Unbekannte Aktion";
+  }
   if (!strcmp(path, "/api/sync")) {
     if (d["group"].is<int>()) { cfg.syncGroup = constrain(d["group"].as<int>(), 1, 9); prefs.putUChar("syncGrp", cfg.syncGroup); }
     if (d["on"].is<bool>()) { cfg.syncOn = d["on"]; prefs.putBool("syncOn", cfg.syncOn); if (!cfg.syncOn) diag("Gleichtakt mit anderen Wänden aus"); }
@@ -3910,9 +4160,12 @@ void setupWeb() {
   server.on("/api/state", HTTP_GET, replyState);
   server.on("/api/energy", HTTP_GET, [] { server.send(200, "application/json", energyJson()); });
   server.on("/api/peers", HTTP_GET, [] { server.send(200, "application/json", peers::json()); });
+  server.on("/api/room", HTTP_GET, [] { server.send(200, "application/json", room::json()); });
+  // Geometrie für den Raumplan: darf von der App einer anderen Wand gelesen werden
+  server.on("/api/room/geo", HTTP_GET, [] { server.sendHeader("Access-Control-Allow-Origin", "*"); server.send(200, "application/json", room::geoJson()); });
   server.on("/api/hue", HTTP_GET, [] { server.send(200, "application/json", hueb::listJson()); });
   // Befehle laufen über apiCall(), damit HTTP und WebSocket dasselbe tun
-  const char* cmds[] = {"/api/set", "/api/presets", "/api/effect", "/api/test", "/api/ota", "/api/light", "/api/diag", "/api/touch", "/api/panelfw", "/api/zigbee", "/api/name", "/api/identify", "/api/guard", "/api/swap", "/api/favs", "/api/view", "/api/signal", "/api/progress", "/api/sleep", "/api/boot", "/api/energy", "/api/peers", "/api/weather", "/api/game", "/api/fault", "/api/mirror", "/api/hue", "/api/palette", "/api/sync",
+  const char* cmds[] = {"/api/set", "/api/presets", "/api/effect", "/api/test", "/api/ota", "/api/light", "/api/diag", "/api/touch", "/api/panelfw", "/api/zigbee", "/api/name", "/api/identify", "/api/guard", "/api/swap", "/api/favs", "/api/view", "/api/signal", "/api/progress", "/api/sleep", "/api/boot", "/api/energy", "/api/peers", "/api/weather", "/api/game", "/api/fault", "/api/mirror", "/api/hue", "/api/palette", "/api/sync", "/api/room",
                         "/api/sim/new", "/api/sim/remove", "/api/sim/rotate", "/api/sim/attach", "/api/sim/detach", "/api/sim/tap"};
   for (const char* path : cmds) {
     server.on(path, HTTP_POST, [path] {
@@ -4267,6 +4520,7 @@ void setup() {
   otaBootCheck();
   guardBoot();
   fxLoad();
+  room::load();
   wx::load();
   { String m = prefs.getString("wledIp", ""); if (m.length() && !safeBoot) mirror::start(m); }
   hueb::load();
@@ -4339,6 +4593,7 @@ void loop() {
   litLoop();
   enLoop();
   wallsync::loop();
+  room::loop();
   if (restartAt && (int32_t)(millis() - restartAt) >= 0) { fxSave(); saveColors(); enSave(); restartWith(R_APP); }
 #if HAS_ZIGBEE
   if (zbResetAt && (int32_t)(millis() - zbResetAt) >= 0) { zbResetAt = 0; prefs.remove("zbBoot"); zb::factoryReset(); }

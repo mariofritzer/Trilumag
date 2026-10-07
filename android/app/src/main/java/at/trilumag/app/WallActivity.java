@@ -99,7 +99,7 @@ public class WallActivity extends Activity {
             }
         });
         if (b != null) web.restoreState(b);
-        else web.loadUrl("http://" + ip + "/");
+        else { String path = getIntent().getStringExtra("path"); web.loadUrl("http://" + ip + (path != null ? path : "/")); }
     }
 
     private static String q(String v) { return "'" + v.replace("\\", "\\\\").replace("'", "\\'") + "'"; }

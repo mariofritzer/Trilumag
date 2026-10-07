@@ -116,6 +116,19 @@ Unter Optionen → Andere Trilumag sucht die App nach weiteren Wänden im selben
 
 Unter Optionen → Updates lässt sich dann auswählen, auf welchen Wänden eine Version installiert wird: diese Wand und/oder gefundene andere. Die anderen holen sich die Version selbst von GitHub; ist diese Wand auch dabei, kommt sie zuletzt dran. Wände ab 0.7.21 lassen sich so aktualisieren.
 
+## Raum: mehrere Wände zusammen
+
+Unter Optionen → Andere Trilumag → „Raum einrichten“ (in der Android-App über ⌂ oben):
+
+- **Grundriss von oben:** Ecken ziehen, ＋ an einer Wand fügt eine Ecke ein, eine Ecke antippen zum Löschen. Die Wände (Striche) zieht man entlang der Raumwände an ihren Platz.
+- **Jede Raumwand von vorne:** so, wie man im Raum davor steht, mit den echten Panel-Formen und ihren aktuellen Farben. Wände frei an ihre Stelle und Höhe ziehen.
+- **Maße:** Raumhöhe und Seitenlänge eines Panels in cm.
+- Der Raum liegt auf allen Wänden gleich: wo man ihn ändert, wird er an alle anderen weitergegeben. Klipst man an einer Wand Panels ab oder an, zieht sie ihren Eintrag selbst nach.
+- **Raum-Effekte:** Raum-Komet, Raum-Regenbogen und Raum-Welle laufen über alle Wände, entlang der Raumwände, der Komet wandert von Wand zu Wand. Jede Wand rechnet selbst mit ihrer Stelle im Raum und der Uhrzeit aus dem Internet, es werden keine Bilder verschickt. Lange Lücken zwischen den Wänden werden dabei kurz. Helligkeit, Tempo, Intensität und Palette gehen an alle Wände, eigene Paletten mit ihren Farben.
+- Die anderen Wände brauchen dafür mindestens dieselbe Version.
+
+Auch der Gleichtakt (unter „Mehrere Wände“) nimmt jetzt eigene Paletten mit ihren Farben mit; die andere Wand legt sie als „mitgenommene“ Palette ab, ohne ihre eigenen zu ändern.
+
 ## Weißton und Tageslicht-Kurve
 
 Im Tab Farben stellt der Regler „Weißton“ Weiß zwischen 2200 K (warm) und 6500 K (kalt) ein; Home Assistant bekommt dafür den Farbtemperatur-Modus. Unter Optionen → Licht macht die „Tageslicht-Kurve“ alle Farben und Effekte abends wärmer und dunkler (ab 18 Uhr, nachts ganz warm auf 35 %, ab 6 Uhr wieder hell). Die Uhrzeit kommt per Internet.

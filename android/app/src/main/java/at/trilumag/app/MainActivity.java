@@ -86,7 +86,9 @@ public class MainActivity extends Activity {
         Button refresh = flatButton("↻"); refresh.setContentDescription(getString(R.string.refresh));
         refresh.setOnClickListener(v -> restartDiscovery());
         Button add = flatButton("＋"); add.setOnClickListener(v -> askAdd());
-        head.addView(refresh); head.addView(add);
+        Button roomB = flatButton("⌂"); roomB.setContentDescription(getString(R.string.room));
+        roomB.setOnClickListener(v -> openRoom());
+        head.addView(roomB); head.addView(refresh); head.addView(add);
         root.addView(head);
 
         // Hinweis auf eine neue App-Version
@@ -135,6 +137,16 @@ public class MainActivity extends Activity {
             }
         } catch (Exception ignored) { }
         nsd = (NsdManager) getSystemService(Context.NSD_SERVICE);
+    }
+
+    // Raumplan aller Wände: liegt auf jeder Wand gleich, also über irgendeine erreichbare öffnen
+    void openRoom() {
+        Wall w = null;
+        for (Wall x : walls.values()) if (x.reachable) { w = x; break; }
+        if (w == null) { android.widget.Toast.makeText(this, R.string.room_none, android.widget.Toast.LENGTH_SHORT).show(); return; }
+        Intent i = new Intent(this, WallActivity.class);
+        i.putExtra("ip", w.ip); i.putExtra("name", getString(R.string.room)); i.putExtra("path", "/#raum");
+        startActivity(i);
     }
 
     Button flatButton(String s) {

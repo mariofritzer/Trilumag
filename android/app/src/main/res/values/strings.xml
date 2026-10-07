@@ -40,4 +40,6 @@
     <string name="upd_current">Die App ist aktuell.</string>
     <string name="upd_noconn">GitHub ist gerade nicht erreichbar.</string>
     <string name="upd_check_btn">Nach Update suchen</string>
+    <string name="room">Raum</string>
+    <string name="room_none">Keine Wand erreichbar</string>
 </resources>
