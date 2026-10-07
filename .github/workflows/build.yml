@@ -188,22 +188,31 @@ jobs:
       - name: APK bauen
         run: |
           set -euo pipefail
+          APPVER=$(tr -d ' \n\r' < android/app/version.txt)
+          echo "APPVER=${APPVER}" >> "$GITHUB_ENV"
           BASE=$(grep -oP 'FW_VERSION = "\K[0-9]+\.[0-9]+' firmware/trilumag/trilumag.ino)
-          VERSION="${BASE}.${GITHUB_RUN_NUMBER}"
-          echo "VERSION=${VERSION}" >> "$GITHUB_ENV"
-          gradle -p android --no-daemon assembleRelease -PappVersionCode=${GITHUB_RUN_NUMBER} -PappVersionName=${VERSION}
-          cp android/app/build/outputs/apk/release/app-release.apk trilumag-app.apk
-          ls -l trilumag-app.apk
-      - name: APK zum Release legen
+          echo "VERSION=${BASE}.${GITHUB_RUN_NUMBER}" >> "$GITHUB_ENV"
+          gradle -p android --no-daemon assembleRelease
+          cp android/app/build/outputs/apk/release/app-release.apk "trilumag-app-${APPVER}.apk"
+          ls -l trilumag-app-*.apk
+      - name: APK zum Release legen (nur wenn es diese App-Version noch nicht gibt)
         if: github.ref == 'refs/heads/main'
         env:
           GH_TOKEN: ${{ github.token }}
-        run: gh release upload "v${VERSION}" trilumag-app.apk --clobber
+        run: |
+          set -euo pipefail
+          if gh api "repos/${GITHUB_REPOSITORY}/releases?per_page=100" -q '.[].assets[].name' | grep -qx "trilumag-app-${APPVER}.apk"; then
+            echo "::notice::App ${APPVER} liegt schon bei einem Release, nichts hochzuladen"; exit 0
+          fi
+          gh release upload "v${VERSION}" "trilumag-app-${APPVER}.apk"
+          # Übergang: Apps bis 0.7.55 suchen noch nach trilumag-app.apk (nur einmal, bei App 1.0)
+          if [ "${APPVER}" = "1.0" ]; then cp "trilumag-app-${APPVER}.apk" trilumag-app.apk; gh release upload "v${VERSION}" trilumag-app.apk; fi
+          echo "::notice::App ${APPVER} veröffentlicht"
       - uses: actions/upload-artifact@v4
         if: github.ref != 'refs/heads/main'
         with:
           name: trilumag-app
-          path: trilumag-app.apk
+          path: trilumag-app-*.apk
 
   deploy:
     needs: build

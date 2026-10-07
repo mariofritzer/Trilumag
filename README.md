@@ -56,7 +56,7 @@ Updates über den Webinstaller behalten WLAN, Einstellungen, Farben und Presets.
 
 ## Android-App
 
-Die App `trilumag-app.apk` liegt bei jedem Release (ab 0.7.51) und lässt sich direkt laden: <https://github.com/mariofritzer/Trilumag/releases/latest/download/trilumag-app.apk>. Beim ersten Installieren fragt Android, ob der Browser Apps installieren darf; das einmal erlauben.
+Die App hat eine eigene Versionsnummer (1.0, 1.1, …), unabhängig von der Firmware; sie steigt nur, wenn sich an der App etwas ändert. Die Datei heißt `trilumag-app-<Version>.apk` und hängt an dem Release, mit dem diese App-Version kam: <https://github.com/mariofritzer/Trilumag/releases>. Beim ersten Installieren fragt Android, ob der Browser Apps installieren darf; das einmal erlauben.
 
 - Beim Start sucht die App alle Trilumag im WLAN und zeigt sie als Liste mit Namen, Farbe, Ein/Aus-Schalter und Helligkeitsregler, ähnlich wie die WLED-App.
 - Antippen öffnet die gewohnte Steuerung im Vollbild. ＋ fügt eine Wand über ihre IP-Adresse hinzu, langes Drücken entfernt sie aus der Liste.

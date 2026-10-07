@@ -1,8 +1,10 @@
 plugins { id 'com.android.application' }
 
-// Version kommt aus der Build-Pipeline (gleich wie die Firmware, z. B. 0.7.51 / 51)
-def vCode = (project.findProperty('appVersionCode') ?: '1') as int
-def vName = (project.findProperty('appVersionName') ?: 'dev') as String
+// Eigene App-Version (unabhängig von der Firmware): nur erhöhen, wenn sich an der App etwas ändert.
+// Steht in version.txt, z. B. 1.0 oder 1.2.1; versionCode = Haupt*10000 + Neben*100 + Patch
+def vName = file('version.txt').text.trim()
+def vParts = (vName.tokenize('.').collect { it as int } + [0, 0, 0]).take(3)
+def vCode = vParts[0] * 10000 + vParts[1] * 100 + vParts[2]
 
 android {
     namespace 'at.trilumag.app'

@@ -325,30 +325,33 @@ public class MainActivity extends Activity {
         finally { if (c != null) c.disconnect(); }
     }
 
-    // ---------- Gibt es eine neuere App? (neuestes Release auf GitHub mit der Datei trilumag-app.apk) ----------
+    // ---------- Gibt es eine neuere App? (Releases auf GitHub mit einer Datei trilumag-app-<Version>.apk) ----------
+    static final java.util.regex.Pattern APK = java.util.regex.Pattern.compile("^trilumag-app-([0-9][0-9.]*)\\.apk$");
     void checkUpdate() {
-        long last = prefs.getLong("updChecked", 0);
-        String known = prefs.getString("updVer", "");
-        String knownUrl = prefs.getString("updUrl", "");
+        long last = prefs.getLong("appChecked", 0);
+        String known = prefs.getString("appVer", "");
+        String knownUrl = prefs.getString("appUrl", "");
         if (!known.isEmpty() && newer(known, BuildConfig.VERSION_NAME)) showUpdate(known, knownUrl);
         if (System.currentTimeMillis() - last < 3 * 3600 * 1000L) return;     // höchstens alle 3 Stunden nachsehen
         pool.execute(() -> {
-            String r = http("GET", "https://api.github.com/repos/" + REPO + "/releases?per_page=10", null, 8000);
+            String r = http("GET", "https://api.github.com/repos/" + REPO + "/releases?per_page=100", null, 10000);
             if (r == null) return;
             try {
                 JSONArray a = new JSONArray(r);
+                String best = null, bestUrl = null;
                 for (int i = 0; i < a.length(); i++) {
                     JSONObject rel = a.getJSONObject(i);
                     if (rel.optBoolean("draft") || rel.optBoolean("prerelease")) continue;
-                    JSONArray as = rel.optJSONArray("assets"); String url = null;
-                    for (int k = 0; as != null && k < as.length(); k++) if ("trilumag-app.apk".equals(as.getJSONObject(k).optString("name"))) url = as.getJSONObject(k).optString("browser_download_url");
-                    if (url == null) continue;
-                    String v = rel.optString("tag_name").replaceFirst("^v", "");
-                    String u = url;
-                    prefs.edit().putLong("updChecked", System.currentTimeMillis()).putString("updVer", v).putString("updUrl", u).apply();
-                    if (newer(v, BuildConfig.VERSION_NAME)) ui.post(() -> showUpdate(v, u));
-                    break;
+                    JSONArray as = rel.optJSONArray("assets");
+                    for (int k = 0; as != null && k < as.length(); k++) {
+                        java.util.regex.Matcher m = APK.matcher(as.getJSONObject(k).optString("name"));
+                        if (m.matches() && (best == null || newer(m.group(1), best))) { best = m.group(1); bestUrl = as.getJSONObject(k).optString("browser_download_url"); }
+                    }
                 }
+                if (best == null) return;
+                String v = best, u = bestUrl;
+                prefs.edit().putLong("appChecked", System.currentTimeMillis()).putString("appVer", v).putString("appUrl", u).apply();
+                if (newer(v, BuildConfig.VERSION_NAME)) ui.post(() -> showUpdate(v, u));
             } catch (Exception ignored) { }
         });
     }
