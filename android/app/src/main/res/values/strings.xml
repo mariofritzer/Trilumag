@@ -39,4 +39,5 @@
     <string name="upd_searching">Suche nach einer neuen App-Version …</string>
     <string name="upd_current">Die App ist aktuell.</string>
     <string name="upd_noconn">GitHub ist gerade nicht erreichbar.</string>
+    <string name="upd_check_btn">Nach Update suchen</string>
 </resources>

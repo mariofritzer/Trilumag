@@ -109,10 +109,18 @@ public class MainActivity extends Activity {
         hint = new TextView(this); hint.setTextColor(getColor(R.color.muted)); hint.setTextSize(14); hint.setPadding(dp(6), dp(16), dp(6), dp(8));
         hint.setText(R.string.searching);
         inner.addView(hint);
-        TextView ver = new TextView(this); ver.setTextColor(Color.parseColor("#555555")); ver.setTextSize(12); ver.setPadding(dp(6), dp(24), dp(6), 0);
+        // unten: App-Version und Knopf, um selbst nach einem Update zu suchen
+        LinearLayout foot = new LinearLayout(this); foot.setGravity(Gravity.CENTER_VERTICAL); foot.setPadding(dp(6), dp(24), 0, 0);
+        TextView ver = new TextView(this); ver.setTextColor(Color.parseColor("#777777")); ver.setTextSize(13);
         ver.setText(getString(R.string.version, BuildConfig.VERSION_NAME));
-        ver.setOnClickListener(v -> { android.widget.Toast.makeText(this, R.string.upd_searching, android.widget.Toast.LENGTH_SHORT).show(); checkUpdate(true); });   // Antippen: sofort nachsehen
-        inner.addView(ver);
+        foot.addView(ver, new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1));
+        Button chk = new Button(this); chk.setText(R.string.upd_check_btn); chk.setAllCaps(false); chk.setTextSize(13);
+        chk.setTextColor(getColor(R.color.fg));
+        GradientDrawable cb = new GradientDrawable(); cb.setColor(Color.parseColor("#1E1E1E")); cb.setCornerRadius(dp(18)); cb.setStroke(dp(1), Color.parseColor("#3A3A3A"));
+        chk.setBackground(cb); chk.setPadding(dp(16), 0, dp(16), 0); chk.setMinHeight(dp(36)); chk.setMinimumHeight(dp(36));
+        chk.setOnClickListener(v -> { android.widget.Toast.makeText(this, R.string.upd_searching, android.widget.Toast.LENGTH_SHORT).show(); checkUpdate(true); });
+        foot.addView(chk);
+        inner.addView(foot);
         sv.addView(inner);
         root.addView(sv, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, 0, 1));
         setContentView(root);
