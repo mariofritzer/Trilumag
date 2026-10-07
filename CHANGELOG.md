@@ -2,6 +2,15 @@
 
 Die Versionsnummer im Webinstaller und in der App setzt sich aus der Version in der Firmware und der Nummer des automatischen Builds zusammen, zum Beispiel **0.5.11** = Version 0.5, Build 11. Bis Build 9 hat der Build die Nummer immer als 0.2.x ausgegeben, die tatsächlichen Stände stehen deshalb unten mit beiden Nummern.
 
+## 0.7.63 · 7. Oktober 2026
+
+**Firmware-Update**
+- Bevor die Wand eine neue Firmware installiert, trennt sie alle Verbindungen nach außen: Hue und WLED pausieren, die Verbindung zur Hue Bridge wird geschlossen, eine laufende Wetter-Abfrage oder Suche nach anderen Wänden wird abgewartet, MQTT meldet sich sauber ab. Nach dem Neustart verbindet sich alles von selbst wieder; schlägt das Update fehl, sofort.
+- Home Assistant: neuer Diagnose-Eintrag „Status“ mit „Bereit“ oder „Update läuft“.
+
+**Android-App 1.0.2**
+- Neues Logo: vier gleich große Dreiecke, die zusammen ein großes Dreieck bilden.
+
 ## 0.7.61 · 7. Oktober 2026
 
 **Android-App 1.0.1**
