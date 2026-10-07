@@ -2,6 +2,15 @@
 
 Die Versionsnummer im Webinstaller und in der App setzt sich aus der Version in der Firmware und der Nummer des automatischen Builds zusammen, zum Beispiel **0.5.11** = Version 0.5, Build 11. Bis Build 9 hat der Build die Nummer immer als 0.2.x ausgegeben, die tatsächlichen Stände stehen deshalb unten mit beiden Nummern.
 
+## 0.7.69 · 7. Oktober 2026
+
+**Raum-Komet**
+- Läuft jetzt wie der normale Komet: ein heller Kopf mit Schweif irrt von Panel zu Panel und springt am Ende einer Wand zur nächsten Wand im Raum. Alle Wände rechnen denselben Weg aus Raum und Uhrzeit.
+- Die Intensität bestimmt die Schweiflänge.
+
+**Raum**
+- Behoben: Kurz hintereinander gemachte Änderungen am Raum konnten verloren gehen.
+
 ## 0.7.67 · 7. Oktober 2026
 
 **Raum: mehrere Wände zusammen**
