@@ -2,6 +2,26 @@
 
 Die Versionsnummer im Webinstaller und in der App setzt sich aus der Version in der Firmware und der Nummer des automatischen Builds zusammen, zum Beispiel **0.5.11** = Version 0.5, Build 11. Bis Build 9 hat der Build die Nummer immer als 0.2.x ausgegeben, die tatsächlichen Stände stehen deshalb unten mit beiden Nummern.
 
+## 0.7.74 · 9. Oktober 2026
+
+**Begriffe**
+- Ein Trilumag mit seinen Panels heißt jetzt **Panelwand**, eine Wand des Raums im Grundriss **Raumwand** (in der App, auf Englisch „panel wall“ und „room wall“).
+
+**Räume**
+- Mehrere Räume (bis zu 6), jeder mit eigenem Grundriss, eigenen Panelwänden und eigenen Raum-Effekten. Panelwände lassen sich mit „Hierher holen“ in einen anderen Raum holen.
+- Raumwand löschen (im Grundriss antippen) und Raum löschen (nur den gezeigten Raum).
+- Raum-Szenen: merken sich, was jede Panelwand im Raum zeigt, und stellen es auf allen wieder her.
+- Neue Raum-Effekte: Raum-Feuerwerk, Raum-Pingpong und Raum-Atmen.
+- Antippen: Die Welle läuft über alle Panelwände des Raums.
+- Home Assistant: Jeder Raum erscheint als eigenes Licht mit Ein/Aus, Helligkeit und allen Effekten.
+
+**Firmware**
+- Die Web-App ist kleiner gepackt; das schafft Platz in der Firmware für den ESP32-C6.
+
+**Android-App 1.2.0**
+- Hinweis bei Störung: Die App sieht etwa alle 15 Minuten im Hintergrund nach, ob alle Panelwände erreichbar sind und ihre Panels antworten (nur im eigenen WLAN).
+- Begriffe „Panelwand“ in der App.
+
 ## 0.7.71 · 9. Oktober 2026
 
 **Raum-Komet**
