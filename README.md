@@ -116,18 +116,21 @@ Unter Optionen → Andere Trilumag sucht die App nach weiteren Wänden im selben
 
 Unter Optionen → Updates lässt sich dann auswählen, auf welchen Wänden eine Version installiert wird: diese Wand und/oder gefundene andere. Die anderen holen sich die Version selbst von GitHub; ist diese Wand auch dabei, kommt sie zuletzt dran. Wände ab 0.7.21 lassen sich so aktualisieren.
 
-## Raum: mehrere Wände zusammen
+## Raum: mehrere Panelwände zusammen
+
+Begriffe: Eine **Panelwand** ist ein Trilumag mit seinen Panels, eine **Raumwand** eine Wand des Raums im Grundriss.
 
 Unter Optionen → Andere Trilumag → „Raum einrichten“ (in der Android-App über ⌂ oben):
 
-- **Grundriss von oben:** Ecken ziehen, ＋ an einer Wand fügt eine Ecke ein, eine Ecke antippen zum Löschen. Die Wände (Striche) zieht man entlang der Raumwände an ihren Platz.
-- **Jede Raumwand von vorne:** so, wie man im Raum davor steht, mit den echten Panel-Formen und ihren aktuellen Farben. Wände frei an ihre Stelle und Höhe ziehen.
+- **Grundriss von oben:** Ecken ziehen, ＋ an einer Raumwand fügt eine Ecke ein, eine Ecke oder Raumwand antippen zum Löschen. Die Panelwände (Striche) zieht man entlang der Raumwände an ihren Platz.
+- **Jede Raumwand von vorne:** so, wie man im Raum davor steht, mit den echten Panel-Formen und ihren aktuellen Farben. Panelwände frei an ihre Stelle und Höhe ziehen.
 - **Maße:** Raumhöhe und Seitenlänge eines Panels in cm.
-- Der Raum liegt auf allen Wänden gleich: wo man ihn ändert, wird er an alle anderen weitergegeben. Klipst man an einer Wand Panels ab oder an, zieht sie ihren Eintrag selbst nach.
-- **Raum-Effekte:** Der Raum-Komet läuft wie der Komet einer Wand: Panel für Panel, bei „Kanten einzeln“ Kante für Kante, und springt am Ende einer Wand zur nächsten Wand im Raum. Es gibt genau einen Kopf für alle Wände. Raum-Regenbogen und Raum-Welle laufen entlang der Raumwände über alle Wände. Jede Wand rechnet selbst mit ihrer Stelle im Raum und der Uhrzeit aus dem Internet, es werden keine Bilder verschickt. Lange Lücken zwischen den Wänden werden dabei kurz. Helligkeit, Tempo, Intensität und Palette gehen an alle Wände, eigene Paletten mit ihren Farben.
-- Die anderen Wände brauchen dafür mindestens dieselbe Version.
+- Der Raum liegt auf allen Panelwänden gleich: wo man ihn ändert, wird er an alle anderen weitergegeben. Klipst man an einer Panelwand Panels ab oder an, zieht sie ihren Eintrag selbst nach.
+- **Raum-Effekte:** Der Raum-Komet läuft wie der Komet einer Panelwand: Panel für Panel, bei „Kanten einzeln“ Kante für Kante, und springt am Ende einer Panelwand zur nächsten Panelwand im Raum. Es gibt genau einen Kopf für alle Panelwände. Raum-Regenbogen und Raum-Welle laufen entlang der Raumwände über alle Panelwände. Jede Panelwand rechnet selbst mit ihrer Stelle im Raum und der Uhrzeit aus dem Internet, es werden keine Bilder verschickt. Lange Lücken zwischen den Panelwänden werden dabei kurz. Helligkeit, Tempo, Intensität und Palette gehen an alle Panelwände, eigene Paletten mit ihren Farben.
+- **Raum löschen:** löscht Grundriss und Aufstellung auf allen Panelwänden; die Panelwände und ihre Einstellungen bleiben.
+- Die anderen Panelwände brauchen dafür mindestens dieselbe Version.
 
-Auch der Gleichtakt (unter „Mehrere Wände“) nimmt jetzt eigene Paletten mit ihren Farben mit; die andere Wand legt sie als „mitgenommene“ Palette ab, ohne ihre eigenen zu ändern.
+Auch der Gleichtakt (unter „Mehrere Panelwände“) nimmt jetzt eigene Paletten mit ihren Farben mit; die andere Panelwand legt sie als „mitgenommene“ Palette ab, ohne ihre eigenen zu ändern.
 
 ## Weißton und Tageslicht-Kurve
 

@@ -1032,11 +1032,16 @@ void store() { prefs.putBytes("room", raw.c_str(), raw.length()); }
 
 // an die anderen Wände im Raum schicken (der Reihe nach, im Hintergrund)
 String qPath, qBody; volatile bool sending = false, again = false;
+String oldIps[MAXD]; uint8_t nOld = 0;        // Panelwände, die bis eben im Raum waren (z. B. vor dem Löschen des Raums)
 void sendTask(void*) {
   do {
     again = false;
-    String path = qPath, body = qBody; String ips[MAXD]; uint8_t n = 0;
-    for (uint8_t i = 0; i < nD; i++) if ((int)i != me && dev[i].ip.length() > 6) ips[n++] = dev[i].ip;
+    String path = qPath, body = qBody; String ips[2 * MAXD]; uint8_t n = 0;
+    String my = WiFi.localIP().toString();
+    auto addIp = [&](const String& ip) { if (ip.length() < 7 || ip == my) return; for (uint8_t k = 0; k < n; k++) if (ips[k] == ip) return; ips[n++] = ip; };
+    for (uint8_t i = 0; i < nD; i++) if ((int)i != me) addIp(dev[i].ip);
+    for (uint8_t i = 0; i < nOld; i++) addIp(oldIps[i]);
+    nOld = 0;
     for (uint8_t i = 0; i < n && !netQuiet && !otaBusy; i++) {
       HTTPClient h; h.setTimeout(2500);
       if (h.begin("http://" + ips[i] + path)) { h.addHeader("Content-Type", "application/json"); h.POST(body); }
@@ -1059,6 +1064,7 @@ const char* save(JsonVariantConst lay, bool fwd) {
   if (v < ver) return nullptr;                          // älterer Stand: ignorieren
   String js; serializeJson(lay, js);
   if (js.length() > 15000) return "Raum zu groß";
+  if (fwd && !sending) { nOld = 0; for (uint8_t i = 0; i < nD && nOld < MAXD; i++) if ((int)i != me) oldIps[nOld++] = dev[i].ip; }
   if (!parse(js)) return "Raum unlesbar";
   raw = js; store();
   if (fwd) { JsonDocument f; f["action"] = "save"; f["fwd"] = false; f["layout"] = lay; String b; serializeJson(f, b); fanout("/api/room", b); }
@@ -2372,7 +2378,7 @@ void applyAll(JsonVariantConst cmd) {
 
 // ---------- Antippen (Beschleunigungssensor in den Panels) ----------
 enum TapAction : uint8_t { TA_NONE, TA_PANEL, TA_WALL, TA_PRESET, TA_EFFECT, TA_COUNT };
-const char* const TAP_NAMES[TA_COUNT] = {"nichts", "Panel ein/aus", "Wand ein/aus", "nächstes Preset", "nächster Effekt"};
+const char* const TAP_NAMES[TA_COUNT] = {"nichts", "Panel ein/aus", "Panelwand ein/aus", "nächstes Preset", "nächster Effekt"};
 
 // kind: 1 = einmal, 2 = doppelt angetippt
 void touchEvent(int i, uint8_t kind) {

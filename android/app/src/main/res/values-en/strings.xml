@@ -1,9 +1,9 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="searching">Searching for Trilumag on the Wi-Fi …</string>
-    <string name="none_found">No Trilumag found. Phone and wall must be on the same Wi-Fi. Use ＋ to add a wall by its IP address.</string>
+    <string name="none_found">No Trilumag found. Phone and panel wall must be on the same Wi-Fi. Use ＋ to add a panel wall by its IP address.</string>
     <string name="unreachable">not reachable</string>
-    <string name="add_title">Add wall by IP</string>
+    <string name="add_title">Add panel wall by IP</string>
     <string name="add_hint">e.g. 192.168.1.50</string>
     <string name="ok">Add</string>
     <string name="cancel">Cancel</string>
@@ -40,5 +40,5 @@
     <string name="upd_noconn">GitHub can’t be reached right now.</string>
     <string name="upd_check_btn">Check for updates</string>
     <string name="room">Room</string>
-    <string name="room_none">No wall reachable</string>
+    <string name="room_none">No panel wall reachable</string>
 </resources>
