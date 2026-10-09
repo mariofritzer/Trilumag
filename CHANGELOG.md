@@ -2,6 +2,15 @@
 
 Die Versionsnummer im Webinstaller und in der App setzt sich aus der Version in der Firmware und der Nummer des automatischen Builds zusammen, zum Beispiel **0.5.11** = Version 0.5, Build 11. Bis Build 9 hat der Build die Nummer immer als 0.2.x ausgegeben, die tatsächlichen Stände stehen deshalb unten mit beiden Nummern.
 
+## 0.7.71 · 9. Oktober 2026
+
+**Raum-Komet**
+- Läuft jetzt wie der Komet einer Wand: Panel für Panel, bei „Kanten einzeln“ Kante für Kante, dann über die zuletzt leuchtende Kante ins nächste Panel; am Ende einer Wand springt er zur nächsten Wand im Raum.
+- Genau ein Kopf für alle Wände: Beim Start eines Raum-Effekts geht der Raum mit an alle Wände, und die Wände gleichen ihren Raum jede Minute untereinander ab.
+
+**Raum**
+- In der Ansicht von vorne liegen die Dreiecke jetzt Kante an Kante wie an der echten Wand.
+
 ## 0.7.69 · 7. Oktober 2026
 
 **Raum-Komet**
