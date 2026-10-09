@@ -41,4 +41,9 @@
     <string name="upd_check_btn">Check for updates</string>
     <string name="room">Room</string>
     <string name="room_none">No panel wall reachable</string>
+    <string name="fault_switch">Notify on faults</string>
+    <string name="fault_note">Checks about every 15 minutes whether all panel walls are reachable and their panels respond. Only on your own Wi-Fi.</string>
+    <string name="fault_channel">Faults</string>
+    <string name="fault_off">“%1$s” is not reachable.</string>
+    <string name="fault_panel">A panel on “%1$s” stopped responding.</string>
 </resources>

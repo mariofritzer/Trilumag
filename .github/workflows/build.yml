@@ -59,6 +59,7 @@ jobs:
           # Das Hauptpanel trägt die Panel-Firmware für Updates über den Bus in sich
           python3 .github/scripts/panel_fw_header.py firmware/panel/panel.bin firmware/panel/panel.c firmware/trilumag/panel_fw.h
           # Die Web-App wird gepackt ausgeliefert
+          pip install --quiet --break-system-packages zopfli || pip install --quiet zopfli || true
           python3 .github/scripts/webapp_gz.py
           mkdir -p site/firmware/panel
           cp firmware/panel/panel.bin firmware/panel/panel.hex site/firmware/panel/

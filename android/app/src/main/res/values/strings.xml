@@ -42,4 +42,9 @@
     <string name="upd_check_btn">Nach Update suchen</string>
     <string name="room">Raum</string>
     <string name="room_none">Keine Panelwand erreichbar</string>
+    <string name="fault_switch">Hinweis bei Störung</string>
+    <string name="fault_note">Sieht etwa alle 15 Minuten nach, ob alle Panelwände erreichbar sind und ihre Panels antworten. Nur im eigenen WLAN.</string>
+    <string name="fault_channel">Störungen</string>
+    <string name="fault_off">„%1$s“ ist nicht erreichbar.</string>
+    <string name="fault_panel">An „%1$s“ antwortet ein Panel nicht mehr.</string>
 </resources>

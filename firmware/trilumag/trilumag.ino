@@ -750,6 +750,9 @@ const FxDef FX[] = {
   {"raum-komet",  "Raum-Komet",      true},     // laufen über alle Wände im Raum
   {"raum-regenbogen", "Raum-Regenbogen", false},
   {"raum-welle",  "Raum-Welle",      true},
+  {"raum-feuerwerk", "Raum-Feuerwerk", false},
+  {"raum-pingpong", "Raum-Pingpong",  true},
+  {"raum-atmen",  "Raum-Atmen",      true},
 };
 const uint8_t FX_COUNT = sizeof(FX) / sizeof(FX[0]);
 
@@ -945,8 +948,12 @@ float cx[MAXC], cy[MAXC], U[MAXC + 1]; uint8_t nC = 0;
 Dev dev[MAXD]; uint8_t nD = 0;
 float H = 250, S = 23, Ptot = 0;
 double ver = 0;
-String raw;                         // der Grundriss so, wie ihn die App geschickt hat
-int me = -1;                        // diese Wand im Raum (-1: nicht aufgestellt)
+String raw;                         // alle Räume so, wie sie die App geschickt hat: {"v":…,"r":[{id,n,h,s,c,d,sc}, …]}
+int me = -1;                        // diese Panelwand in ihrem Raum (-1: in keinem Raum)
+// Mehrere Räume: jeder Raum hat eigene Panelwände; diese Panelwand rechnet mit dem Raum, in dem sie steht
+const uint8_t MAXR = 6;
+String rId[MAXR], rName[MAXR], rIp[MAXR][MAXD]; uint8_t rN[MAXR], nR = 0;
+int ridx = -1;                      // Raum dieser Panelwand
 // Abbildung "Stelle im Raum" → "Effekt-Strecke": lange Lücken zwischen den Wänden werden kurz
 struct Seg { float u0, c0, len, k; };
 Seg seg[2 * MAXD + 2]; uint8_t nS = 0; float Lc = 0, uStart = 0;
@@ -967,20 +974,26 @@ uint32_t geoSig() {
   for (int i = 0; i < SLOTS; i++) if (P[i].used && P[i].attached) h = (h ^ (uint32_t)(P[i].x * 131 + P[i].y * 7 + P[i].rot * 3 + P[i].edges)) * 16777619u;
   return h ? h : 1;
 }
-// Geometrie dieser Wand für die App: Panels mit Mitte, Winkel der Spitze und aktueller Farbe
-String geoJson() {
-  JsonDocument d; float mx, my, bw, bh; ownBox(mx, my, bw, bh);
-  d["id"] = hex(P[0].chip); d["n"] = cfg.name; d["ip"] = WiFi.localIP().toString(); d["ver"] = FW_VERSION; d["g"] = geoSig();
-  d["bw"] = bw; d["bh"] = bh;
-  JsonArray a = d["p"].to<JsonArray>();
+// Panels dieser Panelwand: Mitte, Winkel der Spitze, Kanten einzeln (für den Raum) – mit Farbe für die App
+void packP(JsonArray a, bool col = false) {
+  float mx, my, bw, bh; ownBox(mx, my, bw, bh);
   for (int i = 0; i < SLOTS; i++) if (P[i].used && P[i].attached) {
     float vx, vy; viewXY(P[i].x * 0.5f, P[i].y * 0.866f, vx, vy);
     int ang = (isUp(P[i].x, P[i].y) ? 270 : 90) + cfg.viewRot; if (cfg.viewMir) ang = 180 - ang; ang = ((ang % 360) + 360) % 360;
-    const uint8_t* c = CUR[i][0]; char b[8];
-    auto cl = [](int v) { return v > 255 ? 255 : v; };
-    snprintf(b, sizeof b, "#%02X%02X%02X", cl(c[0] + c[3]), cl(c[1] + c[3]), cl(c[2] + c[3]));
-    JsonArray q = a.add<JsonArray>(); q.add(roundf((vx - mx) * 100) / 100); q.add(roundf((vy - my) * 100) / 100); q.add(ang); q.add(b); q.add(P[i].edges ? 1 : 0);
+    JsonArray q = a.add<JsonArray>(); q.add(roundf((vx - mx) * 100) / 100); q.add(roundf((vy - my) * 100) / 100); q.add(ang); q.add(P[i].edges ? 1 : 0);
+    if (col) {
+      const uint8_t* c = CUR[i][0]; char b[8];
+      auto cl = [](int v) { return v > 255 ? 255 : v; };
+      snprintf(b, sizeof b, "#%02X%02X%02X", cl(c[0] + c[3]), cl(c[1] + c[3]), cl(c[2] + c[3])); q.add(b);
+    }
   }
+}
+// Geometrie dieser Panelwand für die App: [x, y, Winkel, Kanten, Farbe] je Panel
+String geoJson() {
+  JsonDocument d; float mx, my, bw, bh; ownBox(mx, my, bw, bh);
+  d["id"] = hex(P[0].chip); d["n"] = cfg.name; d["ip"] = WiFi.localIP().toString(); d["ver"] = FW_VERSION; d["g"] = geoSig();
+  d["bw"] = bw; d["bh"] = bh; d["room"] = ridx >= 0 ? rId[ridx] : String();
+  packP(d["p"].to<JsonArray>(), true);
   String s; serializeJson(d, s); return s;
 }
 void build() {
@@ -1010,50 +1023,81 @@ float cu(float u) {
   for (uint8_t i = 0; i < nS; i++) if (u < seg[i].u0 + seg[i].len || i == nS - 1) return seg[i].c0 + fminf(u - seg[i].u0, seg[i].len) * seg[i].k;
   return 0;
 }
+// alte Speicherung (ein Raum ohne "r") in die neue umwandeln
+void normalize(JsonDocument& d) {
+  if (d["r"].is<JsonArray>() || !d["c"].is<JsonArray>()) { if (!d["r"].is<JsonArray>()) d["r"].to<JsonArray>(); return; }
+  JsonDocument o; o.set(d);
+  JsonArray r = d["r"].to<JsonArray>(); JsonObject q = r.add<JsonObject>();
+  q["id"] = "r1"; q["n"] = "Raum";
+  for (JsonPair kv : o.as<JsonObject>()) if (strcmp(kv.key().c_str(), "v") && strcmp(kv.key().c_str(), "r")) q[kv.key()] = kv.value();
+  for (const char* k : {"c", "d", "h", "s"}) d.remove(k);
+  if (!q["c"].size()) r.remove(0);                       // gelöschter Raum
+}
 bool parse(const String& js) {
   JsonDocument d; if (deserializeJson(d, js)) return false;
-  nC = 0; for (JsonVariant c : d["c"].as<JsonArray>()) if (nC < MAXC) { cx[nC] = c[0] | 0.0f; cy[nC] = c[1] | 0.0f; nC++; }
-  H = d["h"] | 250.0f; S = constrain(d["s"] | 23.0f, 5.0f, 100.0f); ver = d["v"] | 0.0;
-  nD = 0; me = -1; String my = hex(P[0].chip);
-  for (JsonVariant v : d["d"].as<JsonArray>()) {
-    if (nD >= MAXD) break;
-    Dev& e = dev[nD]; e = Dev();
-    e.id = (const char*)(v["id"] | ""); e.name = (const char*)(v["n"] | ""); e.ip = (const char*)(v["ip"] | "");
-    e.w = v["w"] | 0; e.x = v["x"] | 0.0f; e.y = v["y"] | 0.0f; e.bw = v["bw"] | 0.0f; e.bh = v["bh"] | 0.0f; e.g = v["g"] | 0u;
-    if (e.id == my) me = nD;
-    nD++;
+  normalize(d);
+  ver = d["v"] | 0.0;
+  nC = 0; nD = 0; me = -1; ridx = -1; nR = 0; H = 250; S = 23;
+  String my = hex(P[0].chip);
+  for (JsonVariant q : d["r"].as<JsonArray>()) {
+    if (nR >= MAXR) break;
+    rId[nR] = (const char*)(q["id"] | ""); rName[nR] = (const char*)(q["n"] | "Raum"); rN[nR] = 0;
+    for (JsonVariant v : q["d"].as<JsonArray>()) {
+      if (rN[nR] < MAXD) rIp[nR][rN[nR]++] = (const char*)(v["ip"] | "");
+      if (my == (const char*)(v["id"] | "") && ridx < 0) ridx = nR;
+    }
+    nR++;
   }
-  if (nC < 3) { nC = 0; nD = 0; me = -1; }
+  if (ridx >= 0) {
+    JsonVariant q = d["r"][ridx];
+    for (JsonVariant c : q["c"].as<JsonArray>()) if (nC < MAXC) { cx[nC] = c[0] | 0.0f; cy[nC] = c[1] | 0.0f; nC++; }
+    H = q["h"] | 250.0f; S = constrain(q["s"] | 23.0f, 5.0f, 100.0f);
+    for (JsonVariant v : q["d"].as<JsonArray>()) {
+      if (nD >= MAXD) break;
+      Dev& e = dev[nD]; e = Dev();
+      e.id = (const char*)(v["id"] | ""); e.name = (const char*)(v["n"] | ""); e.ip = (const char*)(v["ip"] | "");
+      e.w = v["w"] | 0; e.x = v["x"] | 0.0f; e.y = v["y"] | 0.0f; e.bw = v["bw"] | 0.0f; e.bh = v["bh"] | 0.0f; e.g = v["g"] | 0u;
+      if (e.id == my) me = nD;
+      nD++;
+    }
+    if (nC < 3) { nC = 0; nD = 0; me = -1; }
+  }
   build();
   return true;
 }
+int roomFind(const String& id) { for (uint8_t i = 0; i < nR; i++) if (rId[i] == id) return i; return -1; }
 void load() { size_t n = prefs.getBytesLength("room"); if (n && n < 16000) { char* b = (char*)malloc(n + 1); if (b) { prefs.getBytes("room", b, n); b[n] = 0; raw = b; free(b); parse(raw); } } }
 void store() { prefs.putBytes("room", raw.c_str(), raw.length()); }
 
-// an die anderen Wände im Raum schicken (der Reihe nach, im Hintergrund)
-String qPath, qBody; volatile bool sending = false, again = false;
-String oldIps[MAXD]; uint8_t nOld = 0;        // Panelwände, die bis eben im Raum waren (z. B. vor dem Löschen des Raums)
+// an andere Panelwände schicken (der Reihe nach, im Hintergrund): an einen Raum (-1: den eigenen) oder an alle (-2)
+struct Job { String path, body; String ips[MAXR * MAXD]; uint8_t n = 0; };
+const uint8_t QN = 4; Job q[QN]; volatile uint8_t qHead = 0, qTail = 0; volatile bool sending = false;
+String oldIps[MAXR * MAXD]; uint8_t nOld = 0;          // Panelwände, die bis eben in einem Raum waren (z. B. vor dem Löschen)
 void sendTask(void*) {
-  do {
-    again = false;
-    String path = qPath, body = qBody; String ips[2 * MAXD]; uint8_t n = 0;
-    String my = WiFi.localIP().toString();
-    auto addIp = [&](const String& ip) { if (ip.length() < 7 || ip == my) return; for (uint8_t k = 0; k < n; k++) if (ips[k] == ip) return; ips[n++] = ip; };
-    for (uint8_t i = 0; i < nD; i++) if ((int)i != me) addIp(dev[i].ip);
-    for (uint8_t i = 0; i < nOld; i++) addIp(oldIps[i]);
-    nOld = 0;
-    for (uint8_t i = 0; i < n && !netQuiet && !otaBusy; i++) {
+  while (qHead != qTail) {
+    Job& j = q[qHead];
+    for (uint8_t i = 0; i < j.n && !netQuiet && !otaBusy; i++) {
       HTTPClient h; h.setTimeout(2500);
-      if (h.begin("http://" + ips[i] + path)) { h.addHeader("Content-Type", "application/json"); h.POST(body); }
+      if (h.begin("http://" + j.ips[i] + j.path)) { h.addHeader("Content-Type", "application/json"); h.POST(j.body); }
       h.end();
     }
-  } while (again);
+    j.body = ""; qHead = (qHead + 1) % QN;
+  }
   sending = false;
   vTaskDelete(nullptr);
 }
-void fanout(const char* path, const String& body) {
-  qPath = path; qBody = body;
-  if (sending) { again = true; return; }
+void fanout(const char* path, const String& body, int room = -1) {
+  if ((qTail + 1) % QN == qHead) return;                 // Warteschlange voll
+  Job& j = q[qTail]; j.path = path; j.body = body; j.n = 0;
+  String my = WiFi.localIP().toString();
+  auto add = [&](const String& ip) { if (ip.length() < 7 || ip == my) return; for (uint8_t k = 0; k < j.n; k++) if (j.ips[k] == ip) return; if (j.n < MAXR * MAXD) j.ips[j.n++] = ip; };
+  if (room == -1) room = ridx;
+  for (uint8_t r = 0; r < nR; r++) if (room == -2 || r == room) for (uint8_t i = 0; i < rN[r]; i++) add(rIp[r][i]);
+  for (uint8_t i = 0; i < nOld; i++) add(oldIps[i]);
+  nOld = 0;
+  if (!j.n) return;
+  qTail = (qTail + 1) % QN;
+  if (sending) return;
   sending = true;
   if (xTaskCreate(sendTask, "raum", 6144, nullptr, 1, nullptr) != pdPASS) sending = false;
 }
@@ -1063,19 +1107,24 @@ const char* save(JsonVariantConst lay, bool fwd) {
   double v = lay["v"] | 0.0;
   if (v < ver) return nullptr;                          // älterer Stand: ignorieren
   String js; serializeJson(lay, js);
-  if (js.length() > 15000) return "Raum zu groß";
-  if (fwd && !sending) { nOld = 0; for (uint8_t i = 0; i < nD && nOld < MAXD; i++) if ((int)i != me) oldIps[nOld++] = dev[i].ip; }
+  if (js.length() > 9000) return "Räume zu groß";              // muss in den Einstellungsspeicher passen
+  if (fwd) { nOld = 0; for (uint8_t r = 0; r < nR; r++) for (uint8_t i = 0; i < rN[r] && nOld < MAXR * MAXD; i++) oldIps[nOld++] = rIp[r][i]; }
   if (!parse(js)) return "Raum unlesbar";
+  { JsonDocument d; deserializeJson(d, js); normalize(d); js = ""; serializeJson(d, js); }
   raw = js; store();
-  if (fwd) { JsonDocument f; f["action"] = "save"; f["fwd"] = false; f["layout"] = lay; String b; serializeJson(f, b); fanout("/api/room", b); }
+  if (fwd) fanout("/api/room", "{\"action\":\"save\",\"fwd\":false,\"layout\":" + raw + "}", -2);
   return nullptr;
 }
 // Abgleich: jede Minute bei den anderen Wänden nachsehen, ob sie denselben Raum haben (z. B. nach einem Update
 // oder wenn eine Wand beim Speichern aus war). Älteren schicken wir unseren, einen neueren übernehmen wir.
 volatile bool healing = false; String healNew;
 void healTask(void*) {
-  String ips[MAXD]; uint8_t n = 0; double v0 = ver; String mine = raw;
-  for (uint8_t i = 0; i < nD; i++) if ((int)i != me && dev[i].ip.length() > 6) ips[n++] = dev[i].ip;
+  String ips[MAXR * MAXD]; uint8_t n = 0; double v0 = ver; String mine = raw, myIp = WiFi.localIP().toString();
+  for (uint8_t r = 0; r < nR; r++) for (uint8_t i = 0; i < rN[r]; i++) {
+    const String& ip = rIp[r][i]; bool dup = ip.length() < 7 || ip == myIp;
+    for (uint8_t k = 0; k < n && !dup; k++) if (ips[k] == ip) dup = true;
+    if (!dup) ips[n++] = ip;
+  }
   for (uint8_t i = 0; i < n && !netQuiet && !otaBusy; i++) {
     HTTPClient h; h.setTimeout(2500); String r;
     if (h.begin("http://" + ips[i] + "/api/room") && h.GET() == 200) r = h.getString();
@@ -1099,7 +1148,7 @@ void healTask(void*) {
 void loop() {
   static uint32_t last = 0, lastHeal = 0;
   if (healNew.length() && !healing) { JsonDocument d; String js = healNew; healNew = ""; if (!deserializeJson(d, js)) save(d.as<JsonVariantConst>(), false); }
-  if (me >= 0 && wlanOk && !healing && !sending && !netQuiet && !otaBusy && nD > 1 && (!lastHeal || millis() - lastHeal > 60000)) {
+  if (nR && wlanOk && !healing && !sending && !netQuiet && !otaBusy && (!lastHeal || millis() - lastHeal > 60000)) {
     lastHeal = millis() | 1; healing = true;
     if (xTaskCreate(healTask, "raumabgl", 6144, nullptr, 1, nullptr) != pdPASS) healing = false;
   }
@@ -1107,11 +1156,12 @@ void loop() {
   last = millis();
   uint32_t g = geoSig(); if (dev[me].g == g) return;
   JsonDocument d; if (deserializeJson(d, raw)) return;
+  normalize(d);
   String my = hex(P[0].chip);
-  for (JsonVariant v : d["d"].as<JsonArray>()) if (my == (const char*)(v["id"] | "")) {
-    JsonDocument geo; deserializeJson(geo, geoJson());
+  for (JsonVariant v : d["r"][ridx]["d"].as<JsonArray>()) if (my == (const char*)(v["id"] | "")) {
     float mx, my2, bw, bh; ownBox(mx, my2, bw, bh);
-    v["p"] = geo["p"]; v["bw"] = roundf(bw * S); v["bh"] = roundf(bh * S); v["g"] = g; v["ip"] = WiFi.localIP().toString(); v["n"] = cfg.name;
+    JsonArray pa = v["p"].to<JsonArray>(); packP(pa);
+    v["bw"] = roundf(bw * S); v["bh"] = roundf(bh * S); v["g"] = g; v["ip"] = WiFi.localIP().toString(); v["n"] = cfg.name;
   }
   d["v"] = (uint64_t)fmax(ver + 1, nowV());           // als ganze Zahl: Millisekunden passen nicht genau in eine Kommazahl
   save(d.as<JsonVariantConst>(), true);
@@ -1162,7 +1212,7 @@ void jump(uint16_t a, uint16_t b) {
   for (int k = 0; k < 2; k++) if (un[b].jmp[k] < 0) { un[b].jmp[k] = a; break; }
 }
 void addP(JsonArrayConst p, float u0, float h0, uint8_t dv) {
-  for (JsonVariantConst q : p) addUnit(u0 + (q[0] | 0.0f) * S, h0 - (q[1] | 0.0f) * S, q[2] | 270.0f, (q[4] | 0) != 0, dv);
+  for (JsonVariantConst q : p) addUnit(u0 + (q[0] | 0.0f) * S, h0 - (q[1] | 0.0f) * S, q[2] | 270.0f, (q[3].is<const char*>() ? (q[4] | 0) : (q[3] | 0)) != 0, dv);
 }
 void graph() {
   nU = nN = 0; curStep = -1;
@@ -1170,9 +1220,10 @@ void graph() {
   float mx, my, bw, bh; ownBox(mx, my, bw, bh);
   JsonDocument d; uint16_t first[MAXD], cnt[MAXD]; float lo[MAXD]; uint8_t k = 0;
   gRoom = me >= 0 && !deserializeJson(d, raw);
+  if (gRoom) normalize(d);
   float ou = 0, oh = 0;                                     // wo die eigene Wand im Raum liegt
   if (gRoom) {
-    for (JsonVariant v : d["d"].as<JsonArray>()) {
+    for (JsonVariant v : d["r"][ridx]["d"].as<JsonArray>()) {
       if (k >= nD) break;
       const Dev& e = dev[k]; first[k] = nU;
       if (e.w < nC) addP(v["p"].as<JsonArrayConst>(), U[e.w] + e.x, e.y, k);
@@ -1254,8 +1305,8 @@ float stepF = 0;
 void frame() {
   float bw, bh; ownBox(ocx, ocy, bw, bh);
   if (me < 0) { Lc = fmaxf(1, bw * S); }
+  if (fx.id == 24 || fx.id == 27) { if (gSig != (geoSig() ^ (uint32_t)ver) || (me >= 0) != gRoom) graph(); }
   if (fx.id == 24) {
-    if (gSig != (geoSig() ^ (uint32_t)ver) || (me >= 0) != gRoom) graph();
     float rate = powf(4.0f, (fx.speed - 50) / 50.0f);
     stepF = (float)fmod(tsec() * 4 * rate, 2000000.0);
     walkTo((int32_t)stepF);
@@ -1272,6 +1323,18 @@ float comet(int i, int e, float tail, bool& isHead) {
   float age = stepF - lv;
   if (age < 1) return 1;
   return fmaxf(0, 1 - (age - 1) / tail);
+}
+// Raum-Feuerwerk: Rakete Nummer k explodiert an einem Panel irgendwo im Raum (für alle Panelwände gleich)
+bool burst(uint32_t k, float& u, float& h, float& hue) {
+  if (!nU) return false;
+  const Unit& q = un[mix(k, 77) % nU]; u = q.u; h = q.h; hue = (mix(k, 5) & 0xFFFF) / 65536.0f; return true;
+}
+// Stelle eines Punkts dieser Panelwand im Raum: u entlang der Raumwände, h Höhe (cm)
+void ownPos(float px, float py, float& u, float& h) {
+  float mx, my, bw, bh; ownBox(mx, my, bw, bh);
+  float vx, vy; viewXY(px, py, vx, vy);
+  if (me < 0) { u = (vx - mx) * S; h = -(vy - my) * S; return; }
+  u = U[dev[me].w] + dev[me].x + (vx - mx) * S; h = dev[me].y - (vy - my) * S;
 }
 // Stelle eines Punkts dieser Wand auf der Effekt-Strecke (cm)
 float at(float px, float py) {
@@ -1532,6 +1595,38 @@ void fxCompute() {
           float W = room::S * (3 + 25 * (1 - K));
           pcol(room::at(px, py) / W - (float)fmod(rT * rate * 0.15, 1000.0), c, D_HUE); break;
         }
+        case 27: {                                             // Raum-Feuerwerk: Raketen explodieren an Panels im ganzen Raum
+          float S = room::S, period = (1.6f - 0.8f * K);
+          double bt = rT * rate; uint32_t k0 = (uint32_t)(bt / period);
+          float u, h; room::ownPos(px, py, u, h);
+          for (uint32_t k = k0 > 0 ? k0 - 1 : 0; k <= k0; k++) {
+            float bu, bh, bhue; if (!room::burst(k, bu, bh, bhue)) break;
+            float age = (float)(bt - k * (double)period), du = fabsf(u - bu);
+            if (room::Ptot > 0) { du = fmodf(du, room::Ptot); du = fminf(du, room::Ptot - du); }
+            float d = hypotf(du, h - bh) / S, rad = age * 5, f = fmaxf(0, 1 - age / 1.6f);
+            float a = expf(-(d - rad) * (d - rad) / 0.6f) * f * f;
+            if (a < 0.01f) continue;
+            float cc[4]; if (fx.pal) pcol(bhue, cc, D_HUE); else hue(bhue, cc);
+            for (int ch = 0; ch < 4; ch++) c[ch] += cc[ch] * a;
+            if (d < 0.6f && age < 0.25f) c[3] += 200 * (1 - age / 0.25f);   // heller Blitz in der Mitte
+          }
+          break;
+        }
+        case 28: {                                             // Raum-Pingpong: ein Lichtpunkt springt zwischen den Panelwänden hin und her
+          float S = room::S, L = fmaxf(S, room::Lc);
+          float pos = (float)fmod(rT * rate * S * 4, 2.0 * L); if (pos > L) pos = 2 * L - pos;
+          float d = fabsf(room::at(px, py) - pos) / S;
+          pcol((float)fmod(rT * rate * 0.05, 1.0), c, D_COLOR);
+          mul(c, 0.02f + 0.98f * expf(-d * d / (0.3f + 3 * K * K)));
+          break;
+        }
+        case 29: {                                             // Raum-Atmen: Atmen, das als Welle von der Mitte durch den Raum läuft
+          float S = room::S, L = fmaxf(S, room::Lc), dist = fabsf(room::at(px, py) - L / 2);
+          float b = 0.5f + 0.5f * cosf(6.2831853f * ((float)fmod(rT * rate * 0.2, 1000.0) - dist / (S * (6 + 20 * (1 - K)))));
+          pcol((float)fmod(rT * rate * 0.01, 1.0), c, D_COLOR);
+          mul(c, 0.04f + 0.96f * b * b);
+          break;
+        }
         case 26: {                                             // Raum-Welle: helle Wellen laufen durch den Raum
           float W = room::S * (4 + 20 * (1 - K)), uu = room::at(px, py);
           float b = 0.5f + 0.5f * sinf(6.2831853f * (uu / W - (float)fmod(rT * rate * 0.25, 1000.0)));
@@ -1641,7 +1736,7 @@ void dayCurve(float& dim, float& warm) {
 }
 float sleepScale = 1;                     // Sleep-Timer: blendet zum Ende hin aus
 // Wellen beim Antippen: laufen vom angetippten Panel als Ring über die Wand
-struct Ripple { uint32_t t0; float x, y; };
+struct Ripple { uint32_t t0; float x, y; bool room; };   // room: x/y sind Stelle im Raum (cm entlang der Raumwände, Höhe)
 Ripple ripples[3];
 const float RIPPLE_SPEED = 4.5f;          // Panels pro Sekunde
 // Einschalt-Animation: Panel für Panel vom Hauptpanel nach außen
@@ -1656,14 +1751,28 @@ uint32_t since(uint32_t t, uint32_t now) { int32_t d = (int32_t)(now - t); retur
 bool overlayActive() {
   uint32_t now = millis();
   if (transOn) return true;                          // weiche Übergänge auch in der App zeigen
-  for (const Ripple& r : ripples) if (r.t0 && now - r.t0 < 4000) return true;
+  for (const Ripple& r : ripples) if (r.t0 && now - r.t0 < 9500) return true;
   return (onAnimAt && now - onAnimAt < 6000) || sigAt || progVal > 0 || game::active();
+}
+int freeRipple() { int k = 0; for (int j = 1; j < 3; j++) if (ripples[j].t0 < ripples[k].t0) k = j; return k; }
+// Welle von einer Stelle im Raum; t: Uhrzeit (Sekunden seit Mitternacht), zu der angetippt wurde (-1: jetzt)
+void roomRipple(float u, float h, double t) {
+  if (!cfg.touchWave || room::me < 0) return;
+  double late = t >= 0 && timeOk() ? room::tsec() - t : 0;
+  if (late < 0 || late > 3) late = 0;
+  int k = freeRipple(); ripples[k].t0 = (millis() - (uint32_t)(late * 1000)) | 1; ripples[k].x = u; ripples[k].y = h; ripples[k].room = true;
 }
 void addRipple(int i) {
   if (!cfg.touchWave || i < 0 || i >= SLOTS) return;
-  int k = 0; for (int j = 1; j < 3; j++) if (ripples[j].t0 < ripples[k].t0) k = j;
-  ripples[k].t0 = millis() | 1; ripples[k].x = P[i].x * 0.5f; ripples[k].y = P[i].y * 0.866f;
-  fxLastFrame = 0;
+  if (room::me >= 0) {                                   // im Raum: Welle läuft über alle Panelwände
+    float u, h; room::ownPos(P[i].x * 0.5f, P[i].y * 0.866f, u, h);
+    roomRipple(u, h, -1);
+    char b[96]; snprintf(b, sizeof b, "{\"action\":\"tap\",\"fwd\":false,\"u\":%.1f,\"h\":%.1f,\"t\":%.3f}", u, h, room::tsec());
+    room::fanout("/api/room", b);
+    return;
+  }
+  int k = freeRipple();
+  ripples[k].t0 = millis() | 1; ripples[k].x = P[i].x * 0.5f; ripples[k].y = P[i].y * 0.866f; ripples[k].room = false;
 }
 uint32_t estMa = 0;                       // geschätzter Strom aller LEDs und Panels in mA (bei 24 V)
 const uint8_t SEG_PER_PANEL = 3;          // LED-Segmente pro Panel (eins pro Kante)
@@ -1754,13 +1863,19 @@ void computeTargets() {
   for (Ripple& r : ripples) {
     if (!r.t0) continue;
     float t = since(r.t0, now) / 1000.0f, rad = t * RIPPLE_SPEED;
-    if (t > 3.5f) { r.t0 = 0; continue; }
-    float fade = 1 - t / 3.5f;
+    float life = r.room ? fminf(9, fmaxf(3.5f, room::Ptot / 2 / (RIPPLE_SPEED * room::S) + 1.5f)) : 3.5f;
+    if (t > life) { r.t0 = 0; continue; }
+    float fade = 1 - t / life;
     for (int i = 0; i < SLOTS; i++) {
       if (!P[i].used || !P[i].attached || P[i].state == DARK) continue;
       for (int e = 0; e < 3; e++) {
         float x, y, dd; edgePos(i, P[i].edges ? e : -1, x, y, dd);
-        float d = hypotf(x - r.x, y - r.y);
+        float d;
+        if (r.room) {                                        // Abstand im Raum (entlang der Raumwände), in Panel-Seitenlängen
+          float u, h; room::ownPos(x, y, u, h); float du = fabsf(u - r.x);
+          if (room::Ptot > 0) { du = fmodf(du, room::Ptot); du = fminf(du, room::Ptot - du); }
+          d = hypotf(du, h - r.y) / room::S;
+        } else d = hypotf(x - r.x, y - r.y);
         float a = expf(-(d - rad) * (d - rad) / (P[i].edges ? 0.12f : 0.35f)) * fade;
         if (a < 0.02f) continue;
         TGT[i][e][0] = (uint8_t)fminf(255, TGT[i][e][0] + 90 * a); TGT[i][e][1] = (uint8_t)fminf(255, TGT[i][e][1] + 90 * a);
@@ -2226,12 +2341,7 @@ void publishPresetState() {
   mqtt.publish("trilumag/szene/state", curPreset >= 0 ? presetNames[curPreset].c_str() : "None", true);
 }
 
-int presetSave(int slot, const char* name) {
-  if (slot < 0 || slot >= PRESET_MAX) {
-    slot = presetFind(name);                                   // gleicher Name: überschreiben
-    for (uint8_t k = 0; slot < 0 && k < PRESET_MAX; k++) if (!presetNames[k].length()) slot = k;
-  }
-  if (slot < 0) return -1;
+String presetJson(const char* name) {
   JsonDocument d;
   d["n"] = name;
   d["m"] = master; d["on"] = masterOn;
@@ -2245,6 +2355,15 @@ int presetSave(int slot, const char* name) {
     a.add(p.r); a.add(p.g); a.add(p.b); a.add(p.w); a.add(p.bri); a.add((int)p.on);
   }
   String out; serializeJson(d, out);
+  return out;
+}
+int presetSave(int slot, const char* name) {
+  if (slot < 0 || slot >= PRESET_MAX) {
+    slot = presetFind(name);                                   // gleicher Name: überschreiben
+    for (uint8_t k = 0; slot < 0 && k < PRESET_MAX; k++) if (!presetNames[k].length()) slot = k;
+  }
+  if (slot < 0) return -1;
+  String out = presetJson(name);
   prefs.putString(presetKey(slot).c_str(), out);
   presetNames[slot] = name;
   presetsVer++;
@@ -2254,10 +2373,10 @@ int presetSave(int slot, const char* name) {
   return slot;
 }
 
-bool presetLoad(int k) {
-  if (k < 0 || k >= PRESET_MAX || !presetNames[k].length()) return false;
+// gespeicherten Zustand übernehmen (Preset oder Raum-Szene)
+bool presetApply(const String& js) {
   JsonDocument d;
-  if (deserializeJson(d, prefs.getString(presetKey(k).c_str(), ""))) return false;
+  if (deserializeJson(d, js)) return false;
   master = d["m"] | master; masterOn = d["on"] | true;
   for (JsonPair kv : d["c"].as<JsonObject>()) {
     uint32_t chip = parseHex(kv.key().c_str());
@@ -2285,12 +2404,33 @@ bool presetLoad(int k) {
     if (id < FX_COUNT && id != fx.id) fxStart(id);
   }
   resendAll();
+  return true;
+}
+bool presetLoad(int k) {
+  if (k < 0 || k >= PRESET_MAX || !presetNames[k].length()) return false;
+  if (!presetApply(prefs.getString(presetKey(k).c_str(), ""))) return false;
   curPreset = k;
   logf("[PRESET] '%s' geladen\n", presetNames[k].c_str());
   publishFx();
   return true;
 }
 
+// Raum-Szenen: jede Panelwand merkt sich ihren Teil unter dem Namen der Szene (8 Plätze, eigene Schlüssel)
+const uint8_t SCENE_MAX = 8;
+String sceneKey(uint8_t k) { return "rs" + String(k); }
+int sceneFind(const char* name) {
+  for (uint8_t k = 0; k < SCENE_MAX; k++) { JsonDocument d; if (!deserializeJson(d, prefs.getString(sceneKey(k).c_str(), "")) && !strcmp(d["n"] | "", name)) return k; }
+  return -1;
+}
+bool sceneSave(const char* name) {
+  int k = sceneFind(name);
+  for (uint8_t i = 0; k < 0 && i < SCENE_MAX; i++) if (!prefs.isKey(sceneKey(i).c_str())) k = i;
+  if (k < 0) return false;
+  prefs.putString(sceneKey(k).c_str(), presetJson(name));
+  return true;
+}
+bool sceneLoad(const char* name) { int k = sceneFind(name); if (k < 0) return false; curPreset = -1; return presetApply(prefs.getString(sceneKey(k).c_str(), "")); }
+void sceneDelete(const char* name) { int k = sceneFind(name); if (k >= 0) prefs.remove(sceneKey(k).c_str()); }
 void presetDelete(int k) {
   if (k < 0 || k >= PRESET_MAX) return;
   presetsVer++;
@@ -4200,16 +4340,35 @@ const char* apiCall(const char* path, JsonDocument& d) {
     const char* a = d["action"] | "";
     bool fwd = d["fwd"] | true;
     if (!strcmp(a, "save")) { if (!d["layout"].is<JsonObjectConst>()) return "Raum fehlt"; return room::save(d["layout"].as<JsonVariantConst>(), fwd); }
+    if (d["layout"].is<JsonObjectConst>() && strcmp(a, "save")) room::save(d["layout"].as<JsonVariantConst>(), false);   // Räume gleich mitgeschickt
+    // welcher Raum: angegeben oder der eigene; hier ausführen nur, wenn diese Panelwand darin steht
+    int rm = d["room"].is<const char*>() ? room::roomFind(d["room"].as<const char*>()) : room::ridx;
+    if (d["room"].is<const char*>() && rm < 0) return "Raum unbekannt";
+    bool here = rm >= 0 && rm == room::ridx;
     if (!strcmp(a, "fx")) {
-      if (d["layout"].is<JsonObjectConst>()) room::save(d["layout"].as<JsonVariantConst>(), false);   // Raum gleich mitgeschickt
       JsonDocument f; f.set(d["fx"]);
-      if (const char* e = apiCall("/api/effect", f)) return e;
+      if (here || rm < 0) { if (const char* e = apiCall("/api/effect", f)) return e; }
       if (fwd) {
-        JsonObject o = f.as<JsonObject>(); palCarry(o); String b; serializeJson(f, b);
-        room::fanout("/api/room", "{\"action\":\"fx\",\"fwd\":false,\"fx\":" + b + (room::raw.length() ? ",\"layout\":" + room::raw : String()) + "}");
+        JsonObject o = f.as<JsonObject>(); if (here || rm < 0) palCarry(o); String b; serializeJson(f, b);
+        room::fanout("/api/room", "{\"action\":\"fx\",\"fwd\":false,\"fx\":" + b + (room::raw.length() ? ",\"layout\":" + room::raw : String()) + "}", rm);
       }
       return nullptr;
     }
+    // Raum-Szenen: {"action":"scene","op":"save|load|delete","name":"Abend"}
+    if (!strcmp(a, "scene")) {
+      const char* op = d["op"] | ""; String nm = d["name"] | ""; nm.trim();
+      if (!nm.length() || nm.length() > 24) return "Name fehlt";
+      if (here) {
+        if (!strcmp(op, "save")) { if (!sceneSave(nm.c_str())) return "Alle 8 Szenen belegt"; }
+        else if (!strcmp(op, "load")) { if (!sceneLoad(nm.c_str()) && !fwd) return "Szene unbekannt"; }
+        else if (!strcmp(op, "delete")) sceneDelete(nm.c_str());
+        else return "Unbekannte Aktion";
+      }
+      if (fwd) { JsonDocument f; f["action"] = "scene"; f["op"] = op; f["name"] = nm; f["fwd"] = false; if (rm >= 0) f["room"] = room::rId[rm]; String b; serializeJson(f, b); room::fanout("/api/room", b, rm); }
+      return nullptr;
+    }
+    // Antippen: Welle läuft durch den ganzen Raum ({"action":"tap","u":…,"h":…,"t":Sekunden})
+    if (!strcmp(a, "tap")) { if (here) roomRipple(d["u"] | 0.0f, d["h"] | 0.0f, d["t"] | -1.0); return nullptr; }
     return "Unbekannte Aktion";
   }
   if (!strcmp(path, "/api/sync")) {
@@ -4347,6 +4506,11 @@ void setupWeb() {
   server.on("/api/energy", HTTP_GET, [] { server.send(200, "application/json", energyJson()); });
   server.on("/api/peers", HTTP_GET, [] { server.send(200, "application/json", peers::json()); });
   server.on("/api/room", HTTP_GET, [] { server.send(200, "application/json", room::json()); });
+  // Zustand für die Android-App (Hinweis bei Störung): Panel antwortet nicht, Anzahl Panels
+  server.on("/api/health", HTTP_GET, [] {
+    bool bad = faultPanelAt && millis() - faultPanelAt < 120000;
+    server.send(200, "application/json", "{\"n\":\"" + cfg.name + "\",\"bad\":" + (bad ? "true" : "false") + ",\"panels\":" + String(countAttached()) + "}");
+  });
   // Geometrie für den Raumplan: darf von der App einer anderen Wand gelesen werden
   server.on("/api/room/geo", HTTP_GET, [] { server.sendHeader("Access-Control-Allow-Origin", "*"); server.send(200, "application/json", room::geoJson()); });
   server.on("/api/hue", HTTP_GET, [] { server.send(200, "application/json", hueb::listJson()); });
@@ -4494,6 +4658,7 @@ void setupWeb() {
 }
 
 // ---------- MQTT-Empfang ----------
+void roomCommand(JsonVariantConst cmd);
 void onMqtt(char* topic, byte* payload, unsigned int len) {
   char b[64]; unsigned n = len < 63 ? len : 63; memcpy(b, payload, n); b[n] = 0;
   if (!strcmp(topic, "trilumag/tempo/set")) { JsonDocument d; d["speed"] = atoi(b); applyFx(d.as<JsonVariantConst>()); return; }
@@ -4516,17 +4681,67 @@ void onMqtt(char* topic, byte* payload, unsigned int len) {
   kelvinToColor(d);
   String t(topic);                       // trilumag/<ID>/set
   String id = t.substring(9, t.lastIndexOf('/'));
+  if (id.startsWith("raum-")) { if (room::me >= 0 && id.substring(5) == room::rId[room::ridx]) roomCommand(d.as<JsonVariantConst>()); return; }
   if (id == "alle") applyAll(d.as<JsonVariantConst>());
   else { int i = findChip(parseHex(id.c_str())); if (i >= 0) applyCommand(i, d.as<JsonVariantConst>()); }
 }
 
 void mqttStatus(const char* s) { if (mqtt.connected()) mqtt.publish("trilumag/bridge/status", s, true); }
+// ----- Raum als eigenes Licht in Home Assistant -----
+// Jede Panelwand im Raum meldet dasselbe Licht an (gleiche ID); Befehle führt jede bei sich aus,
+// die mit der kleinsten Chip-ID gibt sie zusätzlich an die Panelwände ohne MQTT weiter und meldet den Zustand.
+bool roomLeader() {
+  if (room::me < 0) return false;
+  String my = hex(P[0].chip);
+  for (uint8_t i = 0; i < room::nD; i++) if (room::dev[i].id.length() && room::dev[i].id < my) return false;
+  return true;
+}
+String roomTopic(const String& id) { return "trilumag/raum-" + id; }
+void publishRoomLight() {
+  if (!mqtt.connected()) return;
+  String old = prefs.getString("haRoom", ""), cur = room::me >= 0 ? room::rId[room::ridx] : String();
+  if (old.length() && old != cur && room::roomFind(old) < 0)            // Raum gibt es nicht mehr: aus Home Assistant entfernen
+    mqtt.publish(("homeassistant/light/trilumag_raum_" + old + "/config").c_str(), "", true);
+  if (old != cur) prefs.putString("haRoom", cur);
+  if (!cur.length()) return;
+  JsonDocument d;
+  d["name"] = nullptr; d["unique_id"] = "trilumag_raum_" + cur; d["schema"] = "json";
+  d["command_topic"] = roomTopic(cur) + "/set"; d["state_topic"] = roomTopic(cur) + "/state";
+  d["brightness"] = true; d["effect"] = true;
+  JsonArray el = d["effect_list"].to<JsonArray>(); for (uint8_t k = 0; k < FX_COUNT; k++) el.add(FX[k].name);
+  JsonObject dv = d["device"].to<JsonObject>(); dv["identifiers"].to<JsonArray>().add("trilumag_raum_" + cur);
+  dv["name"] = room::rName[room::ridx]; dv["model"] = "Trilumag Raum";
+  String b; serializeJson(d, b);
+  mqtt.publish(("homeassistant/light/trilumag_raum_" + cur + "/config").c_str(), (const uint8_t*)b.c_str(), b.length(), true);
+}
+void publishRoomState(bool force) {
+  static uint32_t lastSig = 0;
+  if (!mqtt.connected() || !roomLeader()) return;
+  uint32_t sig = ((uint32_t)masterOn << 31) ^ ((uint32_t)master << 20) ^ fx.id ^ (room::ridx << 8);
+  if (!force && sig == lastSig) return;
+  lastSig = sig;
+  JsonDocument d; d["state"] = masterOn ? "ON" : "OFF"; d["brightness"] = master; d["effect"] = FX[fx.id].name;
+  String b; serializeJson(d, b);
+  mqtt.publish((roomTopic(room::rId[room::ridx]) + "/state").c_str(), b.c_str(), true);
+}
+void roomCommand(JsonVariantConst cmd) {
+  JsonDocument f; f.set(cmd);
+  JsonDocument r; r["action"] = "fx"; r["fx"] = f; r["fwd"] = roomLeader();
+  apiCall("/api/room", r);
+  publishRoomState(true);
+}
 void mqttLoop() {
   if (!cfg.mqttOn || !cfg.mqttHost.length() || !wlanOk || otaBusy) return;
   if (mqtt.connected()) {
     mqtt.loop();
-    static uint32_t lastPwr = 0;
+    static uint32_t lastPwr = 0, lastRoom = 0; static int lastRidx = -9; static String lastRname;
     if (millis() - lastPwr > 10000) { lastPwr = millis(); publishPower(); }
+    if (millis() - lastRoom > 1000) {
+      lastRoom = millis();
+      String rn = room::ridx >= 0 ? room::rName[room::ridx] : String();
+      if (room::ridx != lastRidx || rn != lastRname) { lastRidx = room::ridx; lastRname = rn; publishRoomLight(); publishRoomState(true); }
+      else publishRoomState(false);
+    }
     return;
   }
   if (millis() - lastMqttTry < 5000) return;

@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- kleines Symbol für Benachrichtigungen: Dreieck aus vier Dreiecken, einfarbig -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp" android:height="24dp" android:viewportWidth="24" android:viewportHeight="24">
+    <path android:fillColor="#FFFFFFFF" android:pathData="M12,3 L15.6,9.2 L8.4,9.2 Z M7.6,10.6 L11.2,16.8 L4,16.8 Z M16.4,10.6 L20,16.8 L12.8,16.8 Z M12,16.2 L8.8,10.6 L15.2,10.6 Z" />
+</vector>

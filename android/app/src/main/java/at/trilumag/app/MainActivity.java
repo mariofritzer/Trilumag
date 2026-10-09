@@ -123,6 +123,18 @@ public class MainActivity extends Activity {
         chk.setOnClickListener(v -> { android.widget.Toast.makeText(this, R.string.upd_searching, android.widget.Toast.LENGTH_SHORT).show(); checkUpdate(true); });
         foot.addView(chk);
         inner.addView(foot);
+        // Hinweis bei Störung: im Hintergrund nachsehen (etwa alle 15 Minuten, nur im eigenen WLAN)
+        Switch fs = new Switch(this); fs.setText(R.string.fault_switch); fs.setTextColor(getColor(R.color.fg)); fs.setTextSize(14);
+        fs.setPadding(dp(6), dp(18), dp(6), 0); fs.setChecked(prefs.getBoolean("faultOn", false));
+        fs.setOnCheckedChangeListener((v, on) -> {
+            prefs.edit().putBoolean("faultOn", on).apply(); FaultJob.schedule(this, on);
+            if (on && android.os.Build.VERSION.SDK_INT >= 33 && checkSelfPermission(android.Manifest.permission.POST_NOTIFICATIONS) != android.content.pm.PackageManager.PERMISSION_GRANTED)
+                requestPermissions(new String[]{android.Manifest.permission.POST_NOTIFICATIONS}, 9);
+        });
+        inner.addView(fs);
+        TextView fn = new TextView(this); fn.setText(R.string.fault_note); fn.setTextColor(getColor(R.color.muted)); fn.setTextSize(12); fn.setPadding(dp(6), dp(4), dp(6), 0);
+        inner.addView(fn);
+        if (prefs.getBoolean("faultOn", false)) FaultJob.schedule(this, true);
         sv.addView(inner);
         root.addView(sv, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, 0, 1));
         setContentView(root);
