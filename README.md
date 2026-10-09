@@ -62,6 +62,7 @@ Die App hat eine eigene Versionsnummer (1.0, 1.1, …), unabhängig von der Firm
 - Antippen öffnet die gewohnte Steuerung im Vollbild. ＋ fügt eine Wand über ihre IP-Adresse hinzu, langes Drücken entfernt sie aus der Liste.
 - Die App sieht selbst bei GitHub nach (höchstens alle drei Stunden) und zeigt oben einen Hinweis, wenn eine neuere App-Version da ist. „Installieren“ lädt sie in der App herunter und installiert sie; dahinter wird alles unscharf, davor stehen Fortschritt und der aktuelle Schritt. Beim ersten Mal fragt Android, ob Trilumag Apps installieren darf.
 - Sicherungen und das Wandbild werden unter Downloads gespeichert.
+- **Hinweis bei Störung** (unten in der Liste einschalten): Die App sieht etwa alle 15 Minuten im Hintergrund nach, ob alle Panelwände erreichbar sind und ihre Panels antworten, und meldet sich sonst. Nur im eigenen WLAN, unterwegs kommt nichts.
 
 ## Effekte und Paletten
 
@@ -127,7 +128,12 @@ Unter Optionen → Andere Trilumag → „Raum einrichten“ (in der Android-App
 - **Maße:** Raumhöhe und Seitenlänge eines Panels in cm.
 - Der Raum liegt auf allen Panelwänden gleich: wo man ihn ändert, wird er an alle anderen weitergegeben. Klipst man an einer Panelwand Panels ab oder an, zieht sie ihren Eintrag selbst nach.
 - **Raum-Effekte:** Der Raum-Komet läuft wie der Komet einer Panelwand: Panel für Panel, bei „Kanten einzeln“ Kante für Kante, und springt am Ende einer Panelwand zur nächsten Panelwand im Raum. Es gibt genau einen Kopf für alle Panelwände. Raum-Regenbogen und Raum-Welle laufen entlang der Raumwände über alle Panelwände. Jede Panelwand rechnet selbst mit ihrer Stelle im Raum und der Uhrzeit aus dem Internet, es werden keine Bilder verschickt. Lange Lücken zwischen den Panelwänden werden dabei kurz. Helligkeit, Tempo, Intensität und Palette gehen an alle Panelwände, eigene Paletten mit ihren Farben.
-- **Raum löschen:** löscht Grundriss und Aufstellung auf allen Panelwänden; die Panelwände und ihre Einstellungen bleiben.
+- **Mehrere Räume** (bis zu 6): oben im Raum-Fenster umschalten, „＋ Raum“ legt einen neuen an, der Name steht unter „Maße“. Eine Panelwand steht in höchstens einem Raum; „Hierher holen“ holt sie aus einem anderen.
+- **Raum löschen:** löscht diesen Raum mit Grundriss, Aufstellung und Szenen auf allen Panelwänden; die Panelwände und ihre Einstellungen bleiben.
+- **Raum-Szenen:** merken sich, was jede Panelwand im Raum zeigt (Effekt, Farben, Helligkeit), und stellen es auf allen wieder her (bis zu 8 je Raum).
+- **Antippen:** Steht die Panelwand in einem Raum, läuft die Welle beim Antippen über alle Panelwände des Raums.
+- **Home Assistant:** Jeder Raum erscheint als eigenes Licht (Ein/Aus, Helligkeit, alle Effekte inkl. Raum-Effekte) für alle seine Panelwände.
+- **Weitere Raum-Effekte:** Raum-Feuerwerk (Raketen explodieren an Panels im ganzen Raum), Raum-Pingpong (ein Lichtpunkt springt zwischen den Panelwänden hin und her), Raum-Atmen (Atmen als Welle von der Mitte durch den Raum).
 - Die anderen Panelwände brauchen dafür mindestens dieselbe Version.
 
 Auch der Gleichtakt (unter „Mehrere Panelwände“) nimmt jetzt eigene Paletten mit ihren Farben mit; die andere Panelwand legt sie als „mitgenommene“ Palette ab, ohne ihre eigenen zu ändern.
