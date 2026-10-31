@@ -275,3 +275,56 @@ def panel_klein():
                            (q(65, 29.25), q(61, 29.25)), (q(65, 52.25), q(61, 52.25)), (q(16.75, 58), q(16.75, 55))],
                texts=[('TRILUMAG Panel Rev 0.3', q(22, 50.5), 1.0)])
     return d, cfg
+
+
+# --------------------------------------------------------------------------------------------
+def main_klein():
+    """Hauptplatine Rev 0.3: Rechteck 90 × 80 mm (unter 100 × 100 mm). Pogo-Kabel an Kante 2 und 3, LED-Streifen per Kabel."""
+    import board
+    X0, Y0, W, Hh = 145.0, 110.0, 90.0, 80.0
+    board.CUSTOM = [(X0, Y0), (X0 + W, Y0), (X0 + W, Y0 + Hh), (X0, Y0 + Hh)]
+    q = lambda x, y: (X0 + x, Y0 + y)
+    d, cfg0 = main()
+    d.parts = [p for p in d.parts if not (p.ref.startswith('X') or p.ref.startswith('L'))]
+    P_ = {p.ref: p for p in d.parts}
+    fixed = {'U3': (q(45, 14), 0), 'J1': (q(14, 66.3), 90), 'J4': (q(72, 76.27), 0), 'F1': (q(26, 57), 0),
+             'PS1': (q(40, 40), 0), 'U4': (q(66, 34), 0), 'U5': (q(64, 46), 0), 'U6': (q(22, 46), 90), 'C1': (q(32, 71.5), 0), 'Q1': (q(54, 61), 0)}
+    fixed['J4'] = (q(72, 77.2), 0)
+    jx, jy = fixed['J4'][0]
+    o = lambda x, y: (x - 284.0 + jx, y - 231.475 + jy)       # Koordinaten aus dem Hand-Fanout der Rev 0.2
+    fixed['R5'] = (o(276.5, 224.0), 0); fixed['R6'] = (o(290.5, 225.5), 0)
+    ux, uy = fixed['U6'][0]
+    u = lambda x, y: (x - 189.69 + ux, y - 198.59 + uy)
+    Y = 227.795
+    pre = [('USB_DN', [o(283.25, Y), o(283.25, 228.8), o(284.25, 228.8), o(284.25, Y)], 0.2, 'F'),
+           ('USB_DN', [o(283.25, Y), o(283.25, 223.0)], 0.2, 'F'),
+           ('USB_DP', [o(283.75, Y), o(283.75, 226.3), o(284.75, 226.3), o(284.75, Y)], 0.2, 'F'),
+           ('USB_DP', [o(284.25, 226.3), o(284.25, 225.0), o(284.75, 224.5), o(284.75, 223.0)], 0.2, 'F'),
+           ('CC1', [o(282.75, Y), o(282.75, 225.0), o(281.25, 223.5)], 0.2, 'F'),
+           ('CC2', [o(285.75, Y), o(285.75, 225.0), o(287.25, 223.5)], 0.2, 'F'),
+           ('VBUS', [o(281.6, Y), o(281.6, 226.4)], 0.4, 'F'), ('VBUS', [o(286.4, Y), o(286.4, 226.4)], 0.4, 'F'),
+           ('VBUS', [o(281.6, 226.4), o(286.4, 226.4)], 0.4, 'B'),
+           ('GND', [u(190.19, 196.39), u(190.19, 197.6), u(189.19, 198.6), u(189.19, 200.79), u(188.69, 200.79)], 0.25, 'F'),
+           ('SDA', [u(190.19, 200.79), u(190.19, 202.6)], 0.25, 'F')]
+    pre_vias = [('VBUS', o(281.6, 226.4)), ('VBUS', o(286.4, 226.4))]
+    for r, (at, rot) in fixed.items():
+        P_[r].at, P_[r].rot = at, rot
+    d.add('J6', 'Connector_Generic', 'Conn_01x04', 'LED-Streifen 1', 'Trilumag:Kabel_4P_LED',
+          {'1': '+24V', '2': 'LED_D1', '3': 'GND', '4': 'GND'}, at=q(50, 74), rot=0, group='LED-Daten & Kanten',
+          note='Kabel zum Anfang von Streifen 1 (24V, DI, BI, GND)')
+    pos = {2: ((85, 30, 270), (85, 54, 270)), 3: ((5, 30, 90), (5, 54, 90))}
+    sns = {2: 'SNS_R', 3: 'SNS_L'}
+    for k in (2, 3):
+        pins = {'1': 'GND', '2': 'A', '3': 'B', '4': sns[k], '5': 'GND', '6': '+24V'}
+        for (x, y, r), suf, kind in zip(pos[k], 'AB', ('Stecker', 'Buchse')):
+            d.add(f'X{k}{suf}', 'Connector_Generic', 'Conn_01x06', f'Kante {k} Pogo {kind}', f'Trilumag:Kabel_6P_{kind}',
+                  pins, at=q(x, y), rot=r, group='Kanten',
+                  mpn=f'Magnet-Pogo 6-pol. {"männlich" if kind == "Stecker" else "weiblich"}',
+                  note=f'Kabel zum Pogo-{kind} an Kante {k}; Pin 1 und 6 sind die dicken Kontakte')
+    ant = [q(33, 0.6), q(57, 0.6), q(57, 7.3), q(33, 7.3)]
+    hs = {f'H{i + 1}': (HOLE, q(x, y)) for i, (x, y) in enumerate(((4.5, 4.5), (85.5, 4.5), (4.5, 75.5), (85.5, 75.5)))}
+    hres = [[(x - 4, y - 4), (x + 4, y - 4), (x + 4, y + 4), (x - 4, y + 4)] for _, (x, y) in hs.values()]
+    cfg = dict(classes=CLASSES, holes=hs, reserve=[ant[:]] + hres, keepouts=[ant], strips=False,
+               classmap=cfg0['classmap'], ring='custom', ring_pts=[], ring_stubs=[], pre=pre, pre_vias=pre_vias,
+               texts=[('Antenne frei lassen', q(45, 9), 0.8)])
+    return d, cfg

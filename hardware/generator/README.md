@@ -14,3 +14,7 @@ Hauptplatine: `./auto.sh`, danach die Nacharbeit in dieser Reihenfolge:
 Nebenplatine Rev 0.3 (70 × 64 mm, Rechteck): `GRID=0.05 FIRST=U1,U2 RMARGIN=10 python3 selfroute.py panel_klein`,
 danach `repair.py` mit Netzliste in `/tmp/prio.txt`, J5 neben U1 verschoben, `swio.py` für den SWIO-Ausgang.
 Pogo-Stecker/-Buchsen und LED-Streifen sitzen im 3D-Druck und kommen per Kabel. Streifen 2 und 3 hängen direkt am Ende des vorherigen Streifens.
+
+Hauptplatine Rev 0.3 (90 × 80 mm): `GRID=0.05 FIRST=U6,J4,U4,U5 RMARGIN=10 python3 selfroute.py main_klein`
+(USB-C- und INA226-Fanout kommen als feste Vorab-Leiterbahnen aus `designs.main_klein`), danach `fixmk.py`,
+`padlinks.py` (Sicherungsclip, Taster, USB-Daten), `gndfix.py C3.2 U3.1`, X3B-Massebrücke, `widen.py` für die 24-V-Bahnen.

@@ -170,7 +170,10 @@ class Builder:
                 tref, tpad = p.near
                 tf = self.fps[tref]
                 tp = [MM(x) for x in next(pd for pd in tf.Pads() if pd.GetNumber() == str(tpad)).GetPosition()]
-                at, rot, poly = self.find_spot(rect, tp, placed, p.rot)
+                try:
+                    at, rot, poly = self.find_spot(rect, tp, placed, p.rot)
+                except RuntimeError:
+                    raise RuntimeError('kein Platz für ' + p.ref)
             f.SetPosition(pcbnew.VECTOR2I(U(at[0]), U(at[1])))
             f.SetOrientationDegrees(rot)
             f.SetReference(p.ref)
@@ -216,6 +219,8 @@ class Builder:
     def esp_handsolder(self, f):
         """Masse-Pad des ESP32-S3: winzige Wärmevias durch ein 1,5-mm-Loch ersetzen,
         damit man das Pad von der Rückseite mit dem Lötkolben verlöten kann."""
+        for z in list(f.Zones()):
+            f.Remove(z)          # 48 mm breite Bibliotheks-Sperrfläche; eigene Antennen-Sperrfläche kommt aus cfg
         for pd in list(f.Pads()):
             if pd.GetNumber() == '41' and pd.GetAttribute() == pcbnew.PAD_ATTRIB_PTH:
                 f.Remove(pd)
