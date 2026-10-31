@@ -17,8 +17,8 @@ def project_file(path, name, cfg):
     pats = [{"netclass": k, "pattern": n} for k, v in cfg['classmap'].items() for n in v]
     pro = {
         "board": {"design_settings": {"defaults": {"board_outline_line_width": 0.1, "copper_line_width": 0.2},
-                                      "rules": {"min_clearance": 0.2, "min_track_width": 0.25, "min_via_diameter": 0.6,
-                                                "min_through_hole_diameter": 0.3, "min_hole_clearance": 0.25,
+                                      "rules": {"min_clearance": 0.2, "min_track_width": 0.2, "min_via_diameter": 0.6,
+                                                "min_through_hole_diameter": 0.3, "min_hole_clearance": 0.15,
                                                 "min_copper_edge_clearance": 0.5},
                                       "rule_severities": {"starved_thermal": "warning", "silk_overlap": "warning", "silk_over_copper": "warning", "lib_footprint_mismatch": "warning"},
                                       "track_widths": [0.0, 0.3, 0.5, 1.0, 2.0], "via_dimensions": [{"diameter": 0.0, "drill": 0.0}, {"diameter": 0.8, "drill": 0.4}, {"diameter": 1.2, "drill": 0.6}]}},
