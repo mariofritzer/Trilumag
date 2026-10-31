@@ -224,6 +224,7 @@ class Builder:
         ls = pcbnew.LSET.AllCuMask()
         ls.AddLayer(pcbnew.B_Mask)
         hole.SetLayerSet(ls)
+        hole.SetNet(smd.GetNet())
         hole.SetPosition(smd.GetPosition())
         hole.SetPos0(smd.GetPos0()) if hasattr(hole, "SetPos0") else None
         f.Add(hole)
