@@ -62,11 +62,31 @@ def strip(name, start):
     return s + ')\n'
 
 
+def wire6(name, kind):
+    """6 Lötaugen für das Kabel zum Magnet-Pogo-Stecker (Stecker sitzt um 90° gedreht im Gehäuse).
+    1 GND, 2 A, 3 B, 4 Kantenerkennung, 5 GND, 6 +24V. Pin 1 und 6 für dickere Adern."""
+    s = HDR.format(n=name, d=f'Kabelanschluss zum 6-pol. Magnet-Pogo-{kind}, Raster 3,5 mm, Pin 1/6 für AWG20, 2-5 für AWG24-26', attr='through_hole')
+    s += _txt('reference', 'REF**', -11.6, 0, 'F.SilkS', 0.9)
+    s += _txt('value', name, 0, -4.2, 'F.Fab', 0.8)
+    s += _rect(-10.4, -2.0, 10.4, 2.0, 'F.Fab', 0.1)
+    s += _rect(-10.8, -2.4, 10.8, 3.6, 'F.CrtYd', 0.05)
+    lab = ['GND', 'A', 'B', 'S', 'GND', '24V']
+    for i in range(6):
+        x = round(-8.75 + 3.5 * i, 3)
+        big = i in (0, 5)
+        size, drill = (2.6, 1.4) if big else (1.9, 1.0)
+        shape = 'rect' if i == 0 else 'circle'
+        s += f'  (pad "{i + 1}" thru_hole {shape} (at {x} 0) (size {size} {size}) (drill {drill}) (layers "*.Cu" "*.Mask"))\n'
+        s += f'  (fp_text user "{lab[i]}" (at {x} -2.3) (layer "F.SilkS") (effects (font (size 0.7 0.7) (thickness 0.12))))\n'
+    s += _txt('user', kind, 0, 2.6, 'F.SilkS', 0.8)
+    return s + ')\n'
+
+
 def write_lib(dirpath):
     os.makedirs(dirpath, exist_ok=True)
     fps = {
-        'Pogo_5P_Stecker': pogo('Pogo_5P_Stecker', False),
-        'Pogo_5P_Buchse': pogo('Pogo_5P_Buchse', True),
+        'Kabel_6P_Stecker': wire6('Kabel_6P_Stecker', 'Stecker'),
+        'Kabel_6P_Buchse': wire6('Kabel_6P_Buchse', 'Buchse'),
         'WS2814_Anfang': strip('WS2814_Anfang', True),
         'WS2814_Ende': strip('WS2814_Ende', False),
     }

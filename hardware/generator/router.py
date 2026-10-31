@@ -6,7 +6,7 @@ from PIL import Image, ImageDraw
 
 MM = pcbnew.ToMM
 U = pcbnew.FromMM
-G = 0.2            # Rastergröße mm
+G = 0.2            # Rastergröße mm (wird für Feinarbeit umgestellt)
 
 
 class Grid:
@@ -80,27 +80,73 @@ def collect(b, netname, layer):
     return obst, own
 
 
-def route(b, netname, src_pad, edge_poly, width=0.3, clear=0.25, via=(0.8, 0.4), margin=25):
+def island(b, netname, seed):
+    """Kupfer, das mit dem Pad 'seed' zusammenhängt – je Lage als Item-Liste (für Ziele)."""
+    from shapely.geometry import Polygon as SPoly, LineString as SL, Point as SP
+    items = []   # (geom, layers, rec)
+    for f in b.GetFootprints():
+        for pd in f.Pads():
+            if pd.GetNetname() != netname: continue
+            ls = [L for L in (pcbnew.F_Cu, pcbnew.B_Cu) if pd.IsOnLayer(L)]
+            pp = pad_poly(pd)
+            items.append((SPoly(pp).buffer(0.01), ls, ('poly', pp, None), pd))
+    for t in b.GetTracks():
+        if t.GetNetname() != netname: continue
+        if t.GetClass() == 'PCB_VIA':
+            c = (MM(t.GetPosition().x), MM(t.GetPosition().y)); r = MM(t.GetWidth()) / 2
+            items.append((SP(c).buffer(r), [pcbnew.F_Cu, pcbnew.B_Cu], ('circ', c, r), t))
+        else:
+            a, e = t.GetStart(), t.GetEnd()
+            seg = ((MM(a.x), MM(a.y)), (MM(e.x), MM(e.y)))
+            g = SL(seg) if seg[0] != seg[1] else SP(seg[0])
+            items.append((g.buffer(MM(t.GetWidth()) / 2), [t.GetLayer()], ('seg', seg, MM(t.GetWidth())), t))
+    start = [i for i, it in enumerate(items) if it[3] is seed or (hasattr(it[3], 'GetPosition') and it[0].contains(SP(MM(seed.GetPosition().x), MM(seed.GetPosition().y))) and it[2][0] == 'poly' and it[3].GetParent().GetReference() == seed.GetParent().GetReference() and it[3].GetNumber() == seed.GetNumber())]
+    seen = set(start); stack = list(start)
+    while stack:
+        i = stack.pop()
+        for j, it in enumerate(items):
+            if j in seen: continue
+            if set(items[i][1]) & set(it[1]) and items[i][0].intersects(it[0]):
+                seen.add(j); stack.append(j)
+    res = {pcbnew.F_Cu: [], pcbnew.B_Cu: []}
+    for j in seen:
+        for L in items[j][1]:
+            res[L].append(items[j][2])
+    return res, [items[j][3] for j in seen]
+
+
+def route(b, netname, src_pad, edge_poly, width=0.3, clear=0.25, via=(0.8, 0.4), margin=25, targets=None):
     """Verbindet src_pad (PAD) mit dem übrigen Kupfer desselben Netzes."""
     sx, sy = MM(src_pad.GetPosition().x), MM(src_pad.GetPosition().y)
     xs = [p[0] for p in edge_poly]; ys = [p[1] for p in edge_poly]
-    g = Grid(b, min(xs), min(ys), max(xs), max(ys))
+    bx0, by0, bx1, by1 = min(xs), min(ys), max(xs), max(ys)
+    if targets is not None:
+        tp = [(sx, sy)]
+        for L in targets:
+            for kind, geo, extra in targets[L]:
+                tp += list(geo) if kind in ('poly', 'seg') else [geo]
+        m = float(__import__("os").environ.get("RMARGIN", "6"))
+        bx0 = max(bx0, min(p[0] for p in tp) - m); by0 = max(by0, min(p[1] for p in tp) - m)
+        bx1 = min(bx1, max(p[0] for p in tp) + m); by1 = min(by1, max(p[1] for p in tp) + m)
+    g = Grid(b, bx0, by0, bx1, by1)
     layers = [pcbnew.F_Cu, pcbnew.B_Cu]
     blocked, target, vblock = [], [], None
+    ownitems = []
     srcpoly = ('poly', pad_poly(src_pad), None)
     for L in layers:
         obst, own = collect(b, netname, L)
         # Platinenrand
         outside = Image.new('1', (g.w, g.h), 1)
         ImageDraw.Draw(outside).polygon([g.px(*p) for p in edge_poly], fill=0)
-        ob = g.raster(obst, clear + width / 2) | np.array(outside, dtype=bool).T
+        ob = g.raster(obst, clear + width / 2 + G * 0.6) | np.array(outside, dtype=bool).T
         er = g.raster([('poly', edge_poly, None)], 0)
         ob |= ~g.raster_inset(edge_poly, 0.6 + width / 2) if hasattr(g, 'raster_inset') else False
-        own_wo_src = [o for o in own if not (o[0] == 'poly' and o[1] == srcpoly[1])]
+        own_wo_src = [o for o in own if not (o[0] == 'poly' and o[1] == srcpoly[1])] if targets is None else targets[L]
+        ownitems.append(own_wo_src)
         tg = g.raster(own_wo_src, 0)
         blocked.append(ob)
         target.append(tg & ~ob | tg)
-        vb = g.raster(obst, clear + via[0] / 2)
+        vb = g.raster(obst, clear + via[0] / 2 + G * 0.6)
         vblock = vb if vblock is None else (vblock | vb)
     # Rand-Abstand
     inner = Image.new('1', (g.w, g.h), 0)
@@ -118,9 +164,12 @@ def route(b, netname, src_pad, edge_poly, width=0.3, clear=0.25, via=(0.8, 0.4),
         if not src_pad.IsOnLayer(L):
             continue
         ii, jj = np.nonzero(sp)
+        ci, cj = g.cell(sx, sy)
         for i, j in zip(ii, jj):
-            starts.append((i, j, k))
-            blocked[k][i, j] = False
+            if not blocked[k][i, j] and abs(i - ci) <= 1 and abs(j - cj) <= 1:
+                starts.append((i, j, k))
+        if not any(s[2] == k for s in starts):
+            starts.append((ci, cj, k)); blocked[k][ci, cj] = False
     # Quellpad selbst nicht als Ziel
     for k in range(2):
         target[k] &= ~sp
@@ -193,6 +242,26 @@ def route(b, netname, src_pad, edge_poly, width=0.3, clear=0.25, via=(0.8, 0.4),
         prev = p
     if prev != start:
         segs.append((start, prev))
+    # letztes Stück sicher ins Zielkupfer führen (Mittelpunkt Pad / nächster Punkt auf der Bahn)
+    from shapely.geometry import Point as SP, Polygon as SPoly, LineString as SL
+    ex, ey = g.mm(end[0], end[1])
+    best, bd = None, 1e9
+    for kind, geo, extra in ownitems[end[2]]:
+        if kind == 'poly':
+            pg = SPoly(geo); dd = pg.distance(SP(ex, ey))
+            if dd < bd: bd, best = dd, (pg.centroid.x, pg.centroid.y) if dd > 0 or not pg.contains(SP(ex, ey)) else (ex, ey)
+            if pg.contains(SP(ex, ey)) and pg.buffer(-0.05).contains(SP(ex, ey)): bd, best = -1, (ex, ey)
+        elif kind == 'seg':
+            ln = SL(geo); dd = ln.distance(SP(ex, ey))
+            if dd < bd:
+                q = ln.interpolate(ln.project(SP(ex, ey))); bd, best = dd, (q.x, q.y)
+        elif kind == 'circ':
+            dd = math.dist(geo, (ex, ey))
+            if dd < bd: bd, best = dd, geo
+        if bd < 0: break
+    tail = None
+    if best is not None and math.dist(best, (ex, ey)) > 0.01:
+        tail = ((ex, ey), best)
     # erstes Stück im Padmittelpunkt beginnen
     for n_, (a, c) in enumerate(segs):
         t = pcbnew.PCB_TRACK(b)
@@ -200,5 +269,10 @@ def route(b, netname, src_pad, edge_poly, width=0.3, clear=0.25, via=(0.8, 0.4),
         pc = g.mm(c[0], c[1])
         t.SetStart(pcbnew.VECTOR2I(U(pa[0]), U(pa[1]))); t.SetEnd(pcbnew.VECTOR2I(U(pc[0]), U(pc[1])))
         t.SetWidth(U(width)); t.SetLayer(layers[a[2]]); t.SetNet(net)
+        b.Add(t)
+    if tail:
+        t = pcbnew.PCB_TRACK(b)
+        t.SetStart(pcbnew.VECTOR2I(U(tail[0][0]), U(tail[0][1]))); t.SetEnd(pcbnew.VECTOR2I(U(float(tail[1][0])), U(float(tail[1][1]))))
+        t.SetWidth(U(min(width, 0.3))); t.SetLayer(layers[end[2]]); t.SetNet(net)
         b.Add(t)
     return True

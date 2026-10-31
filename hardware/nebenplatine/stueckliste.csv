@@ -22,5 +22,5 @@ Menge;Referenzen;Wert;Footprint;Bestellhinweis
 1;U3;78L05;SOT-89-3_Handsoldering;78L05 SOT-89 (≥30 V Eingang)
 1;U4;XC6206P332MR;SOT-23_Handsoldering;XC6206P332MR (3,3 V)
 1;U6;74AHCT1G125;SOT-23-5_HandSoldering;74AHCT1G125 SOT-23-5
-3;X1A X2A X3A;Pogo 5P Stecker;Pogo_5P_Stecker;
-3;X1B X2B X3B;Pogo 5P Buchse;Pogo_5P_Buchse;
+3;X1A X2A X3A;Pogo 6P Stecker (Kabel);Kabel_6P_Stecker;Magnet-Pogo 6-pol. männlich
+3;X1B X2B X3B;Pogo 6P Buchse (Kabel);Kabel_6P_Buchse;Magnet-Pogo 6-pol. weiblich

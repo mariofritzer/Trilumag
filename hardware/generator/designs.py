@@ -22,12 +22,13 @@ def edges_and_strips(d, pogo_edges, sns):
     """Pogo-Stecker/-Buchse an der Kantenmitte ±15 mm, WS2814-Lötpads je Kante, Datenkette 1→2→3."""
     for k in pogo_edges:
         r = erot(k)
-        d.add(f'X{k}A', 'Connector_Generic', 'Conn_01x05', 'Pogo 5P Stecker', 'Trilumag:Pogo_5P_Stecker',
-              {'1': 'GND', '2': '+24V', '3': 'A', '4': 'B', '5': sns[k]}, at=ept(k, 115, 3), rot=r, group='Kanten',
-              note='5-pol. Magnet-Pogo, rechtwinklig, RM 2,54 – Maße prüfen')
-        d.add(f'X{k}B', 'Connector_Generic', 'Conn_01x05', 'Pogo 5P Buchse', 'Trilumag:Pogo_5P_Buchse',
-              {'1': 'GND', '2': '+24V', '3': 'A', '4': 'B', '5': sns[k]}, at=ept(k, 85, 3), rot=r, group='Kanten',
-              note='Gegenstück zum Stecker, gespiegelte Pinfolge')
+        pins = {'1': 'GND', '2': 'A', '3': 'B', '4': sns[k], '5': 'GND', '6': '+24V'}
+        d.add(f'X{k}A', 'Connector_Generic', 'Conn_01x06', 'Pogo 6P Stecker (Kabel)', 'Trilumag:Kabel_6P_Stecker',
+              pins, at=ept(k, 116, 4), rot=r, group='Kanten', mpn='Magnet-Pogo 6-pol. männlich',
+              note='Kabel zum Magnet-Pogo-Stecker; Pin 1 und 6 sind die dicken Kontakte')
+        d.add(f'X{k}B', 'Connector_Generic', 'Conn_01x06', 'Pogo 6P Buchse (Kabel)', 'Trilumag:Kabel_6P_Buchse',
+              pins, at=ept(k, 84, 4), rot=r, group='Kanten', mpn='Magnet-Pogo 6-pol. weiblich',
+              note='Kabel zur Magnet-Pogo-Buchse; Pin 1 und 6 sind die dicken Kontakte')
     chain = {1: ('LED_D1', 'GND', 'LED_D2', 'LED_B2'), 2: ('LED_D2', 'LED_B2', 'LED_D3', 'LED_B3'), 3: ('LED_D3', 'LED_B3', None, None)}
     for k in (1, 2, 3):
         di, bi, do, bo = chain[k]

@@ -191,7 +191,7 @@ class Builder:
             self.b.Add(f)
 
     def find_spot(self, rect, target, placed, rot0):
-        occ = unary_union([pp for _, pp in placed]).buffer(1.5)
+        occ = unary_union([pp for _, pp in placed]).buffer(2.5)
         okarea = self.allowed.difference(self.forbidden)
         rots = [rot0, (rot0 + 90) % 360] if rot0 is not None else [0, 90]
         r = 0.0
@@ -465,7 +465,7 @@ class Builder:
         open(dsn, 'w').write(t)
         if os.path.exists(ses):
             os.remove(ses)
-        cmd = ['timeout', '480', 'java', '-jar', '/opt/fr/fr2.jar', '--gui.enabled=false', '--router.max_passes=150',
+        cmd = ['timeout', '1500', 'java', '-jar', '/opt/fr/fr2.jar', '--gui.enabled=false', '--router.max_passes=100',
                '--router.optimizer.enabled=false', '-de', dsn, '-do', ses, '-inc', 'Masse']
         reuse = os.environ.get('SES_REUSE')
         if reuse:
