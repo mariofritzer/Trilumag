@@ -59,7 +59,12 @@ def xform(pts, at, rot):
     return [(at[0] + x * c + y * s, at[1] - x * s + y * c) for x, y in pts]
 
 
+CUSTOM = None
+
+
 def outline(chamfer=5.0):
+    if CUSTOM:
+        return list(CUSTOM)
     pts = []
     for k in (1, 2, 3):
         pts.append(ept(k, chamfer, 0))
@@ -143,7 +148,7 @@ class Builder:
     def build_parts(self):
         d = self.d
         self.board_poly = Polygon(outline())
-        forb = [strip_zone(k) for k in (1, 2, 3)] + [Polygon(p) for p in self.cfg.get('reserve', [])]
+        forb = ([strip_zone(k) for k in (1, 2, 3)] if self.cfg.get('strips', True) else []) + [Polygon(p) for p in self.cfg.get('reserve', [])]
         self.forbidden = unary_union(forb)
         self.allowed = self.board_poly.buffer(-1.2)
         placed = []
@@ -324,7 +329,7 @@ class Builder:
         self.add_poly_lines(outline(), pcbnew.Edge_Cuts, 0.1)
         self.edge_keepout()
         self.place_refs()
-        for k in (1, 2, 3):
+        for k in ((1, 2, 3) if self.cfg.get('strips', True) else ()):
             z = [ept(k, 44, 7), ept(k, 156, 7), ept(k, 156, 19), ept(k, 44, 19)]
             self.add_poly_lines(z, pcbnew.F_SilkS, 0.12)
             r = readable(erot(k))
@@ -365,6 +370,18 @@ class Builder:
         if not rc:
             return
         net = self.net('+24V')
+        if rc == 'custom':
+            pts = self.cfg['ring_pts']
+            for a, b in zip(pts, pts[1:]):
+                self.track(a, b, net, w, pcbnew.B_Cu)
+            for a, b in self.cfg.get('ring_stubs', []):
+                self.track(a, b, net, w, pcbnew.B_Cu)
+            for n, pts, ww, lay in self.cfg.get('pre', []):
+                for a, b in zip(pts, pts[1:]):
+                    self.track(a, b, self.net(n), ww, pcbnew.B_Cu if lay == 'B' else pcbnew.F_Cu)
+            for n, p in self.cfg.get('pre_vias', []):
+                self.via(p, self.net(n), 0.8, 0.4).SetLocked(True)
+            return
         inset = lambda v: (v[0] + (G[0] - v[0]) / math.dist(v, G) * 2 * depth, v[1] + (G[1] - v[1]) / math.dist(v, G) * 2 * depth)
         if rc == 'closed':
             pts = [inset(A), inset(B), inset(C), inset(A)]

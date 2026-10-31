@@ -195,3 +195,83 @@ def main():
                texts=[('TRILUMAG · Hauptplatine · Rev 0.2', P(100, 60), 2.0), ('24 V', P(26, H - 22), 1.5),
                       ('Antenne – Bereich frei lassen', P(100, 72), 1.0)])
     return d, cfg
+
+
+# --------------------------------------------------------------------------------------------
+def panel_klein():
+    """Nebenplatine Rev 0.3: kleine Rechteckplatine (70 × 64 mm, unter 100 × 100 mm).
+    Pogo-Stecker/-Buchsen und LED-Streifen sitzen im 3D-Druck und kommen per Kabel.
+    Streifen 2 und 3 werden direkt an das Ende des vorherigen Streifens gelötet."""
+    import board
+    X0, Y0, W, Hh = 145.0, 115.0, 70.0, 64.0
+    board.CUSTOM = [(X0, Y0), (X0 + W, Y0), (X0 + W, Y0 + Hh), (X0, Y0 + Hh)]
+    q = lambda x, y: (X0 + x, Y0 + y)
+    d = Design('trilumag-panel', 'Trilumag Panel (Nebenplatine) Rev 0.3')
+    g = 'Mikrocontroller'
+    d.add('U1', 'MCU_WCH_CH32V0', 'CH32V003FxPx', 'CH32V003F4P6', 'Package_SO:TSSOP-20_4.4x6.5mm_P0.65mm',
+          {'1': 'DE', '2': 'TX', '3': 'RX', '7': 'GND', '9': '+3V3', '10': 'S3R', '11': 'SDA', '12': 'SCL',
+           '13': 'S1R', '14': 'S2R', '16': 'LED_IN', '18': 'SWIO', '19': 'TINT'}, at=q(30, 31), rot=0, group=g, mpn='CH32V003F4P6')
+    g = 'Versorgung'
+    d.add('U3', 'Regulator_Linear', 'L78L05_SOT89', '78L05', 'Package_TO_SOT_SMD:SOT-89-3_Handsoldering',
+          {'3': 'V24_LDO', '1': '+5V', '2': 'GND'}, at=q(50, 18), rot=0, group=g, mpn='78L05 SOT-89 (≥30 V Eingang)')
+    d.add('D1', 'Device', 'D_TVS', 'SMBJ26A', 'Diode_SMD:D_SMB_Handsoldering', {'1': '+24V', '2': 'GND'},
+          near=('U3', '3'), group=g, mpn='SMBJ26A')
+    Cap(d, 'C1', '10µF 50V', '+24V', 'GND', ('D1', '1'), C1206, g, 'X5R/X7R 1206 50 V')
+    R(d, 'R8', '10Ω', '+24V', 'V24_LDO', ('U3', '3'), R1206, g)
+    Cap(d, 'C2', '1µF 50V', 'V24_LDO', 'GND', ('U3', '3'), C0805, g)
+    Cap(d, 'C3', '1µF', '+5V', 'GND', ('U3', '1'), C0805, g)
+    d.add('U4', 'Regulator_Linear', 'XC6206PxxxMR', 'XC6206P332MR', 'Package_TO_SOT_SMD:SOT-23_Handsoldering',
+          {'3': '+5V', '2': '+3V3', '1': 'GND'}, near=('U3', '1'), group=g, mpn='XC6206P332MR (3,3 V)')
+    Cap(d, 'C6', '1µF', '+5V', 'GND', ('U4', '3'), C0805, g)
+    Cap(d, 'C7', '1µF', '+3V3', 'GND', ('U4', '2'), C0805, g)
+    g = 'Mikrocontroller'
+    Cap(d, 'C4', '100nF', '+3V3', 'GND', ('U1', '9'), C0805, g)
+    for i, (pin, net) in enumerate([('13', '1'), ('14', '2'), ('10', '3')]):
+        R(d, f'R{i + 1}', '100Ω', f'S{net}R', f'SNS{net}', ('U1', pin), R0805, g)
+    d.add('J5', 'Connector_Generic', 'Conn_01x03', 'SWD', 'Connector_PinHeader_2.54mm:PinHeader_1x03_P2.54mm_Vertical',
+          {'1': 'SWIO', '2': 'GND', '3': '+3V3'}, at=q(14, 34), rot=0, group=g, note='WCH-LinkE: SWDIO, GND, 3V3')
+    g = 'RS-485'
+    d.add('U2', 'Interface_UART', 'MAX3485', 'MAX3485', 'Package_SO:SOIC-8_3.9x4.9mm_P1.27mm',
+          {'1': 'RX', '2': 'DE', '3': 'DE', '4': 'TX', '5': 'GND', '6': 'A', '7': 'B', '8': '+3V3'},
+          at=q(20, 18), rot=0, group=g, mpn='MAX3485ESA / SP3485EN')
+    Cap(d, 'C5', '100nF', '+3V3', 'GND', ('U2', '8'), C0805, g)
+    g = 'Lagesensor'
+    jat = q(58, 52)
+    d.add('J3', 'Connector_Generic', 'Conn_01x08', 'LIS3DH-Modul', 'Connector_PinSocket_2.54mm:PinSocket_1x08_P2.54mm_Vertical',
+          {'1': '+3V3', '2': 'GND', '3': 'SCL', '4': 'SDA', '5': 'GND', '6': '+3V3', '7': 'TINT'}, at=jat, rot=-90, group=g,
+          note='Pinfolge VCC GND SCL SDA SDO CS INT1 INT2 – mit dem Modul vergleichen')
+    R(d, 'R6', '4.7k', 'SDA', '+3V3', ('U1', '11'), R0805, g)
+    R(d, 'R7', '4.7k', 'SCL', '+3V3', ('U1', '12'), R0805, g)
+    Cap(d, 'C8', '100nF', '+3V3', 'GND', ('J3', '1'), C0805, g)
+    g = 'LED-Daten'
+    d.add('U6', '74xGxx', '74AHCT1G125', '74AHCT1G125', 'Package_TO_SOT_SMD:SOT-23-5_HandSoldering',
+          {'1': 'GND', '2': 'LED_IN', '3': 'GND', '4': 'LED_Y', '5': '+5V'}, near=('U1', '16'), group=g, mpn='74AHCT1G125 SOT-23-5')
+    Cap(d, 'C9', '100nF', '+5V', 'GND', ('U6', '5'), C0805, g)
+    R(d, 'R4', '33Ω', 'LED_Y', 'LED_D1', ('U6', '4'), R0805, g)
+    R(d, 'R5', '10k', 'LED_IN', 'GND', ('U6', '2'), R0805, g)
+    d.add('J6', 'Connector_Generic', 'Conn_01x04', 'LED-Streifen 1', 'Trilumag:Kabel_4P_LED',
+          {'1': '+24V', '2': 'LED_D1', '3': 'GND', '4': 'GND'}, at=q(22, 58), rot=0, group=g,
+          note='Kabel zum Anfang von Streifen 1 (24V, DI, BI, GND)')
+    # Kabel zu den Pogo-Steckern/-Buchsen der drei Kanten
+    g = 'Kanten'
+    pos = {1: ((21, 5, 0), (49, 5, 0)), 2: ((5, 20.5, 90), (5, 43.5, 90)), 3: ((65, 20.5, 270), (65, 43.5, 270))}
+    for k in (1, 2, 3):
+        pins = {'1': 'GND', '2': 'A', '3': 'B', '4': f'SNS{k}', '5': 'GND', '6': '+24V'}
+        for (x, y, r), suf, kind in zip(pos[k], 'AB', ('Stecker', 'Buchse')):
+            d.add(f'X{k}{suf}', 'Connector_Generic', 'Conn_01x06', f'Kante {k} Pogo {kind}', f'Trilumag:Kabel_6P_{kind}',
+                  pins, at=q(x, y), rot=r, group=g,
+                  mpn=f'Magnet-Pogo 6-pol. {"männlich" if kind == "Stecker" else "weiblich"}',
+                  note=f'Kabel zum Pogo-{kind} an Kante {k}; Pin 1 und 6 sind die dicken Kontakte')
+    mod = xform([(-15.5, -1.5), (1.5, -1.5), (1.5, 19.3), (-15.5, 19.3)], jat, -90)
+    hs = {f'H{i + 1}': (HOLE, q(x, y)) for i, (x, y) in enumerate(((4.5, 4.5), (65.5, 4.5), (11, 59.5), (59, 59.5)))}
+    hres = [[(x - 4, y - 4), (x + 4, y - 4), (x + 4, y + 4), (x - 4, y + 4)] for _, (x, y) in [v for v in hs.values()]]
+    cfg = dict(classes=CLASSES, holes=hs, reserve=[mod] + hres, strips=False,
+               classmap={'Power': ['+24V'], 'Masse': ['GND']}, ring='custom',
+               ring_pts=[q(9, 11.75), q(9, 9), q(61, 9), q(61, 55), q(9, 55), q(9, 34.75)],
+               pre=[('GND', [q(27.1375, 31.975), q(25.2, 31.975)], 0.3, 'F'),
+                    ('GND', [q(5, 38.25), q(2.3, 38.25), q(2.3, 52.25), q(5, 52.25)], 0.5, 'B')],
+               pre_vias=[('GND', q(25.2, 31.975))],
+               ring_stubs=[(q(29.75, 5), q(29.75, 9)), (q(57.75, 5), q(57.75, 9)), (q(5, 11.75), q(9, 11.75)), (q(5, 34.75), q(9, 34.75)),
+                           (q(65, 29.25), q(61, 29.25)), (q(65, 52.25), q(61, 52.25)), (q(16.75, 58), q(16.75, 55))],
+               texts=[('TRILUMAG Panel Rev 0.3', q(22, 50.5), 1.0)])
+    return d, cfg

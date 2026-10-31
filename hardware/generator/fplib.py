@@ -77,8 +77,26 @@ def wire6(name, kind):
         size, drill = (2.6, 1.4) if big else (1.9, 1.0)
         shape = 'rect' if i == 0 else 'circle'
         s += f'  (pad "{i + 1}" thru_hole {shape} (at {x} 0) (size {size} {size}) (drill {drill}) (layers "*.Cu" "*.Mask"))\n'
-        s += f'  (fp_text user "{lab[i]}" (at {x} -2.3) (layer "F.SilkS") (effects (font (size 0.7 0.7) (thickness 0.12))))\n'
+        s += f'  (fp_text user "{lab[i]}" (at {x} -2.3) (layer "F.SilkS") (effects (font (size 0.8 0.8) (thickness 0.12))))\n'
     s += _txt('user', kind, 0, 2.6, 'F.SilkS', 0.8)
+    return s + ')\n'
+
+
+def wire4(name):
+    """4 Lötaugen für das Kabel zum ersten LED-Streifen: 24V, DI, BI, GND (Streifen 2 und 3 hängen direkt am Vorgänger)."""
+    s = HDR.format(n=name, d='Kabelanschluss LED-Streifen WS2814, Raster 3,5 mm, 24V/GND für AWG20', attr='through_hole')
+    s += _txt('reference', 'REF**', -8.1, 0, 'F.SilkS', 0.9)
+    s += _txt('value', name, 0, -4.2, 'F.Fab', 0.8)
+    s += _rect(-6.9, -2.0, 6.9, 2.0, 'F.Fab', 0.1)
+    s += _rect(-7.3, -3.6, 7.3, 2.4, 'F.CrtYd', 0.05)
+    lab = ['24V', 'DI', 'BI', 'GND']
+    for i in range(4):
+        x = round(-5.25 + 3.5 * i, 3)
+        big = i in (0, 3)
+        size, drill = (2.6, 1.4) if big else (1.9, 1.0)
+        shape = 'rect' if i == 0 else 'circle'
+        s += f'  (pad "{i + 1}" thru_hole {shape} (at {x} 0) (size {size} {size}) (drill {drill}) (layers "*.Cu" "*.Mask"))\n'
+        s += f'  (fp_text user "{lab[i]}" (at {x} -2.3) (layer "F.SilkS") (effects (font (size 0.8 0.8) (thickness 0.12))))\n'
     return s + ')\n'
 
 
@@ -89,6 +107,7 @@ def write_lib(dirpath):
         'Kabel_6P_Buchse': wire6('Kabel_6P_Buchse', 'Buchse'),
         'WS2814_Anfang': strip('WS2814_Anfang', True),
         'WS2814_Ende': strip('WS2814_Ende', False),
+        'Kabel_4P_LED': wire4('Kabel_4P_LED'),
     }
     for n, t in fps.items():
         open(os.path.join(dirpath, n + '.kicad_mod'), 'w').write(t)

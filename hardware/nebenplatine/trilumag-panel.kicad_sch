@@ -1,432 +1,9 @@
 (kicad_sch (version 20230121) (generator eeschema)
-  (uuid cfb1f775-3893-4848-b897-c24ea52d7efb)
+  (uuid bfa3ae2b-98a9-4b6e-8523-9aa45929c119)
   (paper "A2")
-  (title_block (title "Trilumag Panel (Nebenplatine)") (rev "0.2") (company "Trilumag")
+  (title_block (title "Trilumag Panel (Nebenplatine) Rev 0.3") (rev "0.2") (company "Trilumag")
     (comment 1 "Erzeugt aus der Bauteilliste; Netze über Labels verbunden"))
   (lib_symbols
-    (symbol "Regulator_Linear:L78L05_SOT89"
-      (pin_names
-        (offset 0.254))
-      (in_bom yes)
-      (on_board yes)
-      (property "Reference" "U"
-        (at -3.81 3.175 0)
-        (effects
-          (font
-            (size 1.27 1.27))))
-      (property "Value" "L78L05_SOT89"
-        (at -0.635 3.175 0)
-        (effects
-          (font
-            (size 1.27 1.27))
-          (justify left)))
-      (property "Footprint" "Package_TO_SOT_SMD:SOT-89-3"
-        (at 0 5.08 0)
-        (effects
-          (font
-            (size 1.27 1.27) italic) hide))
-      (property "Datasheet" "http://www.st.com/content/ccc/resource/technical/document/datasheet/15/55/e5/aa/23/5b/43/fd/CD00000446.pdf/files/CD00000446.pdf/jcr:content/translations/en.CD00000446.pdf"
-        (at 0 -1.27 0)
-        (effects
-          (font
-            (size 1.27 1.27)) hide))
-      (property "ki_keywords" "Voltage Regulator 100mA Positive"
-        (at 0 0 0)
-        (effects
-          (font
-            (size 1.27 1.27)) hide))
-      (property "ki_description" "Positive 100mA 30V Linear Regulator, Fixed Output 5V, SOT-89"
-        (at 0 0 0)
-        (effects
-          (font
-            (size 1.27 1.27)) hide))
-      (property "ki_fp_filters" "SOT?89*"
-        (at 0 0 0)
-        (effects
-          (font
-            (size 1.27 1.27)) hide))
-      (symbol "L78L05_SOT89_0_1"
-        (rectangle
-          (start -5.08 1.905)
-          (end 5.08 -5.08)
-          (stroke
-            (width 0.254)
-            (type default))
-          (fill
-            (type background))))
-      (symbol "L78L05_SOT89_1_1"
-        (pin power_out line
-          (at 7.62 0 180)
-          (length 2.54)
-          (name "OUT"
-            (effects
-              (font
-                (size 1.27 1.27))))
-          (number "1"
-            (effects
-              (font
-                (size 1.27 1.27)))))
-        (pin power_in line
-          (at 0 -7.62 90)
-          (length 2.54)
-          (name "GND"
-            (effects
-              (font
-                (size 1.27 1.27))))
-          (number "2"
-            (effects
-              (font
-                (size 1.27 1.27)))))
-        (pin power_in line
-          (at -7.62 0 0)
-          (length 2.54)
-          (name "IN"
-            (effects
-              (font
-                (size 1.27 1.27))))
-          (number "3"
-            (effects
-              (font
-                (size 1.27 1.27)))))))
-    (symbol "Device:D_TVS"
-      (pin_numbers hide)
-      (pin_names
-        (offset 1.016) hide)
-      (in_bom yes)
-      (on_board yes)
-      (property "Reference" "D"
-        (at 0 2.54 0)
-        (effects
-          (font
-            (size 1.27 1.27))))
-      (property "Value" "D_TVS"
-        (at 0 -2.54 0)
-        (effects
-          (font
-            (size 1.27 1.27))))
-      (property "Footprint" ""
-        (at 0 0 0)
-        (effects
-          (font
-            (size 1.27 1.27)) hide))
-      (property "Datasheet" "~"
-        (at 0 0 0)
-        (effects
-          (font
-            (size 1.27 1.27)) hide))
-      (property "ki_keywords" "diode TVS thyrector"
-        (at 0 0 0)
-        (effects
-          (font
-            (size 1.27 1.27)) hide))
-      (property "ki_description" "Bidirectional transient-voltage-suppression diode"
-        (at 0 0 0)
-        (effects
-          (font
-            (size 1.27 1.27)) hide))
-      (property "ki_fp_filters" "TO-???* *_Diode_* *SingleDiode* D_*"
-        (at 0 0 0)
-        (effects
-          (font
-            (size 1.27 1.27)) hide))
-      (symbol "D_TVS_0_1"
-        (polyline
-          (pts
-            (xy 1.27 0)
-            (xy -1.27 0))
-          (stroke
-            (width 0)
-            (type default))
-          (fill
-            (type none)))
-        (polyline
-          (pts
-            (xy 0.508 1.27)
-            (xy 0 1.27)
-            (xy 0 -1.27)
-            (xy -0.508 -1.27))
-          (stroke
-            (width 0.254)
-            (type default))
-          (fill
-            (type none)))
-        (polyline
-          (pts
-            (xy -2.54 1.27)
-            (xy -2.54 -1.27)
-            (xy 2.54 1.27)
-            (xy 2.54 -1.27)
-            (xy -2.54 1.27))
-          (stroke
-            (width 0.254)
-            (type default))
-          (fill
-            (type none))))
-      (symbol "D_TVS_1_1"
-        (pin passive line
-          (at -3.81 0 0)
-          (length 2.54)
-          (name "A1"
-            (effects
-              (font
-                (size 1.27 1.27))))
-          (number "1"
-            (effects
-              (font
-                (size 1.27 1.27)))))
-        (pin passive line
-          (at 3.81 0 180)
-          (length 2.54)
-          (name "A2"
-            (effects
-              (font
-                (size 1.27 1.27))))
-          (number "2"
-            (effects
-              (font
-                (size 1.27 1.27)))))))
-    (symbol "Device:C"
-      (pin_numbers hide)
-      (pin_names
-        (offset 0.254))
-      (in_bom yes)
-      (on_board yes)
-      (property "Reference" "C"
-        (at 0.635 2.54 0)
-        (effects
-          (font
-            (size 1.27 1.27))
-          (justify left)))
-      (property "Value" "C"
-        (at 0.635 -2.54 0)
-        (effects
-          (font
-            (size 1.27 1.27))
-          (justify left)))
-      (property "Footprint" ""
-        (at 0.9652 -3.81 0)
-        (effects
-          (font
-            (size 1.27 1.27)) hide))
-      (property "Datasheet" "~"
-        (at 0 0 0)
-        (effects
-          (font
-            (size 1.27 1.27)) hide))
-      (property "ki_keywords" "cap capacitor"
-        (at 0 0 0)
-        (effects
-          (font
-            (size 1.27 1.27)) hide))
-      (property "ki_description" "Unpolarized capacitor"
-        (at 0 0 0)
-        (effects
-          (font
-            (size 1.27 1.27)) hide))
-      (property "ki_fp_filters" "C_*"
-        (at 0 0 0)
-        (effects
-          (font
-            (size 1.27 1.27)) hide))
-      (symbol "C_0_1"
-        (polyline
-          (pts
-            (xy -2.032 -0.762)
-            (xy 2.032 -0.762))
-          (stroke
-            (width 0.508)
-            (type default))
-          (fill
-            (type none)))
-        (polyline
-          (pts
-            (xy -2.032 0.762)
-            (xy 2.032 0.762))
-          (stroke
-            (width 0.508)
-            (type default))
-          (fill
-            (type none))))
-      (symbol "C_1_1"
-        (pin passive line
-          (at 0 3.81 270)
-          (length 2.794)
-          (name "~"
-            (effects
-              (font
-                (size 1.27 1.27))))
-          (number "1"
-            (effects
-              (font
-                (size 1.27 1.27)))))
-        (pin passive line
-          (at 0 -3.81 90)
-          (length 2.794)
-          (name "~"
-            (effects
-              (font
-                (size 1.27 1.27))))
-          (number "2"
-            (effects
-              (font
-                (size 1.27 1.27)))))))
-    (symbol "Device:R"
-      (pin_numbers hide)
-      (pin_names
-        (offset 0))
-      (in_bom yes)
-      (on_board yes)
-      (property "Reference" "R"
-        (at 2.032 0 90)
-        (effects
-          (font
-            (size 1.27 1.27))))
-      (property "Value" "R"
-        (at 0 0 90)
-        (effects
-          (font
-            (size 1.27 1.27))))
-      (property "Footprint" ""
-        (at -1.778 0 90)
-        (effects
-          (font
-            (size 1.27 1.27)) hide))
-      (property "Datasheet" "~"
-        (at 0 0 0)
-        (effects
-          (font
-            (size 1.27 1.27)) hide))
-      (property "ki_keywords" "R res resistor"
-        (at 0 0 0)
-        (effects
-          (font
-            (size 1.27 1.27)) hide))
-      (property "ki_description" "Resistor"
-        (at 0 0 0)
-        (effects
-          (font
-            (size 1.27 1.27)) hide))
-      (property "ki_fp_filters" "R_*"
-        (at 0 0 0)
-        (effects
-          (font
-            (size 1.27 1.27)) hide))
-      (symbol "R_0_1"
-        (rectangle
-          (start -1.016 -2.54)
-          (end 1.016 2.54)
-          (stroke
-            (width 0.254)
-            (type default))
-          (fill
-            (type none))))
-      (symbol "R_1_1"
-        (pin passive line
-          (at 0 3.81 270)
-          (length 1.27)
-          (name "~"
-            (effects
-              (font
-                (size 1.27 1.27))))
-          (number "1"
-            (effects
-              (font
-                (size 1.27 1.27)))))
-        (pin passive line
-          (at 0 -3.81 90)
-          (length 1.27)
-          (name "~"
-            (effects
-              (font
-                (size 1.27 1.27))))
-          (number "2"
-            (effects
-              (font
-                (size 1.27 1.27)))))))
-    (symbol "Regulator_Linear:XC6206PxxxMR"
-      (pin_names
-        (offset 0.254))
-      (in_bom yes)
-      (on_board yes)
-      (property "Reference" "U"
-        (at -3.81 3.175 0)
-        (effects
-          (font
-            (size 1.27 1.27))))
-      (property "Value" "XC6206PxxxMR"
-        (at 0 3.175 0)
-        (effects
-          (font
-            (size 1.27 1.27))
-          (justify left)))
-      (property "Footprint" "Package_TO_SOT_SMD:SOT-23-3"
-        (at 0 5.715 0)
-        (effects
-          (font
-            (size 1.27 1.27) italic) hide))
-      (property "Datasheet" "https://www.torexsemi.com/file/xc6206/XC6206.pdf"
-        (at 0 0 0)
-        (effects
-          (font
-            (size 1.27 1.27)) hide))
-      (property "ki_keywords" "Torex LDO Voltage Regulator Fixed Positive"
-        (at 0 0 0)
-        (effects
-          (font
-            (size 1.27 1.27)) hide))
-      (property "ki_description" "Positive 60-250mA Low Dropout Regulator, Fixed Output, SOT-23"
-        (at 0 0 0)
-        (effects
-          (font
-            (size 1.27 1.27)) hide))
-      (property "ki_fp_filters" "SOT?23?3*"
-        (at 0 0 0)
-        (effects
-          (font
-            (size 1.27 1.27)) hide))
-      (symbol "XC6206PxxxMR_0_1"
-        (rectangle
-          (start -5.08 1.905)
-          (end 5.08 -5.08)
-          (stroke
-            (width 0.254)
-            (type default))
-          (fill
-            (type background))))
-      (symbol "XC6206PxxxMR_1_1"
-        (pin power_in line
-          (at 0 -7.62 90)
-          (length 2.54)
-          (name "GND"
-            (effects
-              (font
-                (size 1.27 1.27))))
-          (number "1"
-            (effects
-              (font
-                (size 1.27 1.27)))))
-        (pin power_out line
-          (at 7.62 0 180)
-          (length 2.54)
-          (name "VO"
-            (effects
-              (font
-                (size 1.27 1.27))))
-          (number "2"
-            (effects
-              (font
-                (size 1.27 1.27)))))
-        (pin power_in line
-          (at -7.62 0 0)
-          (length 2.54)
-          (name "VI"
-            (effects
-              (font
-                (size 1.27 1.27))))
-          (number "3"
-            (effects
-              (font
-                (size 1.27 1.27)))))))
     (symbol "MCU_WCH_CH32V0:CH32V003FxPx"
       (in_bom yes)
       (on_board yes)
@@ -804,6 +381,164 @@
             (effects
               (font
                 (size 1.27 1.27)))))))
+    (symbol "Device:C"
+      (pin_numbers hide)
+      (pin_names
+        (offset 0.254))
+      (in_bom yes)
+      (on_board yes)
+      (property "Reference" "C"
+        (at 0.635 2.54 0)
+        (effects
+          (font
+            (size 1.27 1.27))
+          (justify left)))
+      (property "Value" "C"
+        (at 0.635 -2.54 0)
+        (effects
+          (font
+            (size 1.27 1.27))
+          (justify left)))
+      (property "Footprint" ""
+        (at 0.9652 -3.81 0)
+        (effects
+          (font
+            (size 1.27 1.27)) hide))
+      (property "Datasheet" "~"
+        (at 0 0 0)
+        (effects
+          (font
+            (size 1.27 1.27)) hide))
+      (property "ki_keywords" "cap capacitor"
+        (at 0 0 0)
+        (effects
+          (font
+            (size 1.27 1.27)) hide))
+      (property "ki_description" "Unpolarized capacitor"
+        (at 0 0 0)
+        (effects
+          (font
+            (size 1.27 1.27)) hide))
+      (property "ki_fp_filters" "C_*"
+        (at 0 0 0)
+        (effects
+          (font
+            (size 1.27 1.27)) hide))
+      (symbol "C_0_1"
+        (polyline
+          (pts
+            (xy -2.032 -0.762)
+            (xy 2.032 -0.762))
+          (stroke
+            (width 0.508)
+            (type default))
+          (fill
+            (type none)))
+        (polyline
+          (pts
+            (xy -2.032 0.762)
+            (xy 2.032 0.762))
+          (stroke
+            (width 0.508)
+            (type default))
+          (fill
+            (type none))))
+      (symbol "C_1_1"
+        (pin passive line
+          (at 0 3.81 270)
+          (length 2.794)
+          (name "~"
+            (effects
+              (font
+                (size 1.27 1.27))))
+          (number "1"
+            (effects
+              (font
+                (size 1.27 1.27)))))
+        (pin passive line
+          (at 0 -3.81 90)
+          (length 2.794)
+          (name "~"
+            (effects
+              (font
+                (size 1.27 1.27))))
+          (number "2"
+            (effects
+              (font
+                (size 1.27 1.27)))))))
+    (symbol "Device:R"
+      (pin_numbers hide)
+      (pin_names
+        (offset 0))
+      (in_bom yes)
+      (on_board yes)
+      (property "Reference" "R"
+        (at 2.032 0 90)
+        (effects
+          (font
+            (size 1.27 1.27))))
+      (property "Value" "R"
+        (at 0 0 90)
+        (effects
+          (font
+            (size 1.27 1.27))))
+      (property "Footprint" ""
+        (at -1.778 0 90)
+        (effects
+          (font
+            (size 1.27 1.27)) hide))
+      (property "Datasheet" "~"
+        (at 0 0 0)
+        (effects
+          (font
+            (size 1.27 1.27)) hide))
+      (property "ki_keywords" "R res resistor"
+        (at 0 0 0)
+        (effects
+          (font
+            (size 1.27 1.27)) hide))
+      (property "ki_description" "Resistor"
+        (at 0 0 0)
+        (effects
+          (font
+            (size 1.27 1.27)) hide))
+      (property "ki_fp_filters" "R_*"
+        (at 0 0 0)
+        (effects
+          (font
+            (size 1.27 1.27)) hide))
+      (symbol "R_0_1"
+        (rectangle
+          (start -1.016 -2.54)
+          (end 1.016 2.54)
+          (stroke
+            (width 0.254)
+            (type default))
+          (fill
+            (type none))))
+      (symbol "R_1_1"
+        (pin passive line
+          (at 0 3.81 270)
+          (length 1.27)
+          (name "~"
+            (effects
+              (font
+                (size 1.27 1.27))))
+          (number "1"
+            (effects
+              (font
+                (size 1.27 1.27)))))
+        (pin passive line
+          (at 0 -3.81 90)
+          (length 1.27)
+          (name "~"
+            (effects
+              (font
+                (size 1.27 1.27))))
+          (number "2"
+            (effects
+              (font
+                (size 1.27 1.27)))))))
     (symbol "Connector_Generic:Conn_01x03"
       (pin_names
         (offset 1.016) hide)
@@ -903,6 +638,271 @@
           (at -5.08 -2.54 0)
           (length 3.81)
           (name "Pin_3"
+            (effects
+              (font
+                (size 1.27 1.27))))
+          (number "3"
+            (effects
+              (font
+                (size 1.27 1.27)))))))
+    (symbol "Regulator_Linear:L78L05_SOT89"
+      (pin_names
+        (offset 0.254))
+      (in_bom yes)
+      (on_board yes)
+      (property "Reference" "U"
+        (at -3.81 3.175 0)
+        (effects
+          (font
+            (size 1.27 1.27))))
+      (property "Value" "L78L05_SOT89"
+        (at -0.635 3.175 0)
+        (effects
+          (font
+            (size 1.27 1.27))
+          (justify left)))
+      (property "Footprint" "Package_TO_SOT_SMD:SOT-89-3"
+        (at 0 5.08 0)
+        (effects
+          (font
+            (size 1.27 1.27) italic) hide))
+      (property "Datasheet" "http://www.st.com/content/ccc/resource/technical/document/datasheet/15/55/e5/aa/23/5b/43/fd/CD00000446.pdf/files/CD00000446.pdf/jcr:content/translations/en.CD00000446.pdf"
+        (at 0 -1.27 0)
+        (effects
+          (font
+            (size 1.27 1.27)) hide))
+      (property "ki_keywords" "Voltage Regulator 100mA Positive"
+        (at 0 0 0)
+        (effects
+          (font
+            (size 1.27 1.27)) hide))
+      (property "ki_description" "Positive 100mA 30V Linear Regulator, Fixed Output 5V, SOT-89"
+        (at 0 0 0)
+        (effects
+          (font
+            (size 1.27 1.27)) hide))
+      (property "ki_fp_filters" "SOT?89*"
+        (at 0 0 0)
+        (effects
+          (font
+            (size 1.27 1.27)) hide))
+      (symbol "L78L05_SOT89_0_1"
+        (rectangle
+          (start -5.08 1.905)
+          (end 5.08 -5.08)
+          (stroke
+            (width 0.254)
+            (type default))
+          (fill
+            (type background))))
+      (symbol "L78L05_SOT89_1_1"
+        (pin power_out line
+          (at 7.62 0 180)
+          (length 2.54)
+          (name "OUT"
+            (effects
+              (font
+                (size 1.27 1.27))))
+          (number "1"
+            (effects
+              (font
+                (size 1.27 1.27)))))
+        (pin power_in line
+          (at 0 -7.62 90)
+          (length 2.54)
+          (name "GND"
+            (effects
+              (font
+                (size 1.27 1.27))))
+          (number "2"
+            (effects
+              (font
+                (size 1.27 1.27)))))
+        (pin power_in line
+          (at -7.62 0 0)
+          (length 2.54)
+          (name "IN"
+            (effects
+              (font
+                (size 1.27 1.27))))
+          (number "3"
+            (effects
+              (font
+                (size 1.27 1.27)))))))
+    (symbol "Device:D_TVS"
+      (pin_numbers hide)
+      (pin_names
+        (offset 1.016) hide)
+      (in_bom yes)
+      (on_board yes)
+      (property "Reference" "D"
+        (at 0 2.54 0)
+        (effects
+          (font
+            (size 1.27 1.27))))
+      (property "Value" "D_TVS"
+        (at 0 -2.54 0)
+        (effects
+          (font
+            (size 1.27 1.27))))
+      (property "Footprint" ""
+        (at 0 0 0)
+        (effects
+          (font
+            (size 1.27 1.27)) hide))
+      (property "Datasheet" "~"
+        (at 0 0 0)
+        (effects
+          (font
+            (size 1.27 1.27)) hide))
+      (property "ki_keywords" "diode TVS thyrector"
+        (at 0 0 0)
+        (effects
+          (font
+            (size 1.27 1.27)) hide))
+      (property "ki_description" "Bidirectional transient-voltage-suppression diode"
+        (at 0 0 0)
+        (effects
+          (font
+            (size 1.27 1.27)) hide))
+      (property "ki_fp_filters" "TO-???* *_Diode_* *SingleDiode* D_*"
+        (at 0 0 0)
+        (effects
+          (font
+            (size 1.27 1.27)) hide))
+      (symbol "D_TVS_0_1"
+        (polyline
+          (pts
+            (xy 1.27 0)
+            (xy -1.27 0))
+          (stroke
+            (width 0)
+            (type default))
+          (fill
+            (type none)))
+        (polyline
+          (pts
+            (xy 0.508 1.27)
+            (xy 0 1.27)
+            (xy 0 -1.27)
+            (xy -0.508 -1.27))
+          (stroke
+            (width 0.254)
+            (type default))
+          (fill
+            (type none)))
+        (polyline
+          (pts
+            (xy -2.54 1.27)
+            (xy -2.54 -1.27)
+            (xy 2.54 1.27)
+            (xy 2.54 -1.27)
+            (xy -2.54 1.27))
+          (stroke
+            (width 0.254)
+            (type default))
+          (fill
+            (type none))))
+      (symbol "D_TVS_1_1"
+        (pin passive line
+          (at -3.81 0 0)
+          (length 2.54)
+          (name "A1"
+            (effects
+              (font
+                (size 1.27 1.27))))
+          (number "1"
+            (effects
+              (font
+                (size 1.27 1.27)))))
+        (pin passive line
+          (at 3.81 0 180)
+          (length 2.54)
+          (name "A2"
+            (effects
+              (font
+                (size 1.27 1.27))))
+          (number "2"
+            (effects
+              (font
+                (size 1.27 1.27)))))))
+    (symbol "Regulator_Linear:XC6206PxxxMR"
+      (pin_names
+        (offset 0.254))
+      (in_bom yes)
+      (on_board yes)
+      (property "Reference" "U"
+        (at -3.81 3.175 0)
+        (effects
+          (font
+            (size 1.27 1.27))))
+      (property "Value" "XC6206PxxxMR"
+        (at 0 3.175 0)
+        (effects
+          (font
+            (size 1.27 1.27))
+          (justify left)))
+      (property "Footprint" "Package_TO_SOT_SMD:SOT-23-3"
+        (at 0 5.715 0)
+        (effects
+          (font
+            (size 1.27 1.27) italic) hide))
+      (property "Datasheet" "https://www.torexsemi.com/file/xc6206/XC6206.pdf"
+        (at 0 0 0)
+        (effects
+          (font
+            (size 1.27 1.27)) hide))
+      (property "ki_keywords" "Torex LDO Voltage Regulator Fixed Positive"
+        (at 0 0 0)
+        (effects
+          (font
+            (size 1.27 1.27)) hide))
+      (property "ki_description" "Positive 60-250mA Low Dropout Regulator, Fixed Output, SOT-23"
+        (at 0 0 0)
+        (effects
+          (font
+            (size 1.27 1.27)) hide))
+      (property "ki_fp_filters" "SOT?23?3*"
+        (at 0 0 0)
+        (effects
+          (font
+            (size 1.27 1.27)) hide))
+      (symbol "XC6206PxxxMR_0_1"
+        (rectangle
+          (start -5.08 1.905)
+          (end 5.08 -5.08)
+          (stroke
+            (width 0.254)
+            (type default))
+          (fill
+            (type background))))
+      (symbol "XC6206PxxxMR_1_1"
+        (pin power_in line
+          (at 0 -7.62 90)
+          (length 2.54)
+          (name "GND"
+            (effects
+              (font
+                (size 1.27 1.27))))
+          (number "1"
+            (effects
+              (font
+                (size 1.27 1.27)))))
+        (pin power_out line
+          (at 7.62 0 180)
+          (length 2.54)
+          (name "VO"
+            (effects
+              (font
+                (size 1.27 1.27))))
+          (number "2"
+            (effects
+              (font
+                (size 1.27 1.27)))))
+        (pin power_in line
+          (at -7.62 0 0)
+          (length 2.54)
+          (name "VI"
             (effects
               (font
                 (size 1.27 1.27))))
@@ -1495,6 +1495,131 @@
             (effects
               (font
                 (size 1.27 1.27)))))))
+    (symbol "Connector_Generic:Conn_01x04"
+      (pin_names
+        (offset 1.016) hide)
+      (in_bom yes)
+      (on_board yes)
+      (property "Reference" "J"
+        (at 0 5.08 0)
+        (effects
+          (font
+            (size 1.27 1.27))))
+      (property "Value" "Conn_01x04"
+        (at 0 -7.62 0)
+        (effects
+          (font
+            (size 1.27 1.27))))
+      (property "Footprint" ""
+        (at 0 0 0)
+        (effects
+          (font
+            (size 1.27 1.27)) hide))
+      (property "Datasheet" "~"
+        (at 0 0 0)
+        (effects
+          (font
+            (size 1.27 1.27)) hide))
+      (property "ki_keywords" "connector"
+        (at 0 0 0)
+        (effects
+          (font
+            (size 1.27 1.27)) hide))
+      (property "ki_description" "Generic connector, single row, 01x04, script generated (kicad-library-utils/schlib/autogen/connector/)"
+        (at 0 0 0)
+        (effects
+          (font
+            (size 1.27 1.27)) hide))
+      (property "ki_fp_filters" "Connector*:*_1x??_*"
+        (at 0 0 0)
+        (effects
+          (font
+            (size 1.27 1.27)) hide))
+      (symbol "Conn_01x04_1_1"
+        (rectangle
+          (start -1.27 -4.953)
+          (end 0 -5.207)
+          (stroke
+            (width 0.1524)
+            (type default))
+          (fill
+            (type none)))
+        (rectangle
+          (start -1.27 -2.413)
+          (end 0 -2.667)
+          (stroke
+            (width 0.1524)
+            (type default))
+          (fill
+            (type none)))
+        (rectangle
+          (start -1.27 0.127)
+          (end 0 -0.127)
+          (stroke
+            (width 0.1524)
+            (type default))
+          (fill
+            (type none)))
+        (rectangle
+          (start -1.27 2.667)
+          (end 0 2.413)
+          (stroke
+            (width 0.1524)
+            (type default))
+          (fill
+            (type none)))
+        (rectangle
+          (start -1.27 3.81)
+          (end 1.27 -6.35)
+          (stroke
+            (width 0.254)
+            (type default))
+          (fill
+            (type background)))
+        (pin passive line
+          (at -5.08 2.54 0)
+          (length 3.81)
+          (name "Pin_1"
+            (effects
+              (font
+                (size 1.27 1.27))))
+          (number "1"
+            (effects
+              (font
+                (size 1.27 1.27)))))
+        (pin passive line
+          (at -5.08 0 0)
+          (length 3.81)
+          (name "Pin_2"
+            (effects
+              (font
+                (size 1.27 1.27))))
+          (number "2"
+            (effects
+              (font
+                (size 1.27 1.27)))))
+        (pin passive line
+          (at -5.08 -2.54 0)
+          (length 3.81)
+          (name "Pin_3"
+            (effects
+              (font
+                (size 1.27 1.27))))
+          (number "3"
+            (effects
+              (font
+                (size 1.27 1.27)))))
+        (pin passive line
+          (at -5.08 -5.08 0)
+          (length 3.81)
+          (name "Pin_4"
+            (effects
+              (font
+                (size 1.27 1.27))))
+          (number "4"
+            (effects
+              (font
+                (size 1.27 1.27)))))))
     (symbol "Connector_Generic:Conn_01x06"
       (pin_names
         (offset 1.016) hide)
@@ -1658,131 +1783,6 @@
             (effects
               (font
                 (size 1.27 1.27)))))))
-    (symbol "Connector_Generic:Conn_01x04"
-      (pin_names
-        (offset 1.016) hide)
-      (in_bom yes)
-      (on_board yes)
-      (property "Reference" "J"
-        (at 0 5.08 0)
-        (effects
-          (font
-            (size 1.27 1.27))))
-      (property "Value" "Conn_01x04"
-        (at 0 -7.62 0)
-        (effects
-          (font
-            (size 1.27 1.27))))
-      (property "Footprint" ""
-        (at 0 0 0)
-        (effects
-          (font
-            (size 1.27 1.27)) hide))
-      (property "Datasheet" "~"
-        (at 0 0 0)
-        (effects
-          (font
-            (size 1.27 1.27)) hide))
-      (property "ki_keywords" "connector"
-        (at 0 0 0)
-        (effects
-          (font
-            (size 1.27 1.27)) hide))
-      (property "ki_description" "Generic connector, single row, 01x04, script generated (kicad-library-utils/schlib/autogen/connector/)"
-        (at 0 0 0)
-        (effects
-          (font
-            (size 1.27 1.27)) hide))
-      (property "ki_fp_filters" "Connector*:*_1x??_*"
-        (at 0 0 0)
-        (effects
-          (font
-            (size 1.27 1.27)) hide))
-      (symbol "Conn_01x04_1_1"
-        (rectangle
-          (start -1.27 -4.953)
-          (end 0 -5.207)
-          (stroke
-            (width 0.1524)
-            (type default))
-          (fill
-            (type none)))
-        (rectangle
-          (start -1.27 -2.413)
-          (end 0 -2.667)
-          (stroke
-            (width 0.1524)
-            (type default))
-          (fill
-            (type none)))
-        (rectangle
-          (start -1.27 0.127)
-          (end 0 -0.127)
-          (stroke
-            (width 0.1524)
-            (type default))
-          (fill
-            (type none)))
-        (rectangle
-          (start -1.27 2.667)
-          (end 0 2.413)
-          (stroke
-            (width 0.1524)
-            (type default))
-          (fill
-            (type none)))
-        (rectangle
-          (start -1.27 3.81)
-          (end 1.27 -6.35)
-          (stroke
-            (width 0.254)
-            (type default))
-          (fill
-            (type background)))
-        (pin passive line
-          (at -5.08 2.54 0)
-          (length 3.81)
-          (name "Pin_1"
-            (effects
-              (font
-                (size 1.27 1.27))))
-          (number "1"
-            (effects
-              (font
-                (size 1.27 1.27)))))
-        (pin passive line
-          (at -5.08 0 0)
-          (length 3.81)
-          (name "Pin_2"
-            (effects
-              (font
-                (size 1.27 1.27))))
-          (number "2"
-            (effects
-              (font
-                (size 1.27 1.27)))))
-        (pin passive line
-          (at -5.08 -2.54 0)
-          (length 3.81)
-          (name "Pin_3"
-            (effects
-              (font
-                (size 1.27 1.27))))
-          (number "3"
-            (effects
-              (font
-                (size 1.27 1.27)))))
-        (pin passive line
-          (at -5.08 -5.08 0)
-          (length 3.81)
-          (name "Pin_4"
-            (effects
-              (font
-                (size 1.27 1.27))))
-          (number "4"
-            (effects
-              (font
-                (size 1.27 1.27)))))))
     (symbol "power:PWR_FLAG"
       (power)
       (pin_numbers hide)
@@ -1847,773 +1847,675 @@
           (fill
             (type none)))))
   )
-  (text "Versorgung" (at 25.40 22.48 0) (effects (font (size 2.5 2.5) bold) (justify left bottom)) (uuid 67e41b11-7a89-4d1b-b5c8-97bb9b8a1479))
-  (symbol (lib_id "Regulator_Linear:L78L05_SOT89") (at 43.18 38.10 0) (unit 1)
-    (in_bom yes) (on_board yes) (dnp no) (uuid 1e097fc1-1935-4b26-ae31-28fc668db2aa)
-    (property "Reference" "U3" (at 43.18 32.60 0) (effects (font (size 1.27 1.27))))
-    (property "Value" "78L05" (at 43.18 50.22 0) (effects (font (size 1.27 1.27))))
-    (property "Footprint" "Package_TO_SOT_SMD:SOT-89-3_Handsoldering" (at 43.18 52.72 0) (effects (font (size 1.27 1.27)) hide))
-    (property "Datasheet" "~" (at 43.18 52.72 0) (effects (font (size 1.27 1.27)) hide))
-    (property "Bestellnr" "78L05 SOT-89 (≥30 V Eingang)" (at 43.18 55.22 0) (effects (font (size 1.27 1.27)) hide))
-    (pin "1" (uuid 02e72d3e-c6b1-40c1-a8c8-b939a823397e))
-    (pin "2" (uuid 853f81cd-9581-4920-bf17-f7ef5a208b47))
-    (pin "3" (uuid b0aa641c-51d0-476f-bbc5-8b07b1ce2da4))
-    (instances (project "trilumag-panel" (path "/cfb1f775-3893-4848-b897-c24ea52d7efb" (reference "U3") (unit 1))))
+  (text "Mikrocontroller" (at 25.40 22.48 0) (effects (font (size 2.5 2.5) bold) (justify left bottom)) (uuid e7ba6231-58e0-4b22-9687-3c6df7e2963e))
+  (symbol (lib_id "MCU_WCH_CH32V0:CH32V003FxPx") (at 45.72 55.88 0) (unit 1)
+    (in_bom yes) (on_board yes) (dnp no) (uuid ff687ef7-3fff-44e9-b524-01c199b88002)
+    (property "Reference" "U1" (at 45.72 32.60 0) (effects (font (size 1.27 1.27))))
+    (property "Value" "CH32V003F4P6" (at 45.72 78.16 0) (effects (font (size 1.27 1.27))))
+    (property "Footprint" "Package_SO:TSSOP-20_4.4x6.5mm_P0.65mm" (at 45.72 80.66 0) (effects (font (size 1.27 1.27)) hide))
+    (property "Datasheet" "~" (at 45.72 80.66 0) (effects (font (size 1.27 1.27)) hide))
+    (property "Bestellnr" "CH32V003F4P6" (at 45.72 83.16 0) (effects (font (size 1.27 1.27)) hide))
+    (pin "1" (uuid 9a2a03fc-9131-49dd-8422-a5123f6eaf46))
+    (pin "10" (uuid 532715b1-5386-4d31-9706-3e31accfdb91))
+    (pin "11" (uuid 9ee1235a-c9fa-4f30-8651-8a1c344053d7))
+    (pin "12" (uuid 3870f218-71e9-4a15-9cbc-58e2b66bc47b))
+    (pin "13" (uuid 270b5488-2575-41db-bd44-aec7df471bd4))
+    (pin "14" (uuid ff0b244a-84cf-41d0-944a-c211cf6e4998))
+    (pin "15" (uuid 3d5bf013-f030-4554-9176-4d1d012afdf3))
+    (pin "16" (uuid 9c852bae-bd4b-4fbf-9d46-a0163933eee8))
+    (pin "17" (uuid 7d1c6656-9830-4682-a621-f960c8082542))
+    (pin "18" (uuid 28bde9cc-069d-4217-a7c2-e957c8b6e5e4))
+    (pin "19" (uuid f02036e7-884e-415e-89f1-409252a050e9))
+    (pin "2" (uuid b98a201c-59c1-49b3-a7cd-1995950e8698))
+    (pin "20" (uuid be522b99-d89b-4afc-bc43-a1c1e4a24702))
+    (pin "3" (uuid fa687a76-a0d6-4305-8fcb-6945f51ceeb2))
+    (pin "4" (uuid 1ec98752-68ae-4ceb-a231-51f05070ddae))
+    (pin "5" (uuid 0cebb622-4ce3-4327-9955-ccd8fdc4dbdf))
+    (pin "6" (uuid c76067f1-e8ae-422f-80dc-ec77ae83634d))
+    (pin "7" (uuid 8d77d4b8-c36f-4c3f-adee-2091029fc24d))
+    (pin "8" (uuid fa6d2088-435a-4ced-88a7-61a4dafff37c))
+    (pin "9" (uuid 3f094acc-2c5f-4b42-a04e-de377621d269))
+    (instances (project "trilumag-panel" (path "/bfa3ae2b-98a9-4b6e-8523-9aa45929c119" (reference "U1") (unit 1))))
   )
-  (wire (pts (xy 50.80 38.10) (xy 53.34 38.10)) (stroke (width 0) (type default)) (uuid 9e983487-dd59-4662-85fc-0e784908e313))
-  (label "+5V" (at 53.34 38.10 0) (fields_autoplaced) (effects (font (size 1.27 1.27)) (justify left bottom)) (uuid b74514f6-3f5e-4a69-8e23-9de7604055b3))
-  (wire (pts (xy 43.18 45.72) (xy 43.18 48.26)) (stroke (width 0) (type default)) (uuid 933aac93-6ac6-4482-9c95-cbc0b901dd96))
-  (label "GND" (at 43.18 48.26 270) (fields_autoplaced) (effects (font (size 1.27 1.27)) (justify right bottom)) (uuid f54d9e6a-e636-4f04-9af7-b29ed6faa6a3))
-  (wire (pts (xy 35.56 38.10) (xy 33.02 38.10)) (stroke (width 0) (type default)) (uuid 82ae420d-4416-468c-ac4a-a4a35a46fbae))
-  (label "V24_LDO" (at 33.02 38.10 180) (fields_autoplaced) (effects (font (size 1.27 1.27)) (justify right bottom)) (uuid 0b890d8e-e019-42d2-89e7-34283ce34825))
-  (symbol (lib_id "Device:D_TVS") (at 93.98 38.10 0) (unit 1)
-    (in_bom yes) (on_board yes) (dnp no) (uuid 2bc36472-fcfc-43a6-b422-26a6ba38eaf0)
-    (property "Reference" "D1" (at 93.98 32.60 0) (effects (font (size 1.27 1.27))))
-    (property "Value" "SMBJ26A" (at 93.98 42.60 0) (effects (font (size 1.27 1.27))))
-    (property "Footprint" "Diode_SMD:D_SMB_Handsoldering" (at 93.98 45.10 0) (effects (font (size 1.27 1.27)) hide))
-    (property "Datasheet" "~" (at 93.98 45.10 0) (effects (font (size 1.27 1.27)) hide))
-    (property "Bestellnr" "SMBJ26A" (at 93.98 47.60 0) (effects (font (size 1.27 1.27)) hide))
-    (pin "1" (uuid 5c9a4e5d-b648-4c61-b6c6-521593cf51e6))
-    (pin "2" (uuid e9d28dbc-75eb-4b60-8268-78c061ad967a))
-    (instances (project "trilumag-panel" (path "/cfb1f775-3893-4848-b897-c24ea52d7efb" (reference "D1") (unit 1))))
+  (wire (pts (xy 55.88 53.34) (xy 58.42 53.34)) (stroke (width 0) (type default)) (uuid d7fb818d-3584-4462-bdf2-e68fe5100c79))
+  (label "DE" (at 58.42 53.34 0) (fields_autoplaced) (effects (font (size 1.27 1.27)) (justify left bottom)) (uuid a4518ebd-0335-4299-9faa-20fffeaff603))
+  (wire (pts (xy 35.56 43.18) (xy 33.02 43.18)) (stroke (width 0) (type default)) (uuid ea9d6b41-bf83-436b-a282-48d099e4dfc8))
+  (label "S3R" (at 33.02 43.18 180) (fields_autoplaced) (effects (font (size 1.27 1.27)) (justify right bottom)) (uuid 29e91fe8-cd88-4295-8054-f8a9135421e1))
+  (wire (pts (xy 35.56 45.72) (xy 33.02 45.72)) (stroke (width 0) (type default)) (uuid c55a33d3-640b-4add-9a8c-ce34aedae8dd))
+  (label "SDA" (at 33.02 45.72 180) (fields_autoplaced) (effects (font (size 1.27 1.27)) (justify right bottom)) (uuid 4dfa0fb9-d899-40d2-b9bc-505077430c9c))
+  (wire (pts (xy 35.56 48.26) (xy 33.02 48.26)) (stroke (width 0) (type default)) (uuid 17b57285-da89-4a12-9934-96db84ae1760))
+  (label "SCL" (at 33.02 48.26 180) (fields_autoplaced) (effects (font (size 1.27 1.27)) (justify right bottom)) (uuid f11bf5e0-a3db-4ad7-848c-b52cf2b16a40))
+  (wire (pts (xy 35.56 50.80) (xy 33.02 50.80)) (stroke (width 0) (type default)) (uuid 6a4752ad-d85d-4f8c-9760-86adc3ec17e8))
+  (label "S1R" (at 33.02 50.80 180) (fields_autoplaced) (effects (font (size 1.27 1.27)) (justify right bottom)) (uuid 0ee4fe98-9779-4fff-9a14-a3f52a45563a))
+  (wire (pts (xy 35.56 53.34) (xy 33.02 53.34)) (stroke (width 0) (type default)) (uuid 36344af6-e911-445f-a6ba-205ea7aaa7ee))
+  (label "S2R" (at 33.02 53.34 180) (fields_autoplaced) (effects (font (size 1.27 1.27)) (justify right bottom)) (uuid a360bd6f-2d17-4f9d-bb7a-b0c708468fc1))
+  (no_connect (at 35.56 55.88) (uuid cec59446-9429-4e19-a868-876f02894fac))
+  (wire (pts (xy 35.56 58.42) (xy 33.02 58.42)) (stroke (width 0) (type default)) (uuid f0ca6736-07ff-4908-90c9-f589ee443403))
+  (label "LED_IN" (at 33.02 58.42 180) (fields_autoplaced) (effects (font (size 1.27 1.27)) (justify right bottom)) (uuid 6bb8aa37-9a92-4879-9142-345b5bae4a4e))
+  (no_connect (at 35.56 60.96) (uuid e727b35e-f9a4-4603-90ff-a24ce8c27165))
+  (wire (pts (xy 55.88 45.72) (xy 58.42 45.72)) (stroke (width 0) (type default)) (uuid a60c9cd6-e875-4e73-a616-616af85a6e23))
+  (label "SWIO" (at 58.42 45.72 0) (fields_autoplaced) (effects (font (size 1.27 1.27)) (justify left bottom)) (uuid a496bd0d-baa2-4d25-9bf5-8cd029650510))
+  (wire (pts (xy 55.88 48.26) (xy 58.42 48.26)) (stroke (width 0) (type default)) (uuid dda22616-e936-40c2-b7a7-7c0e77e2d31e))
+  (label "TINT" (at 58.42 48.26 0) (fields_autoplaced) (effects (font (size 1.27 1.27)) (justify left bottom)) (uuid 0497ec7a-f2ce-49c3-a348-9c6a68b58f04))
+  (wire (pts (xy 55.88 55.88) (xy 58.42 55.88)) (stroke (width 0) (type default)) (uuid b18dd0ef-8dee-4fc8-8e63-7423f80ba88b))
+  (label "TX" (at 58.42 55.88 0) (fields_autoplaced) (effects (font (size 1.27 1.27)) (justify left bottom)) (uuid 5f563b8c-deb8-45bb-8f2a-b82285aa5e9f))
+  (no_connect (at 55.88 50.80) (uuid 6d421d9a-d829-4c99-98d3-1372b5ce5f2f))
+  (wire (pts (xy 55.88 58.42) (xy 58.42 58.42)) (stroke (width 0) (type default)) (uuid 7f8d00c2-2e30-47cd-9026-4f5495713066))
+  (label "RX" (at 58.42 58.42 0) (fields_autoplaced) (effects (font (size 1.27 1.27)) (justify left bottom)) (uuid 41e32c48-7aeb-499d-ba8c-b01a90fb66e5))
+  (no_connect (at 55.88 60.96) (uuid 89de754a-4500-4810-9aec-5f0f55f83748))
+  (no_connect (at 55.88 66.04) (uuid 065c3682-c428-4b8f-90b8-931645b6f804))
+  (no_connect (at 55.88 68.58) (uuid 0f26f483-6a93-424c-97af-01cfbfef582d))
+  (wire (pts (xy 45.72 73.66) (xy 45.72 76.20)) (stroke (width 0) (type default)) (uuid 7ffdfb40-96ea-4865-9728-c0b0bd482b27))
+  (label "GND" (at 45.72 76.20 270) (fields_autoplaced) (effects (font (size 1.27 1.27)) (justify right bottom)) (uuid 3450e3ee-8ffc-452a-9a10-fc2cc1471bdc))
+  (no_connect (at 55.88 43.18) (uuid 22e759ca-7734-4641-b045-46b2e39c3daa))
+  (wire (pts (xy 45.72 38.10) (xy 45.72 35.56)) (stroke (width 0) (type default)) (uuid 562b5877-4c42-4f69-809c-dc003429ec87))
+  (label "+3V3" (at 45.72 35.56 90) (fields_autoplaced) (effects (font (size 1.27 1.27)) (justify left bottom)) (uuid 3b700069-8635-4bc1-8608-ad70875e9be5))
+  (symbol (lib_id "Device:C") (at 96.52 43.18 0) (unit 1)
+    (in_bom yes) (on_board yes) (dnp no) (uuid 590c2f79-96ac-44e2-b4a3-8e388e3e8b8a)
+    (property "Reference" "C4" (at 96.52 33.87 0) (effects (font (size 1.27 1.27))))
+    (property "Value" "100nF" (at 96.52 51.49 0) (effects (font (size 1.27 1.27))))
+    (property "Footprint" "Capacitor_SMD:C_0805_2012Metric_Pad1.18x1.45mm_HandSolder" (at 96.52 53.99 0) (effects (font (size 1.27 1.27)) hide))
+    (property "Datasheet" "~" (at 96.52 53.99 0) (effects (font (size 1.27 1.27)) hide))
+    (pin "1" (uuid c8fdae7e-b50c-4a77-abe1-d8b30a05f7c5))
+    (pin "2" (uuid 7b3cffb6-685c-446b-a019-931e11160d45))
+    (instances (project "trilumag-panel" (path "/bfa3ae2b-98a9-4b6e-8523-9aa45929c119" (reference "C4") (unit 1))))
   )
-  (wire (pts (xy 90.17 38.10) (xy 87.63 38.10)) (stroke (width 0) (type default)) (uuid 937f7321-979d-4eb0-b816-4904a6cf8157))
-  (label "+24V" (at 87.63 38.10 180) (fields_autoplaced) (effects (font (size 1.27 1.27)) (justify right bottom)) (uuid fdf9a913-37c8-4c19-91de-3e68a3f46c35))
-  (wire (pts (xy 97.79 38.10) (xy 100.33 38.10)) (stroke (width 0) (type default)) (uuid 48686800-e559-4cab-bfe2-ae86369ce623))
-  (label "GND" (at 100.33 38.10 0) (fields_autoplaced) (effects (font (size 1.27 1.27)) (justify left bottom)) (uuid e2cdfb69-ca05-4925-88af-f0d0d631d365))
-  (symbol (lib_id "Device:C") (at 137.16 43.18 0) (unit 1)
-    (in_bom yes) (on_board yes) (dnp no) (uuid 81aa588b-b7ff-44f6-a6e9-f4dedc1836bb)
-    (property "Reference" "C1" (at 137.16 33.87 0) (effects (font (size 1.27 1.27))))
-    (property "Value" "10µF 50V" (at 137.16 51.49 0) (effects (font (size 1.27 1.27))))
-    (property "Footprint" "Capacitor_SMD:C_1206_3216Metric_Pad1.33x1.80mm_HandSolder" (at 137.16 53.99 0) (effects (font (size 1.27 1.27)) hide))
-    (property "Datasheet" "~" (at 137.16 53.99 0) (effects (font (size 1.27 1.27)) hide))
-    (property "Bestellnr" "X5R/X7R 1206 50 V" (at 137.16 56.49 0) (effects (font (size 1.27 1.27)) hide))
-    (pin "1" (uuid e9c27737-9c08-46f5-b2a0-94ead4e1525a))
-    (pin "2" (uuid ace05515-271b-4d80-bb2e-112612957909))
-    (instances (project "trilumag-panel" (path "/cfb1f775-3893-4848-b897-c24ea52d7efb" (reference "C1") (unit 1))))
+  (wire (pts (xy 96.52 39.37) (xy 96.52 36.83)) (stroke (width 0) (type default)) (uuid 1249065f-7b5f-4d32-a0e2-ae88573cdfc9))
+  (label "+3V3" (at 96.52 36.83 90) (fields_autoplaced) (effects (font (size 1.27 1.27)) (justify left bottom)) (uuid ba8f56ae-e71d-4d52-b16d-8544af56d156))
+  (wire (pts (xy 96.52 46.99) (xy 96.52 49.53)) (stroke (width 0) (type default)) (uuid 5ea843dd-fe17-47ff-82cf-927098837544))
+  (label "GND" (at 96.52 49.53 270) (fields_autoplaced) (effects (font (size 1.27 1.27)) (justify right bottom)) (uuid 08adf8ff-942e-48b7-b6eb-3fac98a93969))
+  (symbol (lib_id "Device:R") (at 134.62 43.18 0) (unit 1)
+    (in_bom yes) (on_board yes) (dnp no) (uuid c79bec76-e85f-46c0-8511-1a8b681f3d46)
+    (property "Reference" "R1" (at 134.62 33.87 0) (effects (font (size 1.27 1.27))))
+    (property "Value" "100Ω" (at 134.62 51.49 0) (effects (font (size 1.27 1.27))))
+    (property "Footprint" "Resistor_SMD:R_0805_2012Metric_Pad1.20x1.40mm_HandSolder" (at 134.62 53.99 0) (effects (font (size 1.27 1.27)) hide))
+    (property "Datasheet" "~" (at 134.62 53.99 0) (effects (font (size 1.27 1.27)) hide))
+    (pin "1" (uuid 43ded381-2727-493a-b75d-31fe5c843936))
+    (pin "2" (uuid dfe1230c-ebb4-4021-ba9b-0634d702df88))
+    (instances (project "trilumag-panel" (path "/bfa3ae2b-98a9-4b6e-8523-9aa45929c119" (reference "R1") (unit 1))))
   )
-  (wire (pts (xy 137.16 39.37) (xy 137.16 36.83)) (stroke (width 0) (type default)) (uuid f871a603-23d0-45f3-a823-d65ea78ddedc))
-  (label "+24V" (at 137.16 36.83 90) (fields_autoplaced) (effects (font (size 1.27 1.27)) (justify left bottom)) (uuid c63d1f1d-dd5c-4e24-a2b0-b1021e7f2266))
-  (wire (pts (xy 137.16 46.99) (xy 137.16 49.53)) (stroke (width 0) (type default)) (uuid 8ffca331-a990-4f4e-81b1-e11c2e756541))
-  (label "GND" (at 137.16 49.53 270) (fields_autoplaced) (effects (font (size 1.27 1.27)) (justify right bottom)) (uuid cb530877-f159-4e1e-baf1-e071335c1792))
-  (symbol (lib_id "Device:R") (at 177.80 43.18 0) (unit 1)
-    (in_bom yes) (on_board yes) (dnp no) (uuid b3e9afa4-de3a-45c5-91f2-647919178c03)
-    (property "Reference" "R8" (at 177.80 33.87 0) (effects (font (size 1.27 1.27))))
-    (property "Value" "10Ω" (at 177.80 51.49 0) (effects (font (size 1.27 1.27))))
-    (property "Footprint" "Resistor_SMD:R_1206_3216Metric_Pad1.30x1.75mm_HandSolder" (at 177.80 53.99 0) (effects (font (size 1.27 1.27)) hide))
-    (property "Datasheet" "~" (at 177.80 53.99 0) (effects (font (size 1.27 1.27)) hide))
-    (pin "1" (uuid e6bcae58-30b3-4754-ba1c-5e3616e70107))
-    (pin "2" (uuid bc8c423b-17ed-41c6-ba0b-f2e6d898ba08))
-    (instances (project "trilumag-panel" (path "/cfb1f775-3893-4848-b897-c24ea52d7efb" (reference "R8") (unit 1))))
+  (wire (pts (xy 134.62 39.37) (xy 134.62 36.83)) (stroke (width 0) (type default)) (uuid 76c12e91-9a55-4c2e-9108-ed8ed51c24dc))
+  (label "S1R" (at 134.62 36.83 90) (fields_autoplaced) (effects (font (size 1.27 1.27)) (justify left bottom)) (uuid 7313e244-d32a-4c8a-a4d7-e357b87887be))
+  (wire (pts (xy 134.62 46.99) (xy 134.62 49.53)) (stroke (width 0) (type default)) (uuid 5f2fede3-88c6-4ab3-8e1e-39f8d6d63ac1))
+  (label "SNS1" (at 134.62 49.53 270) (fields_autoplaced) (effects (font (size 1.27 1.27)) (justify right bottom)) (uuid 2a27847d-7a33-4b02-af55-e7b7358e1a7a))
+  (symbol (lib_id "Device:R") (at 175.26 43.18 0) (unit 1)
+    (in_bom yes) (on_board yes) (dnp no) (uuid 074345a4-493c-49b1-bdd3-1aaca1e39684)
+    (property "Reference" "R2" (at 175.26 33.87 0) (effects (font (size 1.27 1.27))))
+    (property "Value" "100Ω" (at 175.26 51.49 0) (effects (font (size 1.27 1.27))))
+    (property "Footprint" "Resistor_SMD:R_0805_2012Metric_Pad1.20x1.40mm_HandSolder" (at 175.26 53.99 0) (effects (font (size 1.27 1.27)) hide))
+    (property "Datasheet" "~" (at 175.26 53.99 0) (effects (font (size 1.27 1.27)) hide))
+    (pin "1" (uuid 1850d5d4-bc2c-4afd-84e5-0fa77f44c9b5))
+    (pin "2" (uuid eb3f6345-e20d-48d6-92c8-95f88232bea2))
+    (instances (project "trilumag-panel" (path "/bfa3ae2b-98a9-4b6e-8523-9aa45929c119" (reference "R2") (unit 1))))
   )
-  (wire (pts (xy 177.80 39.37) (xy 177.80 36.83)) (stroke (width 0) (type default)) (uuid 408a0f00-e708-454c-aa03-6a226beb6e37))
-  (label "+24V" (at 177.80 36.83 90) (fields_autoplaced) (effects (font (size 1.27 1.27)) (justify left bottom)) (uuid a10680df-41d1-49e5-b00a-09b1f1999c1a))
-  (wire (pts (xy 177.80 46.99) (xy 177.80 49.53)) (stroke (width 0) (type default)) (uuid 65291950-b891-4d6d-b226-67d6b00b0b35))
-  (label "V24_LDO" (at 177.80 49.53 270) (fields_autoplaced) (effects (font (size 1.27 1.27)) (justify right bottom)) (uuid 6e3d34e1-4245-4b87-b568-82bd804c56b2))
-  (symbol (lib_id "Device:C") (at 218.44 43.18 0) (unit 1)
-    (in_bom yes) (on_board yes) (dnp no) (uuid 5feb417d-ea06-4442-b4b4-7b9bcd8c0f33)
-    (property "Reference" "C2" (at 218.44 33.87 0) (effects (font (size 1.27 1.27))))
-    (property "Value" "1µF 50V" (at 218.44 51.49 0) (effects (font (size 1.27 1.27))))
-    (property "Footprint" "Capacitor_SMD:C_0805_2012Metric_Pad1.18x1.45mm_HandSolder" (at 218.44 53.99 0) (effects (font (size 1.27 1.27)) hide))
-    (property "Datasheet" "~" (at 218.44 53.99 0) (effects (font (size 1.27 1.27)) hide))
-    (pin "1" (uuid 5fb42f5e-dff0-4db9-a017-5c7eefb5c399))
-    (pin "2" (uuid 8b21ac6e-1858-406a-9c2b-2e4787f98675))
-    (instances (project "trilumag-panel" (path "/cfb1f775-3893-4848-b897-c24ea52d7efb" (reference "C2") (unit 1))))
+  (wire (pts (xy 175.26 39.37) (xy 175.26 36.83)) (stroke (width 0) (type default)) (uuid 273a6673-1db7-4f5c-8831-332c4b14de16))
+  (label "S2R" (at 175.26 36.83 90) (fields_autoplaced) (effects (font (size 1.27 1.27)) (justify left bottom)) (uuid 0464a21e-1705-478b-9742-d9ff125de115))
+  (wire (pts (xy 175.26 46.99) (xy 175.26 49.53)) (stroke (width 0) (type default)) (uuid 8d441d1b-4c24-4e78-bb2c-3d07327178fe))
+  (label "SNS2" (at 175.26 49.53 270) (fields_autoplaced) (effects (font (size 1.27 1.27)) (justify right bottom)) (uuid fa3da6d7-e1e1-453f-b0aa-ac0458c9d312))
+  (symbol (lib_id "Device:R") (at 215.90 43.18 0) (unit 1)
+    (in_bom yes) (on_board yes) (dnp no) (uuid 0355c3ef-7db0-4b73-94f9-0b73b71e5237)
+    (property "Reference" "R3" (at 215.90 33.87 0) (effects (font (size 1.27 1.27))))
+    (property "Value" "100Ω" (at 215.90 51.49 0) (effects (font (size 1.27 1.27))))
+    (property "Footprint" "Resistor_SMD:R_0805_2012Metric_Pad1.20x1.40mm_HandSolder" (at 215.90 53.99 0) (effects (font (size 1.27 1.27)) hide))
+    (property "Datasheet" "~" (at 215.90 53.99 0) (effects (font (size 1.27 1.27)) hide))
+    (pin "1" (uuid 3f074aab-9d79-4ef4-baf3-c4ae5a39794f))
+    (pin "2" (uuid b13e2640-e4cf-43d2-848d-f43d1f4af3e6))
+    (instances (project "trilumag-panel" (path "/bfa3ae2b-98a9-4b6e-8523-9aa45929c119" (reference "R3") (unit 1))))
   )
-  (wire (pts (xy 218.44 39.37) (xy 218.44 36.83)) (stroke (width 0) (type default)) (uuid 5c4fea16-15fb-483c-8d7b-571f4fd07739))
-  (label "V24_LDO" (at 218.44 36.83 90) (fields_autoplaced) (effects (font (size 1.27 1.27)) (justify left bottom)) (uuid c6e4568e-4f1b-4f2f-95a2-b862f4d5b8e6))
-  (wire (pts (xy 218.44 46.99) (xy 218.44 49.53)) (stroke (width 0) (type default)) (uuid f1a2539e-b653-4e12-b2d0-79dd1a7ddc28))
-  (label "GND" (at 218.44 49.53 270) (fields_autoplaced) (effects (font (size 1.27 1.27)) (justify right bottom)) (uuid 060d5af3-5cde-47bf-9d5a-438b52ae90d3))
-  (symbol (lib_id "Device:C") (at 259.08 43.18 0) (unit 1)
-    (in_bom yes) (on_board yes) (dnp no) (uuid 30a5f088-b2da-4382-9162-f8493fcc3d02)
-    (property "Reference" "C3" (at 259.08 33.87 0) (effects (font (size 1.27 1.27))))
-    (property "Value" "1µF" (at 259.08 51.49 0) (effects (font (size 1.27 1.27))))
-    (property "Footprint" "Capacitor_SMD:C_0805_2012Metric_Pad1.18x1.45mm_HandSolder" (at 259.08 53.99 0) (effects (font (size 1.27 1.27)) hide))
-    (property "Datasheet" "~" (at 259.08 53.99 0) (effects (font (size 1.27 1.27)) hide))
-    (pin "1" (uuid dc9cc455-e2a5-47c1-8095-5982d41a0336))
-    (pin "2" (uuid 93cf1c03-4735-42ee-afc0-e3afb31954b3))
-    (instances (project "trilumag-panel" (path "/cfb1f775-3893-4848-b897-c24ea52d7efb" (reference "C3") (unit 1))))
+  (wire (pts (xy 215.90 39.37) (xy 215.90 36.83)) (stroke (width 0) (type default)) (uuid e60415ad-cee9-4c32-8887-eeb61e84b95a))
+  (label "S3R" (at 215.90 36.83 90) (fields_autoplaced) (effects (font (size 1.27 1.27)) (justify left bottom)) (uuid 412533e3-7f6d-486f-975f-9002a31c4069))
+  (wire (pts (xy 215.90 46.99) (xy 215.90 49.53)) (stroke (width 0) (type default)) (uuid 86fea788-4208-448d-850b-d91cd83401a1))
+  (label "SNS3" (at 215.90 49.53 270) (fields_autoplaced) (effects (font (size 1.27 1.27)) (justify right bottom)) (uuid 5d1cacb5-f63b-4f68-a2d5-598e63355090))
+  (symbol (lib_id "Connector_Generic:Conn_01x03") (at 40.64 119.38 0) (unit 1)
+    (in_bom yes) (on_board yes) (dnp no) (uuid fe0668f2-0f84-4f19-9b1c-fb4ff62e54e0)
+    (property "Reference" "J5" (at 40.64 111.34 0) (effects (font (size 1.27 1.27))))
+    (property "Value" "SWD" (at 40.64 126.42 0) (effects (font (size 1.27 1.27))))
+    (property "Footprint" "Connector_PinHeader_2.54mm:PinHeader_1x03_P2.54mm_Vertical" (at 40.64 128.92 0) (effects (font (size 1.27 1.27)) hide))
+    (property "Datasheet" "~" (at 40.64 128.92 0) (effects (font (size 1.27 1.27)) hide))
+    (property "Hinweis" "WCH-LinkE: SWDIO, GND, 3V3" (at 40.64 131.42 0) (effects (font (size 1.27 1.27)) hide))
+    (pin "1" (uuid 20bc6793-89ad-4feb-acfe-8fe9a59c5c1c))
+    (pin "2" (uuid 1b90b9c5-94e1-42e3-be11-17cd496381c1))
+    (pin "3" (uuid 476e04d9-07bd-4624-9080-de0594425b39))
+    (instances (project "trilumag-panel" (path "/bfa3ae2b-98a9-4b6e-8523-9aa45929c119" (reference "J5") (unit 1))))
   )
-  (wire (pts (xy 259.08 39.37) (xy 259.08 36.83)) (stroke (width 0) (type default)) (uuid e75bc2a2-3280-4256-befd-d588faebed1e))
-  (label "+5V" (at 259.08 36.83 90) (fields_autoplaced) (effects (font (size 1.27 1.27)) (justify left bottom)) (uuid 88cd6af5-31bc-491a-b68a-114b53bb6360))
-  (wire (pts (xy 259.08 46.99) (xy 259.08 49.53)) (stroke (width 0) (type default)) (uuid 55de5026-e895-4f6d-8205-f0ce393d4e87))
-  (label "GND" (at 259.08 49.53 270) (fields_autoplaced) (effects (font (size 1.27 1.27)) (justify right bottom)) (uuid 8c14c312-59d1-4ef7-9c9c-71afbb08fa7e))
-  (symbol (lib_id "Regulator_Linear:XC6206PxxxMR") (at 304.80 38.10 0) (unit 1)
-    (in_bom yes) (on_board yes) (dnp no) (uuid 73523a14-4652-40cb-aa6f-b3530b35c396)
-    (property "Reference" "U4" (at 304.80 32.60 0) (effects (font (size 1.27 1.27))))
-    (property "Value" "XC6206P332MR" (at 304.80 50.22 0) (effects (font (size 1.27 1.27))))
-    (property "Footprint" "Package_TO_SOT_SMD:SOT-23_Handsoldering" (at 304.80 52.72 0) (effects (font (size 1.27 1.27)) hide))
-    (property "Datasheet" "~" (at 304.80 52.72 0) (effects (font (size 1.27 1.27)) hide))
-    (property "Bestellnr" "XC6206P332MR (3,3 V)" (at 304.80 55.22 0) (effects (font (size 1.27 1.27)) hide))
-    (pin "1" (uuid 09253f7e-9ac9-4d95-86a7-24ac1a50225c))
-    (pin "2" (uuid 2efdaa81-56ab-4c49-855b-fa3f78b63cb8))
-    (pin "3" (uuid 003ed1cd-a8aa-4339-9f5c-97a414b4eb09))
-    (instances (project "trilumag-panel" (path "/cfb1f775-3893-4848-b897-c24ea52d7efb" (reference "U4") (unit 1))))
+  (wire (pts (xy 35.56 116.84) (xy 33.02 116.84)) (stroke (width 0) (type default)) (uuid 592ea739-6eaa-459a-b1e3-542f61c57ae6))
+  (label "SWIO" (at 33.02 116.84 180) (fields_autoplaced) (effects (font (size 1.27 1.27)) (justify right bottom)) (uuid 31265daa-7dfb-4bf1-bc63-17078793b251))
+  (wire (pts (xy 35.56 119.38) (xy 33.02 119.38)) (stroke (width 0) (type default)) (uuid 0035f8f8-a806-4dfc-a9a5-be39c05c54a3))
+  (label "GND" (at 33.02 119.38 180) (fields_autoplaced) (effects (font (size 1.27 1.27)) (justify right bottom)) (uuid 8bf88420-ac0d-48bd-9f59-87008910326c))
+  (wire (pts (xy 35.56 121.92) (xy 33.02 121.92)) (stroke (width 0) (type default)) (uuid 0a66ccba-018b-48b9-a979-230f51559e0b))
+  (label "+3V3" (at 33.02 121.92 180) (fields_autoplaced) (effects (font (size 1.27 1.27)) (justify right bottom)) (uuid 7bacd3a1-2264-4059-b437-fa8bccf007e0))
+  (text "Versorgung" (at 25.40 164.12 0) (effects (font (size 2.5 2.5) bold) (justify left bottom)) (uuid 2b6e36e8-f355-4420-9f87-edda0ae82086))
+  (symbol (lib_id "Regulator_Linear:L78L05_SOT89") (at 43.18 180.34 0) (unit 1)
+    (in_bom yes) (on_board yes) (dnp no) (uuid 97444bb7-58cf-4602-b388-0abb1fe98f74)
+    (property "Reference" "U3" (at 43.18 174.84 0) (effects (font (size 1.27 1.27))))
+    (property "Value" "78L05" (at 43.18 192.46 0) (effects (font (size 1.27 1.27))))
+    (property "Footprint" "Package_TO_SOT_SMD:SOT-89-3_Handsoldering" (at 43.18 194.96 0) (effects (font (size 1.27 1.27)) hide))
+    (property "Datasheet" "~" (at 43.18 194.96 0) (effects (font (size 1.27 1.27)) hide))
+    (property "Bestellnr" "78L05 SOT-89 (≥30 V Eingang)" (at 43.18 197.46 0) (effects (font (size 1.27 1.27)) hide))
+    (pin "1" (uuid 77080656-b650-47f4-a23e-57ec1f829983))
+    (pin "2" (uuid b56a9d18-be98-43aa-9b47-ca23dc0cbf75))
+    (pin "3" (uuid 1534165a-f624-44bf-bb05-b59f5477ef6f))
+    (instances (project "trilumag-panel" (path "/bfa3ae2b-98a9-4b6e-8523-9aa45929c119" (reference "U3") (unit 1))))
   )
-  (wire (pts (xy 304.80 45.72) (xy 304.80 48.26)) (stroke (width 0) (type default)) (uuid bd7ca61d-00c3-4153-877f-b5e1eb803349))
-  (label "GND" (at 304.80 48.26 270) (fields_autoplaced) (effects (font (size 1.27 1.27)) (justify right bottom)) (uuid c5033f9d-bfb2-47a8-84ad-a11159f76c8b))
-  (wire (pts (xy 312.42 38.10) (xy 314.96 38.10)) (stroke (width 0) (type default)) (uuid ac6d9f24-5d16-422d-941a-69c21b5c9362))
-  (label "+3V3" (at 314.96 38.10 0) (fields_autoplaced) (effects (font (size 1.27 1.27)) (justify left bottom)) (uuid 5fa39b93-cbb5-4808-a8b4-2591b0afa8f1))
-  (wire (pts (xy 297.18 38.10) (xy 294.64 38.10)) (stroke (width 0) (type default)) (uuid 16c61991-0220-4ca7-a515-f74e48a314b4))
-  (label "+5V" (at 294.64 38.10 180) (fields_autoplaced) (effects (font (size 1.27 1.27)) (justify right bottom)) (uuid 3d0f6963-c2be-4b8f-9c92-0ecb315a84fa))
-  (symbol (lib_id "Device:C") (at 35.56 93.98 0) (unit 1)
-    (in_bom yes) (on_board yes) (dnp no) (uuid 66f0bd0a-904d-459c-821e-4fa68ae4b362)
-    (property "Reference" "C6" (at 35.56 84.67 0) (effects (font (size 1.27 1.27))))
-    (property "Value" "1µF" (at 35.56 102.29 0) (effects (font (size 1.27 1.27))))
-    (property "Footprint" "Capacitor_SMD:C_0805_2012Metric_Pad1.18x1.45mm_HandSolder" (at 35.56 104.79 0) (effects (font (size 1.27 1.27)) hide))
-    (property "Datasheet" "~" (at 35.56 104.79 0) (effects (font (size 1.27 1.27)) hide))
-    (pin "1" (uuid 13a7079e-38f7-42bc-adc0-dfe91704e16e))
-    (pin "2" (uuid 8690d7d7-e9ee-468e-a5ed-14b8d5fd310d))
-    (instances (project "trilumag-panel" (path "/cfb1f775-3893-4848-b897-c24ea52d7efb" (reference "C6") (unit 1))))
+  (wire (pts (xy 50.80 180.34) (xy 53.34 180.34)) (stroke (width 0) (type default)) (uuid 52511f31-aa70-4eb2-a3de-3d007a22008c))
+  (label "+5V" (at 53.34 180.34 0) (fields_autoplaced) (effects (font (size 1.27 1.27)) (justify left bottom)) (uuid 522e9712-7c2f-4466-bd34-1ed586505722))
+  (wire (pts (xy 43.18 187.96) (xy 43.18 190.50)) (stroke (width 0) (type default)) (uuid 1f919347-a9b6-48df-9b42-d12fe68588b4))
+  (label "GND" (at 43.18 190.50 270) (fields_autoplaced) (effects (font (size 1.27 1.27)) (justify right bottom)) (uuid 1fee5e76-177f-4e48-ad47-d2d388e416fe))
+  (wire (pts (xy 35.56 180.34) (xy 33.02 180.34)) (stroke (width 0) (type default)) (uuid ebc5facf-7a49-4734-8cf0-dd06b164619e))
+  (label "V24_LDO" (at 33.02 180.34 180) (fields_autoplaced) (effects (font (size 1.27 1.27)) (justify right bottom)) (uuid 5eb3acf3-c1fb-4288-9fca-27fd037bf1ae))
+  (symbol (lib_id "Device:D_TVS") (at 93.98 180.34 0) (unit 1)
+    (in_bom yes) (on_board yes) (dnp no) (uuid 1c49e1b9-773f-440a-bc51-0aa78d2fbf17)
+    (property "Reference" "D1" (at 93.98 174.84 0) (effects (font (size 1.27 1.27))))
+    (property "Value" "SMBJ26A" (at 93.98 184.84 0) (effects (font (size 1.27 1.27))))
+    (property "Footprint" "Diode_SMD:D_SMB_Handsoldering" (at 93.98 187.34 0) (effects (font (size 1.27 1.27)) hide))
+    (property "Datasheet" "~" (at 93.98 187.34 0) (effects (font (size 1.27 1.27)) hide))
+    (property "Bestellnr" "SMBJ26A" (at 93.98 189.84 0) (effects (font (size 1.27 1.27)) hide))
+    (pin "1" (uuid 94ad62d0-3b07-49f3-88fa-acd7e39564c6))
+    (pin "2" (uuid cecc653d-7ddd-4c65-b9cf-3dcdb7aa2779))
+    (instances (project "trilumag-panel" (path "/bfa3ae2b-98a9-4b6e-8523-9aa45929c119" (reference "D1") (unit 1))))
   )
-  (wire (pts (xy 35.56 90.17) (xy 35.56 87.63)) (stroke (width 0) (type default)) (uuid c9f3eff4-2db6-4442-a945-a03ed19c7097))
-  (label "+5V" (at 35.56 87.63 90) (fields_autoplaced) (effects (font (size 1.27 1.27)) (justify left bottom)) (uuid 8cf32957-b616-4e26-b2b9-b643d94d218d))
-  (wire (pts (xy 35.56 97.79) (xy 35.56 100.33)) (stroke (width 0) (type default)) (uuid 73794957-08f0-4a7e-9a3f-caff0fec67b8))
-  (label "GND" (at 35.56 100.33 270) (fields_autoplaced) (effects (font (size 1.27 1.27)) (justify right bottom)) (uuid 0d21d771-596e-4792-af31-144df6e8d5c2))
-  (symbol (lib_id "Device:C") (at 76.20 93.98 0) (unit 1)
-    (in_bom yes) (on_board yes) (dnp no) (uuid 7113a86d-4f3c-4304-98f3-5c8effd197c0)
-    (property "Reference" "C7" (at 76.20 84.67 0) (effects (font (size 1.27 1.27))))
-    (property "Value" "1µF" (at 76.20 102.29 0) (effects (font (size 1.27 1.27))))
-    (property "Footprint" "Capacitor_SMD:C_0805_2012Metric_Pad1.18x1.45mm_HandSolder" (at 76.20 104.79 0) (effects (font (size 1.27 1.27)) hide))
-    (property "Datasheet" "~" (at 76.20 104.79 0) (effects (font (size 1.27 1.27)) hide))
-    (pin "1" (uuid 2956f54a-ec38-42c6-b33e-8899db745f24))
-    (pin "2" (uuid 387f7ccb-c8ba-406c-8e47-5261e353e470))
-    (instances (project "trilumag-panel" (path "/cfb1f775-3893-4848-b897-c24ea52d7efb" (reference "C7") (unit 1))))
+  (wire (pts (xy 90.17 180.34) (xy 87.63 180.34)) (stroke (width 0) (type default)) (uuid 4ca83b4a-e27c-42ff-9d45-186cc1a8c2b4))
+  (label "+24V" (at 87.63 180.34 180) (fields_autoplaced) (effects (font (size 1.27 1.27)) (justify right bottom)) (uuid 6c10c930-d30c-4f5f-adf2-a12821421710))
+  (wire (pts (xy 97.79 180.34) (xy 100.33 180.34)) (stroke (width 0) (type default)) (uuid 1f6cba97-de78-4818-9e78-b875ecfd0537))
+  (label "GND" (at 100.33 180.34 0) (fields_autoplaced) (effects (font (size 1.27 1.27)) (justify left bottom)) (uuid 3dd039fb-a5ae-4984-9ad2-59b645e81080))
+  (symbol (lib_id "Device:C") (at 137.16 182.88 0) (unit 1)
+    (in_bom yes) (on_board yes) (dnp no) (uuid 41f4dcb6-fa78-4587-a98b-72510be0d7f2)
+    (property "Reference" "C1" (at 137.16 173.57 0) (effects (font (size 1.27 1.27))))
+    (property "Value" "10µF 50V" (at 137.16 191.19 0) (effects (font (size 1.27 1.27))))
+    (property "Footprint" "Capacitor_SMD:C_1206_3216Metric_Pad1.33x1.80mm_HandSolder" (at 137.16 193.69 0) (effects (font (size 1.27 1.27)) hide))
+    (property "Datasheet" "~" (at 137.16 193.69 0) (effects (font (size 1.27 1.27)) hide))
+    (property "Bestellnr" "X5R/X7R 1206 50 V" (at 137.16 196.19 0) (effects (font (size 1.27 1.27)) hide))
+    (pin "1" (uuid c9294238-06cf-403c-a9ce-8b247949dd08))
+    (pin "2" (uuid d87de79f-e374-4dc0-942b-53fa39a71f3e))
+    (instances (project "trilumag-panel" (path "/bfa3ae2b-98a9-4b6e-8523-9aa45929c119" (reference "C1") (unit 1))))
   )
-  (wire (pts (xy 76.20 90.17) (xy 76.20 87.63)) (stroke (width 0) (type default)) (uuid 5b1577c6-9cfc-4de6-8edf-cf454ee3463e))
-  (label "+3V3" (at 76.20 87.63 90) (fields_autoplaced) (effects (font (size 1.27 1.27)) (justify left bottom)) (uuid afef479a-0cf3-4ce9-819f-378791d0ee13))
-  (wire (pts (xy 76.20 97.79) (xy 76.20 100.33)) (stroke (width 0) (type default)) (uuid 251fa081-b659-47cd-acf0-5c3d95456dab))
-  (label "GND" (at 76.20 100.33 270) (fields_autoplaced) (effects (font (size 1.27 1.27)) (justify right bottom)) (uuid 9190ba3e-cc39-432c-934a-7f09d1e35609))
-  (text "Mikrocontroller" (at 25.40 138.72 0) (effects (font (size 2.5 2.5) bold) (justify left bottom)) (uuid 20b56355-c719-46be-84d0-5933008675a1))
-  (symbol (lib_id "MCU_WCH_CH32V0:CH32V003FxPx") (at 45.72 172.72 0) (unit 1)
-    (in_bom yes) (on_board yes) (dnp no) (uuid 628941d8-5eb4-4b1f-8b94-c6e6dfb43901)
-    (property "Reference" "U1" (at 45.72 149.44 0) (effects (font (size 1.27 1.27))))
-    (property "Value" "CH32V003F4P6" (at 45.72 195.00 0) (effects (font (size 1.27 1.27))))
-    (property "Footprint" "Package_SO:TSSOP-20_4.4x6.5mm_P0.65mm" (at 45.72 197.50 0) (effects (font (size 1.27 1.27)) hide))
-    (property "Datasheet" "~" (at 45.72 197.50 0) (effects (font (size 1.27 1.27)) hide))
-    (property "Bestellnr" "CH32V003F4P6" (at 45.72 200.00 0) (effects (font (size 1.27 1.27)) hide))
-    (pin "1" (uuid e599e1a5-0261-4f41-b85e-afbfd64fdd85))
-    (pin "10" (uuid 23d6804f-d997-40d3-ac3f-1034d4228c3b))
-    (pin "11" (uuid 9f8a9647-abe7-43b2-95c0-988676bbdf14))
-    (pin "12" (uuid 525eac55-66ff-4b68-ba23-869c2549b60c))
-    (pin "13" (uuid d018dd81-b86d-4728-ab4f-10e8c9b47d19))
-    (pin "14" (uuid 48a8de8c-ba95-4aec-9d24-9bb05741103b))
-    (pin "15" (uuid e78bbbc7-17a6-46b0-a2d7-7ca7a9049a03))
-    (pin "16" (uuid 2c293b59-2538-4898-992e-eda7f64fbbb2))
-    (pin "17" (uuid efdae167-ce9d-4809-bdd4-62d41ec175a0))
-    (pin "18" (uuid 154e1af8-c395-435a-a2e3-898c9280f381))
-    (pin "19" (uuid 590e7c44-273a-44cc-9ae5-dc65bc169bda))
-    (pin "2" (uuid 41acb4a4-d074-4d34-8e9f-8548d95411a4))
-    (pin "20" (uuid d61b44b7-1ae0-4024-9926-ca0f9e13b529))
-    (pin "3" (uuid 0209ec85-29ff-423e-9012-4777e28b6462))
-    (pin "4" (uuid efc0d9d2-7b86-459d-81c8-b074debe2d27))
-    (pin "5" (uuid c6f74807-6678-4ac0-b866-da1d1849ff68))
-    (pin "6" (uuid db3df900-50f9-4c63-8157-1d2090892717))
-    (pin "7" (uuid 6a06050a-0ae0-4d40-aa2a-ff3ce0486df8))
-    (pin "8" (uuid e048b55e-f0e0-456e-aa80-7f17f7203d16))
-    (pin "9" (uuid 491a4670-f4ee-49b7-bdf3-b512810c0f64))
-    (instances (project "trilumag-panel" (path "/cfb1f775-3893-4848-b897-c24ea52d7efb" (reference "U1") (unit 1))))
+  (wire (pts (xy 137.16 179.07) (xy 137.16 176.53)) (stroke (width 0) (type default)) (uuid fd3d4e2e-4981-4e0a-b8eb-58f09bf892fc))
+  (label "+24V" (at 137.16 176.53 90) (fields_autoplaced) (effects (font (size 1.27 1.27)) (justify left bottom)) (uuid d2bd4c3a-37c8-44d1-965b-87a886c3431f))
+  (wire (pts (xy 137.16 186.69) (xy 137.16 189.23)) (stroke (width 0) (type default)) (uuid 8a2b4ca3-13d6-4c3c-bc36-7710c5e20724))
+  (label "GND" (at 137.16 189.23 270) (fields_autoplaced) (effects (font (size 1.27 1.27)) (justify right bottom)) (uuid 97abcadd-fbfa-4b68-a478-0b8e355ed1bc))
+  (symbol (lib_id "Device:R") (at 177.80 182.88 0) (unit 1)
+    (in_bom yes) (on_board yes) (dnp no) (uuid fded63a2-ae20-4707-b6c1-62c1752d93bb)
+    (property "Reference" "R8" (at 177.80 173.57 0) (effects (font (size 1.27 1.27))))
+    (property "Value" "10Ω" (at 177.80 191.19 0) (effects (font (size 1.27 1.27))))
+    (property "Footprint" "Resistor_SMD:R_1206_3216Metric_Pad1.30x1.75mm_HandSolder" (at 177.80 193.69 0) (effects (font (size 1.27 1.27)) hide))
+    (property "Datasheet" "~" (at 177.80 193.69 0) (effects (font (size 1.27 1.27)) hide))
+    (pin "1" (uuid baf351f4-d496-4867-862f-6176d6c1b851))
+    (pin "2" (uuid ea9835bd-c81d-4c98-a8d3-64168cf56d69))
+    (instances (project "trilumag-panel" (path "/bfa3ae2b-98a9-4b6e-8523-9aa45929c119" (reference "R8") (unit 1))))
   )
-  (wire (pts (xy 55.88 170.18) (xy 58.42 170.18)) (stroke (width 0) (type default)) (uuid ac0427ba-45eb-4417-b629-207bfd20683a))
-  (label "DE" (at 58.42 170.18 0) (fields_autoplaced) (effects (font (size 1.27 1.27)) (justify left bottom)) (uuid 0a2f266b-131d-4dd8-b1e1-3cc8de75e454))
-  (wire (pts (xy 35.56 160.02) (xy 33.02 160.02)) (stroke (width 0) (type default)) (uuid 7c7fc468-d48a-4332-8bd5-b5e2b9cec810))
-  (label "S3R" (at 33.02 160.02 180) (fields_autoplaced) (effects (font (size 1.27 1.27)) (justify right bottom)) (uuid 2ea87b82-cfdb-428f-a43d-ff19747ddf50))
-  (wire (pts (xy 35.56 162.56) (xy 33.02 162.56)) (stroke (width 0) (type default)) (uuid c7f5a71c-c883-4b71-bd56-7d2dfbadbc59))
-  (label "SDA" (at 33.02 162.56 180) (fields_autoplaced) (effects (font (size 1.27 1.27)) (justify right bottom)) (uuid 935843d1-2a19-4b96-bff0-fa6723e77348))
-  (wire (pts (xy 35.56 165.10) (xy 33.02 165.10)) (stroke (width 0) (type default)) (uuid 7eb1dfac-f56e-49e8-8707-5a7abf8153dc))
-  (label "SCL" (at 33.02 165.10 180) (fields_autoplaced) (effects (font (size 1.27 1.27)) (justify right bottom)) (uuid e70c9476-abd1-4c7a-9b22-439ba4dc5c60))
-  (wire (pts (xy 35.56 167.64) (xy 33.02 167.64)) (stroke (width 0) (type default)) (uuid 0e43eee4-a866-42ad-b852-959d8b5315ae))
-  (label "S1R" (at 33.02 167.64 180) (fields_autoplaced) (effects (font (size 1.27 1.27)) (justify right bottom)) (uuid 2ad1ebcb-cb41-41b0-a890-c518760e7212))
-  (wire (pts (xy 35.56 170.18) (xy 33.02 170.18)) (stroke (width 0) (type default)) (uuid 63b12864-7d82-4cf7-b5e0-1b4bf2806200))
-  (label "S2R" (at 33.02 170.18 180) (fields_autoplaced) (effects (font (size 1.27 1.27)) (justify right bottom)) (uuid b250c891-1f4d-4bad-acc8-72ce9af64392))
-  (no_connect (at 35.56 172.72) (uuid 7a73e92f-da97-455a-8796-f328f3ba6066))
-  (wire (pts (xy 35.56 175.26) (xy 33.02 175.26)) (stroke (width 0) (type default)) (uuid fe157a21-03ae-4923-85fd-739724d112b5))
-  (label "LED_IN" (at 33.02 175.26 180) (fields_autoplaced) (effects (font (size 1.27 1.27)) (justify right bottom)) (uuid 69046a7b-fbfe-4afe-9c2f-7cd216ba2005))
-  (no_connect (at 35.56 177.80) (uuid 01f2750b-b5b6-4a72-b08a-88c27c6288ec))
-  (wire (pts (xy 55.88 162.56) (xy 58.42 162.56)) (stroke (width 0) (type default)) (uuid 7f7843e9-8b1b-4e76-9fdb-c4f53fe29291))
-  (label "SWIO" (at 58.42 162.56 0) (fields_autoplaced) (effects (font (size 1.27 1.27)) (justify left bottom)) (uuid e5e33d65-67c0-488f-99c5-f8cda66fd812))
-  (wire (pts (xy 55.88 165.10) (xy 58.42 165.10)) (stroke (width 0) (type default)) (uuid 9d22b628-e0e9-4d61-ad0f-f1288d52b2dd))
-  (label "TINT" (at 58.42 165.10 0) (fields_autoplaced) (effects (font (size 1.27 1.27)) (justify left bottom)) (uuid 1589b73d-0054-41a6-b00a-f78e760a997b))
-  (wire (pts (xy 55.88 172.72) (xy 58.42 172.72)) (stroke (width 0) (type default)) (uuid ef635737-9d9c-4691-ba1b-fe8136a9d71b))
-  (label "TX" (at 58.42 172.72 0) (fields_autoplaced) (effects (font (size 1.27 1.27)) (justify left bottom)) (uuid 89a8d185-f573-42ac-822f-bd5707b1df0e))
-  (no_connect (at 55.88 167.64) (uuid a6793bc7-6f9d-4467-99e3-b7a8e3888cbc))
-  (wire (pts (xy 55.88 175.26) (xy 58.42 175.26)) (stroke (width 0) (type default)) (uuid 1291c4aa-c4a9-45da-ad3c-64fe326af460))
-  (label "RX" (at 58.42 175.26 0) (fields_autoplaced) (effects (font (size 1.27 1.27)) (justify left bottom)) (uuid 1b14fb83-15ed-4aef-9d88-bad2d81fdbc0))
-  (no_connect (at 55.88 177.80) (uuid 2684e31d-7ddc-41ed-8894-1b211be1192e))
-  (no_connect (at 55.88 182.88) (uuid 3bdd5e40-cb26-4447-b941-d84db24c7160))
-  (no_connect (at 55.88 185.42) (uuid b29fb1b4-d0a2-4995-abef-ab9611f4dd98))
-  (wire (pts (xy 45.72 190.50) (xy 45.72 193.04)) (stroke (width 0) (type default)) (uuid f6972644-37f2-4389-9b15-b860101aee11))
-  (label "GND" (at 45.72 193.04 270) (fields_autoplaced) (effects (font (size 1.27 1.27)) (justify right bottom)) (uuid c124fefe-80b0-4c89-98a1-5fb92e2ed3b4))
-  (no_connect (at 55.88 160.02) (uuid 5a6a9b53-d02d-4b35-978f-01dd692d04b7))
-  (wire (pts (xy 45.72 154.94) (xy 45.72 152.40)) (stroke (width 0) (type default)) (uuid 9b1478df-953c-4339-a677-ea8fa9b2b45b))
-  (label "+3V3" (at 45.72 152.40 90) (fields_autoplaced) (effects (font (size 1.27 1.27)) (justify left bottom)) (uuid 3139bcac-7e4e-45dc-87e9-907129ca0523))
-  (symbol (lib_id "Device:C") (at 96.52 157.48 0) (unit 1)
-    (in_bom yes) (on_board yes) (dnp no) (uuid ae802a01-e333-46bb-88e9-2dde05781281)
-    (property "Reference" "C4" (at 96.52 148.17 0) (effects (font (size 1.27 1.27))))
-    (property "Value" "100nF" (at 96.52 165.79 0) (effects (font (size 1.27 1.27))))
-    (property "Footprint" "Capacitor_SMD:C_0805_2012Metric_Pad1.18x1.45mm_HandSolder" (at 96.52 168.29 0) (effects (font (size 1.27 1.27)) hide))
-    (property "Datasheet" "~" (at 96.52 168.29 0) (effects (font (size 1.27 1.27)) hide))
-    (pin "1" (uuid 72440c44-b912-4748-8c0e-803f06b313b8))
-    (pin "2" (uuid da7b7c72-77f3-43a5-a588-db4985d79a8b))
-    (instances (project "trilumag-panel" (path "/cfb1f775-3893-4848-b897-c24ea52d7efb" (reference "C4") (unit 1))))
+  (wire (pts (xy 177.80 179.07) (xy 177.80 176.53)) (stroke (width 0) (type default)) (uuid 35c1f098-3ab3-4eab-8eff-6459b6fb9120))
+  (label "+24V" (at 177.80 176.53 90) (fields_autoplaced) (effects (font (size 1.27 1.27)) (justify left bottom)) (uuid fc7da69f-209b-4d53-9a6f-9cbfe246ad1b))
+  (wire (pts (xy 177.80 186.69) (xy 177.80 189.23)) (stroke (width 0) (type default)) (uuid 25eef886-bc72-4ca7-8505-364e885295ff))
+  (label "V24_LDO" (at 177.80 189.23 270) (fields_autoplaced) (effects (font (size 1.27 1.27)) (justify right bottom)) (uuid c2a82772-1d07-4d90-b5ab-3e3c6f8bb618))
+  (symbol (lib_id "Device:C") (at 218.44 182.88 0) (unit 1)
+    (in_bom yes) (on_board yes) (dnp no) (uuid 57587100-e71f-4057-8e72-b17a1506e2e5)
+    (property "Reference" "C2" (at 218.44 173.57 0) (effects (font (size 1.27 1.27))))
+    (property "Value" "1µF 50V" (at 218.44 191.19 0) (effects (font (size 1.27 1.27))))
+    (property "Footprint" "Capacitor_SMD:C_0805_2012Metric_Pad1.18x1.45mm_HandSolder" (at 218.44 193.69 0) (effects (font (size 1.27 1.27)) hide))
+    (property "Datasheet" "~" (at 218.44 193.69 0) (effects (font (size 1.27 1.27)) hide))
+    (pin "1" (uuid 6de5b9a4-c664-4d7b-ad57-8136d595f87a))
+    (pin "2" (uuid 32837968-642c-46fe-a696-5f9c89698288))
+    (instances (project "trilumag-panel" (path "/bfa3ae2b-98a9-4b6e-8523-9aa45929c119" (reference "C2") (unit 1))))
   )
-  (wire (pts (xy 96.52 153.67) (xy 96.52 151.13)) (stroke (width 0) (type default)) (uuid b2f8719f-6389-480e-8c1b-1420fa815a87))
-  (label "+3V3" (at 96.52 151.13 90) (fields_autoplaced) (effects (font (size 1.27 1.27)) (justify left bottom)) (uuid 091c1ab4-db1d-4e66-aeb8-4954d44b77fc))
-  (wire (pts (xy 96.52 161.29) (xy 96.52 163.83)) (stroke (width 0) (type default)) (uuid 39d2f8c4-4107-4f00-b93d-0c3e8d39a414))
-  (label "GND" (at 96.52 163.83 270) (fields_autoplaced) (effects (font (size 1.27 1.27)) (justify right bottom)) (uuid e8800e82-18ac-4dbf-a662-fcf81e001f96))
-  (symbol (lib_id "Device:R") (at 134.62 157.48 0) (unit 1)
-    (in_bom yes) (on_board yes) (dnp no) (uuid c2e68556-2b76-4b55-b5cf-e75f06ac1487)
-    (property "Reference" "R1" (at 134.62 148.17 0) (effects (font (size 1.27 1.27))))
-    (property "Value" "100Ω" (at 134.62 165.79 0) (effects (font (size 1.27 1.27))))
-    (property "Footprint" "Resistor_SMD:R_0805_2012Metric_Pad1.20x1.40mm_HandSolder" (at 134.62 168.29 0) (effects (font (size 1.27 1.27)) hide))
-    (property "Datasheet" "~" (at 134.62 168.29 0) (effects (font (size 1.27 1.27)) hide))
-    (pin "1" (uuid ed5c6215-50d1-455a-acab-ffe2ebd7e909))
-    (pin "2" (uuid 8657a10d-3292-4544-9535-f3a68743e334))
-    (instances (project "trilumag-panel" (path "/cfb1f775-3893-4848-b897-c24ea52d7efb" (reference "R1") (unit 1))))
+  (wire (pts (xy 218.44 179.07) (xy 218.44 176.53)) (stroke (width 0) (type default)) (uuid e5c850a8-1f3c-46d0-861e-2b58a05390eb))
+  (label "V24_LDO" (at 218.44 176.53 90) (fields_autoplaced) (effects (font (size 1.27 1.27)) (justify left bottom)) (uuid 9e6a8a2e-e0e5-4530-8558-bc6363eedaf9))
+  (wire (pts (xy 218.44 186.69) (xy 218.44 189.23)) (stroke (width 0) (type default)) (uuid 8462ea35-cf7d-4612-87e8-d039570adbaf))
+  (label "GND" (at 218.44 189.23 270) (fields_autoplaced) (effects (font (size 1.27 1.27)) (justify right bottom)) (uuid ddce67da-b271-412b-979c-c6820f050f33))
+  (symbol (lib_id "Device:C") (at 259.08 182.88 0) (unit 1)
+    (in_bom yes) (on_board yes) (dnp no) (uuid c8cff563-f4ff-4445-bb8a-4c28325c2155)
+    (property "Reference" "C3" (at 259.08 173.57 0) (effects (font (size 1.27 1.27))))
+    (property "Value" "1µF" (at 259.08 191.19 0) (effects (font (size 1.27 1.27))))
+    (property "Footprint" "Capacitor_SMD:C_0805_2012Metric_Pad1.18x1.45mm_HandSolder" (at 259.08 193.69 0) (effects (font (size 1.27 1.27)) hide))
+    (property "Datasheet" "~" (at 259.08 193.69 0) (effects (font (size 1.27 1.27)) hide))
+    (pin "1" (uuid 96fb13ff-9e51-4be4-a767-b8b439fe6506))
+    (pin "2" (uuid dffda21b-34e5-4cc6-94c3-b4a577654769))
+    (instances (project "trilumag-panel" (path "/bfa3ae2b-98a9-4b6e-8523-9aa45929c119" (reference "C3") (unit 1))))
   )
-  (wire (pts (xy 134.62 153.67) (xy 134.62 151.13)) (stroke (width 0) (type default)) (uuid a9e12e8b-9b18-4702-a654-6a47f4992432))
-  (label "S1R" (at 134.62 151.13 90) (fields_autoplaced) (effects (font (size 1.27 1.27)) (justify left bottom)) (uuid 8bf18892-30f7-46a7-a8f5-4f2058052554))
-  (wire (pts (xy 134.62 161.29) (xy 134.62 163.83)) (stroke (width 0) (type default)) (uuid af471cbb-5870-4337-8f00-eaa34e9f4249))
-  (label "SNS1" (at 134.62 163.83 270) (fields_autoplaced) (effects (font (size 1.27 1.27)) (justify right bottom)) (uuid 2b6ae775-9814-4801-8da2-660537e1375d))
-  (symbol (lib_id "Device:R") (at 175.26 157.48 0) (unit 1)
-    (in_bom yes) (on_board yes) (dnp no) (uuid 6545a684-8614-47b2-ae4f-a0f1d2f0e262)
-    (property "Reference" "R2" (at 175.26 148.17 0) (effects (font (size 1.27 1.27))))
-    (property "Value" "100Ω" (at 175.26 165.79 0) (effects (font (size 1.27 1.27))))
-    (property "Footprint" "Resistor_SMD:R_0805_2012Metric_Pad1.20x1.40mm_HandSolder" (at 175.26 168.29 0) (effects (font (size 1.27 1.27)) hide))
-    (property "Datasheet" "~" (at 175.26 168.29 0) (effects (font (size 1.27 1.27)) hide))
-    (pin "1" (uuid 1b801102-4ec0-41dc-87f8-448a209db7a3))
-    (pin "2" (uuid ad52d101-a356-405b-8e40-cb6457866032))
-    (instances (project "trilumag-panel" (path "/cfb1f775-3893-4848-b897-c24ea52d7efb" (reference "R2") (unit 1))))
+  (wire (pts (xy 259.08 179.07) (xy 259.08 176.53)) (stroke (width 0) (type default)) (uuid 713bb538-6ab0-42c4-85e5-e7fe68f5df4f))
+  (label "+5V" (at 259.08 176.53 90) (fields_autoplaced) (effects (font (size 1.27 1.27)) (justify left bottom)) (uuid 9ef7b36d-423b-4c2b-8ee4-896dcd0920c6))
+  (wire (pts (xy 259.08 186.69) (xy 259.08 189.23)) (stroke (width 0) (type default)) (uuid c1b83ed6-e3db-4156-aa83-f32ec0ad220e))
+  (label "GND" (at 259.08 189.23 270) (fields_autoplaced) (effects (font (size 1.27 1.27)) (justify right bottom)) (uuid 78f66d16-142b-406f-b846-bdde4d92aa73))
+  (symbol (lib_id "Regulator_Linear:XC6206PxxxMR") (at 304.80 180.34 0) (unit 1)
+    (in_bom yes) (on_board yes) (dnp no) (uuid faeee2ae-9fe3-4446-8cea-12139548543e)
+    (property "Reference" "U4" (at 304.80 174.84 0) (effects (font (size 1.27 1.27))))
+    (property "Value" "XC6206P332MR" (at 304.80 192.46 0) (effects (font (size 1.27 1.27))))
+    (property "Footprint" "Package_TO_SOT_SMD:SOT-23_Handsoldering" (at 304.80 194.96 0) (effects (font (size 1.27 1.27)) hide))
+    (property "Datasheet" "~" (at 304.80 194.96 0) (effects (font (size 1.27 1.27)) hide))
+    (property "Bestellnr" "XC6206P332MR (3,3 V)" (at 304.80 197.46 0) (effects (font (size 1.27 1.27)) hide))
+    (pin "1" (uuid f9876c26-b6d2-4b16-b6b5-a29bee9eb331))
+    (pin "2" (uuid 5cf0e007-6473-4b38-aed7-9d973d917c3c))
+    (pin "3" (uuid ad57348d-6b91-40b1-bf83-61b4ca8db9cc))
+    (instances (project "trilumag-panel" (path "/bfa3ae2b-98a9-4b6e-8523-9aa45929c119" (reference "U4") (unit 1))))
   )
-  (wire (pts (xy 175.26 153.67) (xy 175.26 151.13)) (stroke (width 0) (type default)) (uuid ecd48afd-3588-49b3-b447-62c794150d76))
-  (label "S2R" (at 175.26 151.13 90) (fields_autoplaced) (effects (font (size 1.27 1.27)) (justify left bottom)) (uuid 99cd3189-57f6-4cfa-a57d-02d4b4fe7050))
-  (wire (pts (xy 175.26 161.29) (xy 175.26 163.83)) (stroke (width 0) (type default)) (uuid e2c866ac-f0ce-4e2a-b398-51a72af84266))
-  (label "SNS2" (at 175.26 163.83 270) (fields_autoplaced) (effects (font (size 1.27 1.27)) (justify right bottom)) (uuid 6a94eae3-a28c-4033-84d1-27702bd440e8))
-  (symbol (lib_id "Device:R") (at 215.90 157.48 0) (unit 1)
-    (in_bom yes) (on_board yes) (dnp no) (uuid 20bc5656-44f4-4d49-bb36-9aff695d02a3)
-    (property "Reference" "R3" (at 215.90 148.17 0) (effects (font (size 1.27 1.27))))
-    (property "Value" "100Ω" (at 215.90 165.79 0) (effects (font (size 1.27 1.27))))
-    (property "Footprint" "Resistor_SMD:R_0805_2012Metric_Pad1.20x1.40mm_HandSolder" (at 215.90 168.29 0) (effects (font (size 1.27 1.27)) hide))
-    (property "Datasheet" "~" (at 215.90 168.29 0) (effects (font (size 1.27 1.27)) hide))
-    (pin "1" (uuid 65853ce6-4e39-4d8d-aed2-e4efd79bd3b9))
-    (pin "2" (uuid a312f7fd-b70c-4308-8a7a-e138589bc679))
-    (instances (project "trilumag-panel" (path "/cfb1f775-3893-4848-b897-c24ea52d7efb" (reference "R3") (unit 1))))
+  (wire (pts (xy 304.80 187.96) (xy 304.80 190.50)) (stroke (width 0) (type default)) (uuid 330b8d45-3e7c-441a-bf27-180d1212a986))
+  (label "GND" (at 304.80 190.50 270) (fields_autoplaced) (effects (font (size 1.27 1.27)) (justify right bottom)) (uuid bc982f50-7b6f-4ac7-8e54-41d814ed3c57))
+  (wire (pts (xy 312.42 180.34) (xy 314.96 180.34)) (stroke (width 0) (type default)) (uuid c12c28b1-5e90-4d5c-be12-46d593e475e3))
+  (label "+3V3" (at 314.96 180.34 0) (fields_autoplaced) (effects (font (size 1.27 1.27)) (justify left bottom)) (uuid 8b93bc99-7ae0-4f2f-8c40-1596ee1d9e88))
+  (wire (pts (xy 297.18 180.34) (xy 294.64 180.34)) (stroke (width 0) (type default)) (uuid d01c00cb-de1e-4d18-98a4-183b28aa2fe4))
+  (label "+5V" (at 294.64 180.34 180) (fields_autoplaced) (effects (font (size 1.27 1.27)) (justify right bottom)) (uuid b3e1cced-1d5e-4fe3-8f3e-bf7e851ae110))
+  (symbol (lib_id "Device:C") (at 35.56 236.22 0) (unit 1)
+    (in_bom yes) (on_board yes) (dnp no) (uuid e42b29af-8587-4ba8-b887-11c9d9ed29a5)
+    (property "Reference" "C6" (at 35.56 226.91 0) (effects (font (size 1.27 1.27))))
+    (property "Value" "1µF" (at 35.56 244.53 0) (effects (font (size 1.27 1.27))))
+    (property "Footprint" "Capacitor_SMD:C_0805_2012Metric_Pad1.18x1.45mm_HandSolder" (at 35.56 247.03 0) (effects (font (size 1.27 1.27)) hide))
+    (property "Datasheet" "~" (at 35.56 247.03 0) (effects (font (size 1.27 1.27)) hide))
+    (pin "1" (uuid 785bf560-e35e-4b60-b1d5-5ab601d02f3c))
+    (pin "2" (uuid 6fb8cada-3b4f-4bc8-8ee9-37ba6f6f15e4))
+    (instances (project "trilumag-panel" (path "/bfa3ae2b-98a9-4b6e-8523-9aa45929c119" (reference "C6") (unit 1))))
   )
-  (wire (pts (xy 215.90 153.67) (xy 215.90 151.13)) (stroke (width 0) (type default)) (uuid a2de5812-ec48-4dba-b934-6f9a43c1d427))
-  (label "S3R" (at 215.90 151.13 90) (fields_autoplaced) (effects (font (size 1.27 1.27)) (justify left bottom)) (uuid f2cbbe4e-3459-4208-8541-67747b282be1))
-  (wire (pts (xy 215.90 161.29) (xy 215.90 163.83)) (stroke (width 0) (type default)) (uuid a9a8fb49-eb51-4cd0-a2a6-3db8aeb26fc4))
-  (label "SNS3" (at 215.90 163.83 270) (fields_autoplaced) (effects (font (size 1.27 1.27)) (justify right bottom)) (uuid 5c2099ea-c8fe-4ff3-95eb-0e86a6d91890))
-  (symbol (lib_id "Connector_Generic:Conn_01x03") (at 40.64 236.22 0) (unit 1)
-    (in_bom yes) (on_board yes) (dnp no) (uuid 276bde0f-1817-4c34-9d6e-bc7c50faf064)
-    (property "Reference" "J5" (at 40.64 228.18 0) (effects (font (size 1.27 1.27))))
-    (property "Value" "SWD" (at 40.64 243.26 0) (effects (font (size 1.27 1.27))))
-    (property "Footprint" "Connector_PinHeader_2.54mm:PinHeader_1x03_P2.54mm_Vertical" (at 40.64 245.76 0) (effects (font (size 1.27 1.27)) hide))
-    (property "Datasheet" "~" (at 40.64 245.76 0) (effects (font (size 1.27 1.27)) hide))
-    (property "Hinweis" "WCH-LinkE: SWDIO, GND, 3V3" (at 40.64 248.26 0) (effects (font (size 1.27 1.27)) hide))
-    (pin "1" (uuid 3c39b760-1b27-46f5-a241-a012ead10402))
-    (pin "2" (uuid 944dfc0d-6a69-4306-82bf-6799fee6e60b))
-    (pin "3" (uuid 72766d0e-73c9-419b-be86-8d268bf4dbac))
-    (instances (project "trilumag-panel" (path "/cfb1f775-3893-4848-b897-c24ea52d7efb" (reference "J5") (unit 1))))
+  (wire (pts (xy 35.56 232.41) (xy 35.56 229.87)) (stroke (width 0) (type default)) (uuid 3e65720e-cc61-4650-a728-5074e9b6d6d6))
+  (label "+5V" (at 35.56 229.87 90) (fields_autoplaced) (effects (font (size 1.27 1.27)) (justify left bottom)) (uuid 4978e9bc-910f-4625-b85f-70b44d4eba4d))
+  (wire (pts (xy 35.56 240.03) (xy 35.56 242.57)) (stroke (width 0) (type default)) (uuid 01555640-b11b-426f-9654-5900388d5c51))
+  (label "GND" (at 35.56 242.57 270) (fields_autoplaced) (effects (font (size 1.27 1.27)) (justify right bottom)) (uuid fac984e5-ad97-492a-9a42-aa4c05f6ec9e))
+  (symbol (lib_id "Device:C") (at 76.20 236.22 0) (unit 1)
+    (in_bom yes) (on_board yes) (dnp no) (uuid 7d25825a-bc27-4a37-acdd-ea16ff96f01a)
+    (property "Reference" "C7" (at 76.20 226.91 0) (effects (font (size 1.27 1.27))))
+    (property "Value" "1µF" (at 76.20 244.53 0) (effects (font (size 1.27 1.27))))
+    (property "Footprint" "Capacitor_SMD:C_0805_2012Metric_Pad1.18x1.45mm_HandSolder" (at 76.20 247.03 0) (effects (font (size 1.27 1.27)) hide))
+    (property "Datasheet" "~" (at 76.20 247.03 0) (effects (font (size 1.27 1.27)) hide))
+    (pin "1" (uuid 1296b6ee-0341-45bc-8f1d-2ac8d532863c))
+    (pin "2" (uuid 41cfe2c3-877e-4331-ae75-2675856f416b))
+    (instances (project "trilumag-panel" (path "/bfa3ae2b-98a9-4b6e-8523-9aa45929c119" (reference "C7") (unit 1))))
   )
-  (wire (pts (xy 35.56 233.68) (xy 33.02 233.68)) (stroke (width 0) (type default)) (uuid 70c80cfb-0f9c-46d7-9dbb-e11e1d7efcd3))
-  (label "SWIO" (at 33.02 233.68 180) (fields_autoplaced) (effects (font (size 1.27 1.27)) (justify right bottom)) (uuid cb866a47-3393-4ed6-80fe-2c0dbc03b8da))
-  (wire (pts (xy 35.56 236.22) (xy 33.02 236.22)) (stroke (width 0) (type default)) (uuid ba8ce637-f13b-4f1b-aa9b-989d468b9bfc))
-  (label "GND" (at 33.02 236.22 180) (fields_autoplaced) (effects (font (size 1.27 1.27)) (justify right bottom)) (uuid 1c1f7017-3ff4-4d6c-a4e2-75395c5af73e))
-  (wire (pts (xy 35.56 238.76) (xy 33.02 238.76)) (stroke (width 0) (type default)) (uuid 1adf9a6f-e60d-4080-9e43-9e66ecaec7f1))
-  (label "+3V3" (at 33.02 238.76 180) (fields_autoplaced) (effects (font (size 1.27 1.27)) (justify right bottom)) (uuid 8e5080b1-0ae1-48e3-abe7-6337840b1afc))
-  (text "RS-485" (at 255.72 138.72 0) (effects (font (size 2.5 2.5) bold) (justify left bottom)) (uuid cd9318da-a11a-4e69-bb02-c49ec5d71371))
-  (symbol (lib_id "Interface_UART:MAX3485") (at 276.86 167.64 0) (unit 1)
-    (in_bom yes) (on_board yes) (dnp no) (uuid c1bec7e2-6c7c-4421-b7b0-d3158fbb3898)
-    (property "Reference" "U2" (at 276.86 149.44 0) (effects (font (size 1.27 1.27))))
-    (property "Value" "MAX3485" (at 276.86 187.38 0) (effects (font (size 1.27 1.27))))
-    (property "Footprint" "Package_SO:SOIC-8_3.9x4.9mm_P1.27mm" (at 276.86 189.88 0) (effects (font (size 1.27 1.27)) hide))
-    (property "Datasheet" "~" (at 276.86 189.88 0) (effects (font (size 1.27 1.27)) hide))
-    (property "Bestellnr" "MAX3485ESA / SP3485EN" (at 276.86 192.38 0) (effects (font (size 1.27 1.27)) hide))
-    (pin "1" (uuid 2f8449d6-9bc4-4a7a-9206-3ea6be3a09a2))
-    (pin "2" (uuid 59704d69-0cb0-434f-b624-6ab73b21a55d))
-    (pin "3" (uuid 2534bdb2-a6dd-41a2-89af-4445118cf294))
-    (pin "4" (uuid 3afed816-e88a-485d-9dc7-e7604be6714c))
-    (pin "5" (uuid 5e24e0c2-28f2-4e1a-9cea-74a3896d2cca))
-    (pin "6" (uuid 1a8a67a2-d6a5-4451-b649-c61eda81204e))
-    (pin "7" (uuid a0366429-13cb-4282-b15f-76003882c9f8))
-    (pin "8" (uuid 3a012608-417b-4a3e-b39b-c1534c2887a7))
-    (instances (project "trilumag-panel" (path "/cfb1f775-3893-4848-b897-c24ea52d7efb" (reference "U2") (unit 1))))
+  (wire (pts (xy 76.20 232.41) (xy 76.20 229.87)) (stroke (width 0) (type default)) (uuid 36980a2c-5233-40c7-9e29-437dca80efa7))
+  (label "+3V3" (at 76.20 229.87 90) (fields_autoplaced) (effects (font (size 1.27 1.27)) (justify left bottom)) (uuid ef43b6bd-6c93-416b-b8e8-2dfa0147e4a0))
+  (wire (pts (xy 76.20 240.03) (xy 76.20 242.57)) (stroke (width 0) (type default)) (uuid 48c30a40-3e0c-47b4-b6a2-e49e962dd96b))
+  (label "GND" (at 76.20 242.57 270) (fields_autoplaced) (effects (font (size 1.27 1.27)) (justify right bottom)) (uuid f3be46d7-e6b2-4030-839b-c096dad21ecc))
+  (text "RS-485" (at 25.40 280.36 0) (effects (font (size 2.5 2.5) bold) (justify left bottom)) (uuid f98b9648-3d11-4e76-ba86-153a70f968c5))
+  (symbol (lib_id "Interface_UART:MAX3485") (at 45.72 309.88 0) (unit 1)
+    (in_bom yes) (on_board yes) (dnp no) (uuid 224e88f1-7df4-49ae-b48f-8c69173ce9b1)
+    (property "Reference" "U2" (at 45.72 291.68 0) (effects (font (size 1.27 1.27))))
+    (property "Value" "MAX3485" (at 45.72 329.62 0) (effects (font (size 1.27 1.27))))
+    (property "Footprint" "Package_SO:SOIC-8_3.9x4.9mm_P1.27mm" (at 45.72 332.12 0) (effects (font (size 1.27 1.27)) hide))
+    (property "Datasheet" "~" (at 45.72 332.12 0) (effects (font (size 1.27 1.27)) hide))
+    (property "Bestellnr" "MAX3485ESA / SP3485EN" (at 45.72 334.62 0) (effects (font (size 1.27 1.27)) hide))
+    (pin "1" (uuid cc6f9337-2f21-4bbf-9853-d711230589dd))
+    (pin "2" (uuid 9a6850e4-0094-4a13-afc5-3b888ddee35e))
+    (pin "3" (uuid be24f337-de56-4b27-8251-d418cea015ea))
+    (pin "4" (uuid 33cafcaf-b394-40b2-a248-c0cf06efa774))
+    (pin "5" (uuid c781f87b-c1b9-4cb1-b0d2-37bcca41fce1))
+    (pin "6" (uuid 9b49fa8b-d44a-4320-8a9a-0bd266d1f678))
+    (pin "7" (uuid cfdc7b2e-5f78-48a1-a655-edfca4223546))
+    (pin "8" (uuid 0a148292-503f-45d9-bd2d-f0df9b743a57))
+    (instances (project "trilumag-panel" (path "/bfa3ae2b-98a9-4b6e-8523-9aa45929c119" (reference "U2") (unit 1))))
   )
-  (wire (pts (xy 266.70 165.10) (xy 264.16 165.10)) (stroke (width 0) (type default)) (uuid deafa84c-0c11-4ba0-a668-f0b733a65164))
-  (label "RX" (at 264.16 165.10 180) (fields_autoplaced) (effects (font (size 1.27 1.27)) (justify right bottom)) (uuid f5b34494-ff5d-4c17-befd-cd7bb81d0d0f))
-  (wire (pts (xy 266.70 167.64) (xy 264.16 167.64)) (stroke (width 0) (type default)) (uuid ba7c009f-4939-4ea6-a7c3-c649dd0d2e14))
-  (label "DE" (at 264.16 167.64 180) (fields_autoplaced) (effects (font (size 1.27 1.27)) (justify right bottom)) (uuid 1e2c2746-1892-4a49-9877-2244b0e477f5))
-  (wire (pts (xy 266.70 170.18) (xy 264.16 170.18)) (stroke (width 0) (type default)) (uuid 9c74b14d-d84b-47ed-92f4-b20d743ae87a))
-  (label "DE" (at 264.16 170.18 180) (fields_autoplaced) (effects (font (size 1.27 1.27)) (justify right bottom)) (uuid a42dc219-dd04-4409-9961-e450980fb950))
-  (wire (pts (xy 266.70 172.72) (xy 264.16 172.72)) (stroke (width 0) (type default)) (uuid 7ea1c7ef-a3f3-417f-8484-6a76e687277e))
-  (label "TX" (at 264.16 172.72 180) (fields_autoplaced) (effects (font (size 1.27 1.27)) (justify right bottom)) (uuid 9a8e5a54-a312-43f9-9f56-98d5aa858eb2))
-  (wire (pts (xy 276.86 182.88) (xy 276.86 185.42)) (stroke (width 0) (type default)) (uuid 7fa143fe-64ed-4ed4-b95e-3a31aeb9fe82))
-  (label "GND" (at 276.86 185.42 270) (fields_autoplaced) (effects (font (size 1.27 1.27)) (justify right bottom)) (uuid 845efdb7-51c6-476c-a4fa-e40280f922f2))
-  (wire (pts (xy 287.02 172.72) (xy 289.56 172.72)) (stroke (width 0) (type default)) (uuid d9687db6-3f4d-4f25-847d-fd101b57802d))
-  (label "A" (at 289.56 172.72 0) (fields_autoplaced) (effects (font (size 1.27 1.27)) (justify left bottom)) (uuid c89e9c52-4c8a-4109-92c0-51f20b0da248))
-  (wire (pts (xy 287.02 165.10) (xy 289.56 165.10)) (stroke (width 0) (type default)) (uuid c83e835c-d56d-4dcb-8ed8-226f8bc108da))
-  (label "B" (at 289.56 165.10 0) (fields_autoplaced) (effects (font (size 1.27 1.27)) (justify left bottom)) (uuid 50a49d5a-ab50-445e-9dd1-e7001d064849))
-  (wire (pts (xy 276.86 154.94) (xy 276.86 152.40)) (stroke (width 0) (type default)) (uuid cbfb02a1-2238-4c57-a475-e2c30876c918))
-  (label "+3V3" (at 276.86 152.40 90) (fields_autoplaced) (effects (font (size 1.27 1.27)) (justify left bottom)) (uuid fbcd45d9-6138-4cac-9457-c28493655192))
-  (symbol (lib_id "Device:C") (at 325.12 157.48 0) (unit 1)
-    (in_bom yes) (on_board yes) (dnp no) (uuid e1be3794-c63e-4d19-9861-59d604298582)
-    (property "Reference" "C5" (at 325.12 148.17 0) (effects (font (size 1.27 1.27))))
-    (property "Value" "100nF" (at 325.12 165.79 0) (effects (font (size 1.27 1.27))))
-    (property "Footprint" "Capacitor_SMD:C_0805_2012Metric_Pad1.18x1.45mm_HandSolder" (at 325.12 168.29 0) (effects (font (size 1.27 1.27)) hide))
-    (property "Datasheet" "~" (at 325.12 168.29 0) (effects (font (size 1.27 1.27)) hide))
-    (pin "1" (uuid 0ac02c23-ce47-4b78-ba11-644cbc415d45))
-    (pin "2" (uuid 4e36f6e3-88ac-4dba-9c84-ba373c9b2990))
-    (instances (project "trilumag-panel" (path "/cfb1f775-3893-4848-b897-c24ea52d7efb" (reference "C5") (unit 1))))
+  (wire (pts (xy 35.56 307.34) (xy 33.02 307.34)) (stroke (width 0) (type default)) (uuid 69bb1595-6523-43ba-bd9c-183aa1ab799b))
+  (label "RX" (at 33.02 307.34 180) (fields_autoplaced) (effects (font (size 1.27 1.27)) (justify right bottom)) (uuid 78dbbbfa-782f-4e0b-ae8e-b93358fe1665))
+  (wire (pts (xy 35.56 309.88) (xy 33.02 309.88)) (stroke (width 0) (type default)) (uuid 60f7e811-f435-4296-9d5c-fd37766d7f94))
+  (label "DE" (at 33.02 309.88 180) (fields_autoplaced) (effects (font (size 1.27 1.27)) (justify right bottom)) (uuid 19965b97-8ab4-4a7f-8c0a-b70183a4d5d4))
+  (wire (pts (xy 35.56 312.42) (xy 33.02 312.42)) (stroke (width 0) (type default)) (uuid e3365f11-7465-4e8e-96dc-ed933cc18834))
+  (label "DE" (at 33.02 312.42 180) (fields_autoplaced) (effects (font (size 1.27 1.27)) (justify right bottom)) (uuid d6dda393-96c9-431f-aee4-70063c37679b))
+  (wire (pts (xy 35.56 314.96) (xy 33.02 314.96)) (stroke (width 0) (type default)) (uuid e759ce86-6f73-4920-91f3-b6e006e60e66))
+  (label "TX" (at 33.02 314.96 180) (fields_autoplaced) (effects (font (size 1.27 1.27)) (justify right bottom)) (uuid 88fe4594-1ca5-4d7b-b653-ba53dd2c67d7))
+  (wire (pts (xy 45.72 325.12) (xy 45.72 327.66)) (stroke (width 0) (type default)) (uuid 2c4c5eac-7df2-43b2-873f-a751673ebf7b))
+  (label "GND" (at 45.72 327.66 270) (fields_autoplaced) (effects (font (size 1.27 1.27)) (justify right bottom)) (uuid 1475cf60-99da-4db5-81f5-9562c3726d75))
+  (wire (pts (xy 55.88 314.96) (xy 58.42 314.96)) (stroke (width 0) (type default)) (uuid add4a985-acdf-48cb-a389-a627c2537ffb))
+  (label "A" (at 58.42 314.96 0) (fields_autoplaced) (effects (font (size 1.27 1.27)) (justify left bottom)) (uuid 1c7405ab-82d2-412f-8873-b8dd711be59d))
+  (wire (pts (xy 55.88 307.34) (xy 58.42 307.34)) (stroke (width 0) (type default)) (uuid 4fc8dbf4-e029-4e3e-a27c-aa5402f330f6))
+  (label "B" (at 58.42 307.34 0) (fields_autoplaced) (effects (font (size 1.27 1.27)) (justify left bottom)) (uuid 83f950ff-2b0a-477a-99d3-3b9f1facdfe0))
+  (wire (pts (xy 45.72 297.18) (xy 45.72 294.64)) (stroke (width 0) (type default)) (uuid da8e0ac9-49bb-4379-a7f1-8681c1c3417d))
+  (label "+3V3" (at 45.72 294.64 90) (fields_autoplaced) (effects (font (size 1.27 1.27)) (justify left bottom)) (uuid 55d9ff11-f5e1-4277-bdd0-6420cbeb440a))
+  (symbol (lib_id "Device:C") (at 96.52 299.72 0) (unit 1)
+    (in_bom yes) (on_board yes) (dnp no) (uuid 0b82bb21-808b-489f-bcae-2c8528c82a0a)
+    (property "Reference" "C5" (at 96.52 290.41 0) (effects (font (size 1.27 1.27))))
+    (property "Value" "100nF" (at 96.52 308.03 0) (effects (font (size 1.27 1.27))))
+    (property "Footprint" "Capacitor_SMD:C_0805_2012Metric_Pad1.18x1.45mm_HandSolder" (at 96.52 310.53 0) (effects (font (size 1.27 1.27)) hide))
+    (property "Datasheet" "~" (at 96.52 310.53 0) (effects (font (size 1.27 1.27)) hide))
+    (pin "1" (uuid 7f7e368b-b030-4958-8640-f30d8e4ec963))
+    (pin "2" (uuid 0e68dbee-ee60-4185-89f4-655859862285))
+    (instances (project "trilumag-panel" (path "/bfa3ae2b-98a9-4b6e-8523-9aa45929c119" (reference "C5") (unit 1))))
   )
-  (wire (pts (xy 325.12 153.67) (xy 325.12 151.13)) (stroke (width 0) (type default)) (uuid 71792c7e-6e8f-46db-b0d1-731193c50864))
-  (label "+3V3" (at 325.12 151.13 90) (fields_autoplaced) (effects (font (size 1.27 1.27)) (justify left bottom)) (uuid 78a9476f-02c8-4eb8-bd12-24bfa528ea19))
-  (wire (pts (xy 325.12 161.29) (xy 325.12 163.83)) (stroke (width 0) (type default)) (uuid 9fb62694-3089-4a8e-a6ad-f560c6e833b3))
-  (label "GND" (at 325.12 163.83 270) (fields_autoplaced) (effects (font (size 1.27 1.27)) (justify right bottom)) (uuid 9d2229cd-8367-45ac-b1a0-8addb3935c38))
-  (text "Lagesensor" (at 25.40 280.36 0) (effects (font (size 2.5 2.5) bold) (justify left bottom)) (uuid a43fb506-207b-4972-8cc1-4eac086dc6c6))
-  (symbol (lib_id "Connector_Generic:Conn_01x08") (at 40.64 304.80 0) (unit 1)
-    (in_bom yes) (on_board yes) (dnp no) (uuid 9d26a8c8-dfdc-44d5-9cf3-706b4e7ae9b0)
-    (property "Reference" "J3" (at 40.64 291.68 0) (effects (font (size 1.27 1.27))))
-    (property "Value" "LIS3DH-Modul" (at 40.64 319.46 0) (effects (font (size 1.27 1.27))))
-    (property "Footprint" "Connector_PinSocket_2.54mm:PinSocket_1x08_P2.54mm_Vertical" (at 40.64 321.96 0) (effects (font (size 1.27 1.27)) hide))
-    (property "Datasheet" "~" (at 40.64 321.96 0) (effects (font (size 1.27 1.27)) hide))
-    (property "Hinweis" "Pinfolge VCC GND SCL SDA SDO CS INT1 INT2 – mit dem Modul vergleichen" (at 40.64 324.46 0) (effects (font (size 1.27 1.27)) hide))
-    (pin "1" (uuid b9935a0c-7196-4c16-a3ee-ee0f0b13b837))
-    (pin "2" (uuid c03c424d-533f-4346-81fe-adfbc7542c82))
-    (pin "3" (uuid c2ca4eb6-fa8a-4e9c-af2e-622105a3dcd1))
-    (pin "4" (uuid 0902465f-a90c-479a-87c5-3459aa5a1fe0))
-    (pin "5" (uuid b9469586-1def-4bf4-b243-55c22fc9b961))
-    (pin "6" (uuid 9451c4b9-3099-4910-9878-13c66f5b314d))
-    (pin "7" (uuid 62da6b74-71c0-4090-b031-1a5fecdfcaf7))
-    (pin "8" (uuid ba9916e4-af95-4790-85b5-7084a8187998))
-    (instances (project "trilumag-panel" (path "/cfb1f775-3893-4848-b897-c24ea52d7efb" (reference "J3") (unit 1))))
+  (wire (pts (xy 96.52 295.91) (xy 96.52 293.37)) (stroke (width 0) (type default)) (uuid cbb6df0d-6951-4648-902c-9c87bfaccaec))
+  (label "+3V3" (at 96.52 293.37 90) (fields_autoplaced) (effects (font (size 1.27 1.27)) (justify left bottom)) (uuid 1f09f723-20bb-48d0-95b1-b19b3dca4321))
+  (wire (pts (xy 96.52 303.53) (xy 96.52 306.07)) (stroke (width 0) (type default)) (uuid 1c274123-4ec7-4bbc-b4d2-48a9b60bc7dc))
+  (label "GND" (at 96.52 306.07 270) (fields_autoplaced) (effects (font (size 1.27 1.27)) (justify right bottom)) (uuid 0c08b5a4-ab6d-434e-b929-1859e1759cb3))
+  (text "Lagesensor" (at 135.72 280.36 0) (effects (font (size 2.5 2.5) bold) (justify left bottom)) (uuid 8e46829a-df51-45e8-912b-dc4d70ba452b))
+  (symbol (lib_id "Connector_Generic:Conn_01x08") (at 149.86 304.80 0) (unit 1)
+    (in_bom yes) (on_board yes) (dnp no) (uuid 8b154db4-6c71-46b7-9284-d484ae2d5856)
+    (property "Reference" "J3" (at 149.86 291.68 0) (effects (font (size 1.27 1.27))))
+    (property "Value" "LIS3DH-Modul" (at 149.86 319.46 0) (effects (font (size 1.27 1.27))))
+    (property "Footprint" "Connector_PinSocket_2.54mm:PinSocket_1x08_P2.54mm_Vertical" (at 149.86 321.96 0) (effects (font (size 1.27 1.27)) hide))
+    (property "Datasheet" "~" (at 149.86 321.96 0) (effects (font (size 1.27 1.27)) hide))
+    (property "Hinweis" "Pinfolge VCC GND SCL SDA SDO CS INT1 INT2 – mit dem Modul vergleichen" (at 149.86 324.46 0) (effects (font (size 1.27 1.27)) hide))
+    (pin "1" (uuid 17f3911a-4140-4fb6-a626-c2d2358210c9))
+    (pin "2" (uuid 4d0da8dc-f659-4652-99d2-96db3c50ae82))
+    (pin "3" (uuid 38cfb7f1-65bb-47b3-a308-36b84791ff96))
+    (pin "4" (uuid c91adca0-4aed-4580-8db1-9d7d5d71c764))
+    (pin "5" (uuid 98d10fa3-7bcb-405d-9dc2-3e89bf36b214))
+    (pin "6" (uuid 79c60a54-9cff-483c-9eb7-4ec86738c392))
+    (pin "7" (uuid 1a199a9c-10be-4111-8be6-3a06c7fbda6f))
+    (pin "8" (uuid 9cde90ef-51f6-4a30-8508-35aaae90f83c))
+    (instances (project "trilumag-panel" (path "/bfa3ae2b-98a9-4b6e-8523-9aa45929c119" (reference "J3") (unit 1))))
   )
-  (wire (pts (xy 35.56 297.18) (xy 33.02 297.18)) (stroke (width 0) (type default)) (uuid ca437968-5cda-4079-b3aa-812b0e68c132))
-  (label "+3V3" (at 33.02 297.18 180) (fields_autoplaced) (effects (font (size 1.27 1.27)) (justify right bottom)) (uuid 64f29960-82f8-4bea-ba45-93886da92f3c))
-  (wire (pts (xy 35.56 299.72) (xy 33.02 299.72)) (stroke (width 0) (type default)) (uuid 18c677bf-58dd-440d-9c01-dfc0e27d8553))
-  (label "GND" (at 33.02 299.72 180) (fields_autoplaced) (effects (font (size 1.27 1.27)) (justify right bottom)) (uuid d3dbbee8-4879-47e9-916a-0ddb49436c9c))
-  (wire (pts (xy 35.56 302.26) (xy 33.02 302.26)) (stroke (width 0) (type default)) (uuid b144aed1-c164-4677-a41b-54026c38d3dd))
-  (label "SCL" (at 33.02 302.26 180) (fields_autoplaced) (effects (font (size 1.27 1.27)) (justify right bottom)) (uuid 5b5a47d7-ecc2-41d0-ba30-0ca1ac4dcb8b))
-  (wire (pts (xy 35.56 304.80) (xy 33.02 304.80)) (stroke (width 0) (type default)) (uuid 4e9d54d7-b86f-48b6-b0aa-abdfd9137187))
-  (label "SDA" (at 33.02 304.80 180) (fields_autoplaced) (effects (font (size 1.27 1.27)) (justify right bottom)) (uuid 3af8aa15-527b-49c7-9754-0514891cef9c))
-  (wire (pts (xy 35.56 307.34) (xy 33.02 307.34)) (stroke (width 0) (type default)) (uuid 338ff458-49c7-4887-a866-bfbb156b821a))
-  (label "GND" (at 33.02 307.34 180) (fields_autoplaced) (effects (font (size 1.27 1.27)) (justify right bottom)) (uuid c70ebaaa-97f1-4ad9-b3e1-f89b5d0266ea))
-  (wire (pts (xy 35.56 309.88) (xy 33.02 309.88)) (stroke (width 0) (type default)) (uuid c4a1baf1-e0ae-47cc-b5de-79b21304456c))
-  (label "+3V3" (at 33.02 309.88 180) (fields_autoplaced) (effects (font (size 1.27 1.27)) (justify right bottom)) (uuid 35ebf2e9-90f7-44ea-8d1a-b127cf85004b))
-  (wire (pts (xy 35.56 312.42) (xy 33.02 312.42)) (stroke (width 0) (type default)) (uuid 4357355e-dc2d-416b-9f9a-71c8de0c40bb))
-  (label "TINT" (at 33.02 312.42 180) (fields_autoplaced) (effects (font (size 1.27 1.27)) (justify right bottom)) (uuid 1445b505-9979-4d16-85c8-ed16c2cf49c9))
-  (no_connect (at 35.56 314.96) (uuid dc8c0bff-d773-449d-bc9f-a766ba0a6bac))
-  (symbol (lib_id "Device:R") (at 76.20 299.72 0) (unit 1)
-    (in_bom yes) (on_board yes) (dnp no) (uuid 3fba2a5d-0df5-46d7-85b5-d86467c3a1b6)
-    (property "Reference" "R6" (at 76.20 290.41 0) (effects (font (size 1.27 1.27))))
-    (property "Value" "4.7k" (at 76.20 308.03 0) (effects (font (size 1.27 1.27))))
-    (property "Footprint" "Resistor_SMD:R_0805_2012Metric_Pad1.20x1.40mm_HandSolder" (at 76.20 310.53 0) (effects (font (size 1.27 1.27)) hide))
-    (property "Datasheet" "~" (at 76.20 310.53 0) (effects (font (size 1.27 1.27)) hide))
-    (pin "1" (uuid 69660af9-479c-4f47-95b3-735be069063d))
-    (pin "2" (uuid d96253c4-cb30-4a05-b1e8-9ada68dd901d))
-    (instances (project "trilumag-panel" (path "/cfb1f775-3893-4848-b897-c24ea52d7efb" (reference "R6") (unit 1))))
+  (wire (pts (xy 144.78 297.18) (xy 142.24 297.18)) (stroke (width 0) (type default)) (uuid 45e8e990-d5b0-4b8c-bdb9-d7516578c0ad))
+  (label "+3V3" (at 142.24 297.18 180) (fields_autoplaced) (effects (font (size 1.27 1.27)) (justify right bottom)) (uuid 2d27ba26-8705-4c89-849d-244a49a427e1))
+  (wire (pts (xy 144.78 299.72) (xy 142.24 299.72)) (stroke (width 0) (type default)) (uuid b313e69e-e37f-4f06-9d29-8030db298674))
+  (label "GND" (at 142.24 299.72 180) (fields_autoplaced) (effects (font (size 1.27 1.27)) (justify right bottom)) (uuid ceb2fdf9-c40d-476f-9a25-df8d6c3694be))
+  (wire (pts (xy 144.78 302.26) (xy 142.24 302.26)) (stroke (width 0) (type default)) (uuid 7cf9d525-b03b-4712-8229-618f7c0bd8e2))
+  (label "SCL" (at 142.24 302.26 180) (fields_autoplaced) (effects (font (size 1.27 1.27)) (justify right bottom)) (uuid 7484e5e5-cf87-47f2-9d89-aeccad245a62))
+  (wire (pts (xy 144.78 304.80) (xy 142.24 304.80)) (stroke (width 0) (type default)) (uuid 38321ea4-ac44-4149-b5c4-e4beea10f307))
+  (label "SDA" (at 142.24 304.80 180) (fields_autoplaced) (effects (font (size 1.27 1.27)) (justify right bottom)) (uuid 81d57391-00ea-44ff-b4eb-0d5bef83925b))
+  (wire (pts (xy 144.78 307.34) (xy 142.24 307.34)) (stroke (width 0) (type default)) (uuid c7674604-49ed-44e1-a40e-43f79ba8053f))
+  (label "GND" (at 142.24 307.34 180) (fields_autoplaced) (effects (font (size 1.27 1.27)) (justify right bottom)) (uuid 619b9bb6-325c-46ff-b689-01df208dd5bb))
+  (wire (pts (xy 144.78 309.88) (xy 142.24 309.88)) (stroke (width 0) (type default)) (uuid 5ef98e26-8551-411a-97b6-f1f5abdf0fbf))
+  (label "+3V3" (at 142.24 309.88 180) (fields_autoplaced) (effects (font (size 1.27 1.27)) (justify right bottom)) (uuid adbcdca3-7a41-43bf-9396-a60972a837e0))
+  (wire (pts (xy 144.78 312.42) (xy 142.24 312.42)) (stroke (width 0) (type default)) (uuid 1313e7de-9311-42df-b6ad-0d1778695306))
+  (label "TINT" (at 142.24 312.42 180) (fields_autoplaced) (effects (font (size 1.27 1.27)) (justify right bottom)) (uuid 457b0ae7-b9e3-4dd5-8ec0-1196e9877598))
+  (no_connect (at 144.78 314.96) (uuid b2e4c4f1-99ba-4e61-a9d4-6a0dbdbe2773))
+  (symbol (lib_id "Device:R") (at 185.42 299.72 0) (unit 1)
+    (in_bom yes) (on_board yes) (dnp no) (uuid 7516e87d-2113-4579-8942-ac32371f2e76)
+    (property "Reference" "R6" (at 185.42 290.41 0) (effects (font (size 1.27 1.27))))
+    (property "Value" "4.7k" (at 185.42 308.03 0) (effects (font (size 1.27 1.27))))
+    (property "Footprint" "Resistor_SMD:R_0805_2012Metric_Pad1.20x1.40mm_HandSolder" (at 185.42 310.53 0) (effects (font (size 1.27 1.27)) hide))
+    (property "Datasheet" "~" (at 185.42 310.53 0) (effects (font (size 1.27 1.27)) hide))
+    (pin "1" (uuid 4df33489-d99d-4273-8717-5f46e77e9577))
+    (pin "2" (uuid e7ddc0fa-4a41-4fd7-8022-3e0a0497157c))
+    (instances (project "trilumag-panel" (path "/bfa3ae2b-98a9-4b6e-8523-9aa45929c119" (reference "R6") (unit 1))))
   )
-  (wire (pts (xy 76.20 295.91) (xy 76.20 293.37)) (stroke (width 0) (type default)) (uuid 6e4f27de-c307-4026-b3f0-d924dad44c28))
-  (label "SDA" (at 76.20 293.37 90) (fields_autoplaced) (effects (font (size 1.27 1.27)) (justify left bottom)) (uuid cf1733bf-0d73-468f-b366-3721c4b4835b))
-  (wire (pts (xy 76.20 303.53) (xy 76.20 306.07)) (stroke (width 0) (type default)) (uuid 0bfa9165-e9ce-4308-9fdf-46cebaee1090))
-  (label "+3V3" (at 76.20 306.07 270) (fields_autoplaced) (effects (font (size 1.27 1.27)) (justify right bottom)) (uuid 34b58df1-4cd8-47ec-a5be-aded74ecf3f4))
-  (symbol (lib_id "Device:R") (at 114.30 299.72 0) (unit 1)
-    (in_bom yes) (on_board yes) (dnp no) (uuid 806acbaf-a871-490e-8f89-8a5164e82a8c)
-    (property "Reference" "R7" (at 114.30 290.41 0) (effects (font (size 1.27 1.27))))
-    (property "Value" "4.7k" (at 114.30 308.03 0) (effects (font (size 1.27 1.27))))
-    (property "Footprint" "Resistor_SMD:R_0805_2012Metric_Pad1.20x1.40mm_HandSolder" (at 114.30 310.53 0) (effects (font (size 1.27 1.27)) hide))
-    (property "Datasheet" "~" (at 114.30 310.53 0) (effects (font (size 1.27 1.27)) hide))
-    (pin "1" (uuid f8b34a43-4797-4367-957c-274b9c179a49))
-    (pin "2" (uuid 2a9ca13d-4f8c-4ccb-9945-42bd4a6efc93))
-    (instances (project "trilumag-panel" (path "/cfb1f775-3893-4848-b897-c24ea52d7efb" (reference "R7") (unit 1))))
+  (wire (pts (xy 185.42 295.91) (xy 185.42 293.37)) (stroke (width 0) (type default)) (uuid 4b8655be-4286-43f2-83c2-d5c3aa0c4b06))
+  (label "SDA" (at 185.42 293.37 90) (fields_autoplaced) (effects (font (size 1.27 1.27)) (justify left bottom)) (uuid 06251eec-c545-4707-ae91-af38a3471458))
+  (wire (pts (xy 185.42 303.53) (xy 185.42 306.07)) (stroke (width 0) (type default)) (uuid bb2e8232-8ed9-4355-ac3c-09c3fb38e29a))
+  (label "+3V3" (at 185.42 306.07 270) (fields_autoplaced) (effects (font (size 1.27 1.27)) (justify right bottom)) (uuid 88038725-44a9-45d0-ad83-6b1ada2e1239))
+  (symbol (lib_id "Device:R") (at 226.06 299.72 0) (unit 1)
+    (in_bom yes) (on_board yes) (dnp no) (uuid c7f3045e-c295-46f4-9f71-c93c72f93f48)
+    (property "Reference" "R7" (at 226.06 290.41 0) (effects (font (size 1.27 1.27))))
+    (property "Value" "4.7k" (at 226.06 308.03 0) (effects (font (size 1.27 1.27))))
+    (property "Footprint" "Resistor_SMD:R_0805_2012Metric_Pad1.20x1.40mm_HandSolder" (at 226.06 310.53 0) (effects (font (size 1.27 1.27)) hide))
+    (property "Datasheet" "~" (at 226.06 310.53 0) (effects (font (size 1.27 1.27)) hide))
+    (pin "1" (uuid 510cf169-28b4-467c-a9a4-2e16aadb9f28))
+    (pin "2" (uuid a057f250-a6e0-4bef-9f37-ca1fa640566d))
+    (instances (project "trilumag-panel" (path "/bfa3ae2b-98a9-4b6e-8523-9aa45929c119" (reference "R7") (unit 1))))
   )
-  (wire (pts (xy 114.30 295.91) (xy 114.30 293.37)) (stroke (width 0) (type default)) (uuid 93348389-83b8-4950-b66a-7fc8c9bfac4a))
-  (label "SCL" (at 114.30 293.37 90) (fields_autoplaced) (effects (font (size 1.27 1.27)) (justify left bottom)) (uuid c8ba7679-0961-4a65-ad7d-a2b804970b45))
-  (wire (pts (xy 114.30 303.53) (xy 114.30 306.07)) (stroke (width 0) (type default)) (uuid eb5890db-805a-4ab9-bc43-0d11e55c8818))
-  (label "+3V3" (at 114.30 306.07 270) (fields_autoplaced) (effects (font (size 1.27 1.27)) (justify right bottom)) (uuid 87187ff5-103e-4e9d-99bf-27995f1ea754))
-  (symbol (lib_id "Device:C") (at 35.56 360.68 0) (unit 1)
-    (in_bom yes) (on_board yes) (dnp no) (uuid 835dc740-59ec-4bb1-bb8b-f13b115b930b)
-    (property "Reference" "C8" (at 35.56 351.37 0) (effects (font (size 1.27 1.27))))
-    (property "Value" "100nF" (at 35.56 368.99 0) (effects (font (size 1.27 1.27))))
-    (property "Footprint" "Capacitor_SMD:C_0805_2012Metric_Pad1.18x1.45mm_HandSolder" (at 35.56 371.49 0) (effects (font (size 1.27 1.27)) hide))
-    (property "Datasheet" "~" (at 35.56 371.49 0) (effects (font (size 1.27 1.27)) hide))
-    (pin "1" (uuid 9ad5df8a-0b45-4272-ae4d-ad2c5dac22f1))
-    (pin "2" (uuid 3c7747d5-603b-4c4b-96e3-62b6c5bc2671))
-    (instances (project "trilumag-panel" (path "/cfb1f775-3893-4848-b897-c24ea52d7efb" (reference "C8") (unit 1))))
+  (wire (pts (xy 226.06 295.91) (xy 226.06 293.37)) (stroke (width 0) (type default)) (uuid 79bd1422-8bc4-497a-996c-968e41adc98e))
+  (label "SCL" (at 226.06 293.37 90) (fields_autoplaced) (effects (font (size 1.27 1.27)) (justify left bottom)) (uuid 96e36fbf-2e62-4d3a-8389-83804d316b25))
+  (wire (pts (xy 226.06 303.53) (xy 226.06 306.07)) (stroke (width 0) (type default)) (uuid dc73c8e3-ae06-4177-b010-c573bc49f45f))
+  (label "+3V3" (at 226.06 306.07 270) (fields_autoplaced) (effects (font (size 1.27 1.27)) (justify right bottom)) (uuid fbfd5474-d984-447f-9c0e-c7e2b54998b8))
+  (symbol (lib_id "Device:C") (at 144.78 360.68 0) (unit 1)
+    (in_bom yes) (on_board yes) (dnp no) (uuid c12e12c3-1f90-4ecc-b5af-7e9141f1f703)
+    (property "Reference" "C8" (at 144.78 351.37 0) (effects (font (size 1.27 1.27))))
+    (property "Value" "100nF" (at 144.78 368.99 0) (effects (font (size 1.27 1.27))))
+    (property "Footprint" "Capacitor_SMD:C_0805_2012Metric_Pad1.18x1.45mm_HandSolder" (at 144.78 371.49 0) (effects (font (size 1.27 1.27)) hide))
+    (property "Datasheet" "~" (at 144.78 371.49 0) (effects (font (size 1.27 1.27)) hide))
+    (pin "1" (uuid 7a30d78f-722e-4b85-9262-fe702c0d62c1))
+    (pin "2" (uuid 1fd031ec-a03d-430f-869d-e8da4c4e2e9b))
+    (instances (project "trilumag-panel" (path "/bfa3ae2b-98a9-4b6e-8523-9aa45929c119" (reference "C8") (unit 1))))
   )
-  (wire (pts (xy 35.56 356.87) (xy 35.56 354.33)) (stroke (width 0) (type default)) (uuid c7d3e6f3-b648-43d0-a38b-8ee1bc8c6413))
-  (label "+3V3" (at 35.56 354.33 90) (fields_autoplaced) (effects (font (size 1.27 1.27)) (justify left bottom)) (uuid b6d76b7e-6913-4827-8801-a37ed1a789e2))
-  (wire (pts (xy 35.56 364.49) (xy 35.56 367.03)) (stroke (width 0) (type default)) (uuid 97d38d86-1751-42c3-8d49-b2920b28d169))
-  (label "GND" (at 35.56 367.03 270) (fields_autoplaced) (effects (font (size 1.27 1.27)) (justify right bottom)) (uuid e4bdae69-d66c-4a84-8b64-a560757d8cbd))
-  (text "LED-Daten" (at 175.40 280.36 0) (effects (font (size 2.5 2.5) bold) (justify left bottom)) (uuid 3067e25e-7038-41ae-9d7b-7dc2af683f52))
-  (symbol (lib_id "74xGxx:74AHCT1G125") (at 200.66 307.34 0) (unit 1)
-    (in_bom yes) (on_board yes) (dnp no) (uuid 1a05323e-215c-4aba-aa0a-d27352a9654d)
-    (property "Reference" "U6" (at 200.66 291.68 0) (effects (font (size 1.27 1.27))))
-    (property "Value" "74AHCT1G125" (at 200.66 322.00 0) (effects (font (size 1.27 1.27))))
-    (property "Footprint" "Package_TO_SOT_SMD:SOT-23-5_HandSoldering" (at 200.66 324.50 0) (effects (font (size 1.27 1.27)) hide))
-    (property "Datasheet" "~" (at 200.66 324.50 0) (effects (font (size 1.27 1.27)) hide))
-    (property "Bestellnr" "74AHCT1G125 SOT-23-5" (at 200.66 327.00 0) (effects (font (size 1.27 1.27)) hide))
-    (pin "1" (uuid 475a3e7f-85f2-45d8-a03d-de5f0d6b8e2d))
-    (pin "2" (uuid 583ad0e5-b18a-489c-b2ec-9f83a8b7a176))
-    (pin "3" (uuid a9af463c-ca32-4a19-851e-79cdd118240f))
-    (pin "4" (uuid 0a8e63e4-3684-4ca5-88ed-876a391ff79d))
-    (pin "5" (uuid b396d5de-9dc1-457f-99f8-8a940b72046a))
-    (instances (project "trilumag-panel" (path "/cfb1f775-3893-4848-b897-c24ea52d7efb" (reference "U6") (unit 1))))
+  (wire (pts (xy 144.78 356.87) (xy 144.78 354.33)) (stroke (width 0) (type default)) (uuid 0ae4f6db-0f7d-4c64-b1e7-fb82694d650f))
+  (label "+3V3" (at 144.78 354.33 90) (fields_autoplaced) (effects (font (size 1.27 1.27)) (justify left bottom)) (uuid d0212a65-0479-481f-a0dd-f0a1ef9d1ca0))
+  (wire (pts (xy 144.78 364.49) (xy 144.78 367.03)) (stroke (width 0) (type default)) (uuid 3b509ce1-c50c-45f2-bb9e-1810621cee81))
+  (label "GND" (at 144.78 367.03 270) (fields_autoplaced) (effects (font (size 1.27 1.27)) (justify right bottom)) (uuid 75cc298d-93d0-49a9-8166-841036ffd7b1))
+  (text "LED-Daten" (at 25.40 406.76 0) (effects (font (size 2.5 2.5) bold) (justify left bottom)) (uuid c2ff9b63-5875-45b3-853d-cffcbd3dc42c))
+  (symbol (lib_id "74xGxx:74AHCT1G125") (at 50.80 431.80 0) (unit 1)
+    (in_bom yes) (on_board yes) (dnp no) (uuid b77d1aff-cf01-44ed-8b58-92207b1199cd)
+    (property "Reference" "U6" (at 50.80 416.14 0) (effects (font (size 1.27 1.27))))
+    (property "Value" "74AHCT1G125" (at 50.80 446.46 0) (effects (font (size 1.27 1.27))))
+    (property "Footprint" "Package_TO_SOT_SMD:SOT-23-5_HandSoldering" (at 50.80 448.96 0) (effects (font (size 1.27 1.27)) hide))
+    (property "Datasheet" "~" (at 50.80 448.96 0) (effects (font (size 1.27 1.27)) hide))
+    (property "Bestellnr" "74AHCT1G125 SOT-23-5" (at 50.80 451.46 0) (effects (font (size 1.27 1.27)) hide))
+    (pin "1" (uuid a320ca20-6506-4767-aadf-fb0ff51e45c5))
+    (pin "2" (uuid 0708640a-7dce-4474-ae9d-60b391feb905))
+    (pin "3" (uuid 334785d0-f0e1-4bd2-821c-56fc6f235299))
+    (pin "4" (uuid ea235367-d094-42e7-88a8-562623f74c9b))
+    (pin "5" (uuid b7473d39-2976-4601-9deb-99a62fd57a82))
+    (instances (project "trilumag-panel" (path "/bfa3ae2b-98a9-4b6e-8523-9aa45929c119" (reference "U6") (unit 1))))
   )
-  (wire (pts (xy 200.66 297.18) (xy 200.66 294.64)) (stroke (width 0) (type default)) (uuid 239f2f06-ce52-46b2-a75b-8022256e308a))
-  (label "GND" (at 200.66 294.64 90) (fields_autoplaced) (effects (font (size 1.27 1.27)) (justify left bottom)) (uuid 44583757-1d25-403a-bf8c-edc08a35f7f8))
-  (wire (pts (xy 185.42 307.34) (xy 182.88 307.34)) (stroke (width 0) (type default)) (uuid 5d3318d9-e2c0-4b16-aca0-346497160b52))
-  (label "LED_IN" (at 182.88 307.34 180) (fields_autoplaced) (effects (font (size 1.27 1.27)) (justify right bottom)) (uuid 87774cbf-1e9c-40ae-b2b8-e5cb2f56a7b5))
-  (wire (pts (xy 195.58 317.50) (xy 195.58 320.04)) (stroke (width 0) (type default)) (uuid 9116898f-bbd9-4f8c-9bf8-e673e3d385a9))
-  (label "GND" (at 195.58 320.04 270) (fields_autoplaced) (effects (font (size 1.27 1.27)) (justify right bottom)) (uuid 885ff0dc-29b8-4877-a63a-5276584b6bd9))
-  (wire (pts (xy 213.36 307.34) (xy 215.90 307.34)) (stroke (width 0) (type default)) (uuid ff768bdf-099a-4dce-850d-d9ffb28541f9))
-  (label "LED_Y" (at 215.90 307.34 0) (fields_autoplaced) (effects (font (size 1.27 1.27)) (justify left bottom)) (uuid 4fce44c6-45c1-416f-bd2f-05211b3cbd82))
-  (wire (pts (xy 195.58 297.18) (xy 195.58 294.64)) (stroke (width 0) (type default)) (uuid a1db6c44-dbbc-497b-8a33-1036a6c0d05e))
-  (label "+5V" (at 195.58 294.64 90) (fields_autoplaced) (effects (font (size 1.27 1.27)) (justify left bottom)) (uuid 9eb4d1d3-4f88-47c5-92c3-8b06f7d06945))
-  (symbol (lib_id "Device:C") (at 254.00 299.72 0) (unit 1)
-    (in_bom yes) (on_board yes) (dnp no) (uuid 8ce5220d-2b1e-4895-95b6-9eb754998c69)
-    (property "Reference" "C9" (at 254.00 290.41 0) (effects (font (size 1.27 1.27))))
-    (property "Value" "100nF" (at 254.00 308.03 0) (effects (font (size 1.27 1.27))))
-    (property "Footprint" "Capacitor_SMD:C_0805_2012Metric_Pad1.18x1.45mm_HandSolder" (at 254.00 310.53 0) (effects (font (size 1.27 1.27)) hide))
-    (property "Datasheet" "~" (at 254.00 310.53 0) (effects (font (size 1.27 1.27)) hide))
-    (pin "1" (uuid 3749a6bd-f930-4b01-b7a2-daa175e21738))
-    (pin "2" (uuid edc2f966-a2e2-4e29-811f-762ce7db6a4a))
-    (instances (project "trilumag-panel" (path "/cfb1f775-3893-4848-b897-c24ea52d7efb" (reference "C9") (unit 1))))
+  (wire (pts (xy 50.80 421.64) (xy 50.80 419.10)) (stroke (width 0) (type default)) (uuid 5de96241-a6cf-4188-a82a-8e66c3182bf5))
+  (label "GND" (at 50.80 419.10 90) (fields_autoplaced) (effects (font (size 1.27 1.27)) (justify left bottom)) (uuid ca1dca8c-589d-4a6f-9371-b5f3b53e1648))
+  (wire (pts (xy 35.56 431.80) (xy 33.02 431.80)) (stroke (width 0) (type default)) (uuid 22008956-aff4-41da-95d8-692b085c6787))
+  (label "LED_IN" (at 33.02 431.80 180) (fields_autoplaced) (effects (font (size 1.27 1.27)) (justify right bottom)) (uuid a102ef4c-eb95-4438-8dfd-3c144b85240d))
+  (wire (pts (xy 45.72 441.96) (xy 45.72 444.50)) (stroke (width 0) (type default)) (uuid 7d552b35-ae7f-4a84-b21b-aa24a93c2ea5))
+  (label "GND" (at 45.72 444.50 270) (fields_autoplaced) (effects (font (size 1.27 1.27)) (justify right bottom)) (uuid 67956d65-a2fb-4051-b388-ec4207b49ff3))
+  (wire (pts (xy 63.50 431.80) (xy 66.04 431.80)) (stroke (width 0) (type default)) (uuid 7b2f3fa7-9123-4a91-bf49-be6b26dd742f))
+  (label "LED_Y" (at 66.04 431.80 0) (fields_autoplaced) (effects (font (size 1.27 1.27)) (justify left bottom)) (uuid 55f3928c-f27c-4ea8-81a7-a38106d13224))
+  (wire (pts (xy 45.72 421.64) (xy 45.72 419.10)) (stroke (width 0) (type default)) (uuid a204f350-b186-4c7a-b287-c06b289c78a9))
+  (label "+5V" (at 45.72 419.10 90) (fields_autoplaced) (effects (font (size 1.27 1.27)) (justify left bottom)) (uuid 92b59dea-c4e9-4e84-9eae-2f9bce9433ae))
+  (symbol (lib_id "Device:C") (at 104.14 426.72 0) (unit 1)
+    (in_bom yes) (on_board yes) (dnp no) (uuid 93ec225c-df2b-4fe4-b292-c7abc5c67364)
+    (property "Reference" "C9" (at 104.14 417.41 0) (effects (font (size 1.27 1.27))))
+    (property "Value" "100nF" (at 104.14 435.03 0) (effects (font (size 1.27 1.27))))
+    (property "Footprint" "Capacitor_SMD:C_0805_2012Metric_Pad1.18x1.45mm_HandSolder" (at 104.14 437.53 0) (effects (font (size 1.27 1.27)) hide))
+    (property "Datasheet" "~" (at 104.14 437.53 0) (effects (font (size 1.27 1.27)) hide))
+    (pin "1" (uuid 46dfb6a0-1887-4399-aed3-9bd2fd8c4cdc))
+    (pin "2" (uuid d4d42329-f6f3-4d47-8485-3a5f3b35594e))
+    (instances (project "trilumag-panel" (path "/bfa3ae2b-98a9-4b6e-8523-9aa45929c119" (reference "C9") (unit 1))))
   )
-  (wire (pts (xy 254.00 295.91) (xy 254.00 293.37)) (stroke (width 0) (type default)) (uuid 4ca2bc1f-ff4e-4e50-bc21-173073be7d8e))
-  (label "+5V" (at 254.00 293.37 90) (fields_autoplaced) (effects (font (size 1.27 1.27)) (justify left bottom)) (uuid f78f78d5-31a8-4ab2-a289-14475f30746a))
-  (wire (pts (xy 254.00 303.53) (xy 254.00 306.07)) (stroke (width 0) (type default)) (uuid 0d9ae303-1b00-415e-8561-1e3c9cd550c0))
-  (label "GND" (at 254.00 306.07 270) (fields_autoplaced) (effects (font (size 1.27 1.27)) (justify right bottom)) (uuid b757106a-15e2-4894-af12-d4f1fe4d8c16))
-  (symbol (lib_id "Device:R") (at 292.10 299.72 0) (unit 1)
-    (in_bom yes) (on_board yes) (dnp no) (uuid acdc67a2-7b8c-4ea4-bdf6-b6a8629de58c)
-    (property "Reference" "R4" (at 292.10 290.41 0) (effects (font (size 1.27 1.27))))
-    (property "Value" "33Ω" (at 292.10 308.03 0) (effects (font (size 1.27 1.27))))
-    (property "Footprint" "Resistor_SMD:R_0805_2012Metric_Pad1.20x1.40mm_HandSolder" (at 292.10 310.53 0) (effects (font (size 1.27 1.27)) hide))
-    (property "Datasheet" "~" (at 292.10 310.53 0) (effects (font (size 1.27 1.27)) hide))
-    (pin "1" (uuid 08d7b35b-3024-4cad-b33d-b2481807d413))
-    (pin "2" (uuid 30382c97-1acc-4912-9b24-3f211027fc47))
-    (instances (project "trilumag-panel" (path "/cfb1f775-3893-4848-b897-c24ea52d7efb" (reference "R4") (unit 1))))
+  (wire (pts (xy 104.14 422.91) (xy 104.14 420.37)) (stroke (width 0) (type default)) (uuid 0c550828-d506-46d7-9e4c-b3cf6a644d5e))
+  (label "+5V" (at 104.14 420.37 90) (fields_autoplaced) (effects (font (size 1.27 1.27)) (justify left bottom)) (uuid 7d5c316a-0033-461f-b6ca-066e85991bcf))
+  (wire (pts (xy 104.14 430.53) (xy 104.14 433.07)) (stroke (width 0) (type default)) (uuid c7efae36-9034-4c79-903c-f2e00ff895b6))
+  (label "GND" (at 104.14 433.07 270) (fields_autoplaced) (effects (font (size 1.27 1.27)) (justify right bottom)) (uuid c0d3ece9-190b-4d4c-b196-30ac2bfaba8d))
+  (symbol (lib_id "Device:R") (at 142.24 426.72 0) (unit 1)
+    (in_bom yes) (on_board yes) (dnp no) (uuid 7e3cd9bc-9c05-4ab1-a84b-1a0326658a78)
+    (property "Reference" "R4" (at 142.24 417.41 0) (effects (font (size 1.27 1.27))))
+    (property "Value" "33Ω" (at 142.24 435.03 0) (effects (font (size 1.27 1.27))))
+    (property "Footprint" "Resistor_SMD:R_0805_2012Metric_Pad1.20x1.40mm_HandSolder" (at 142.24 437.53 0) (effects (font (size 1.27 1.27)) hide))
+    (property "Datasheet" "~" (at 142.24 437.53 0) (effects (font (size 1.27 1.27)) hide))
+    (pin "1" (uuid 26c70aad-5ab0-48ed-a681-42c392051a63))
+    (pin "2" (uuid 4d647176-96a0-4910-ae70-28dd876ec5f1))
+    (instances (project "trilumag-panel" (path "/bfa3ae2b-98a9-4b6e-8523-9aa45929c119" (reference "R4") (unit 1))))
   )
-  (wire (pts (xy 292.10 295.91) (xy 292.10 293.37)) (stroke (width 0) (type default)) (uuid 73eaf2d1-b615-4e45-b96a-8a9e635e80e6))
-  (label "LED_Y" (at 292.10 293.37 90) (fields_autoplaced) (effects (font (size 1.27 1.27)) (justify left bottom)) (uuid 83f3720c-2be6-425d-8a4b-df10ef839981))
-  (wire (pts (xy 292.10 303.53) (xy 292.10 306.07)) (stroke (width 0) (type default)) (uuid 79969175-e00a-4e88-8bd3-86cd09ec4c21))
-  (label "LED_D1" (at 292.10 306.07 270) (fields_autoplaced) (effects (font (size 1.27 1.27)) (justify right bottom)) (uuid 2105ab8e-5d43-48e6-84c5-fef55526d25f))
-  (symbol (lib_id "Device:R") (at 185.42 365.76 0) (unit 1)
-    (in_bom yes) (on_board yes) (dnp no) (uuid 4a916f53-b661-4e56-8749-bf06c95ecf81)
-    (property "Reference" "R5" (at 185.42 356.45 0) (effects (font (size 1.27 1.27))))
-    (property "Value" "10k" (at 185.42 374.07 0) (effects (font (size 1.27 1.27))))
-    (property "Footprint" "Resistor_SMD:R_0805_2012Metric_Pad1.20x1.40mm_HandSolder" (at 185.42 376.57 0) (effects (font (size 1.27 1.27)) hide))
-    (property "Datasheet" "~" (at 185.42 376.57 0) (effects (font (size 1.27 1.27)) hide))
-    (pin "1" (uuid 4674d8e6-f711-46bd-bf02-6c2b88d6e508))
-    (pin "2" (uuid b39520c7-29b4-4a63-aff9-b03343e9d76f))
-    (instances (project "trilumag-panel" (path "/cfb1f775-3893-4848-b897-c24ea52d7efb" (reference "R5") (unit 1))))
+  (wire (pts (xy 142.24 422.91) (xy 142.24 420.37)) (stroke (width 0) (type default)) (uuid 15c05c8f-9d74-4faf-abdf-436e45f77c29))
+  (label "LED_Y" (at 142.24 420.37 90) (fields_autoplaced) (effects (font (size 1.27 1.27)) (justify left bottom)) (uuid 6cce9232-d183-4674-87b0-f0b634fe2189))
+  (wire (pts (xy 142.24 430.53) (xy 142.24 433.07)) (stroke (width 0) (type default)) (uuid 036b7346-1b8e-4e5c-93f3-f434f55d4c97))
+  (label "LED_D1" (at 142.24 433.07 270) (fields_autoplaced) (effects (font (size 1.27 1.27)) (justify right bottom)) (uuid 5a41e8de-ebf3-434c-8d9c-c5bcaabbd7f1))
+  (symbol (lib_id "Device:R") (at 182.88 426.72 0) (unit 1)
+    (in_bom yes) (on_board yes) (dnp no) (uuid 8c88e8fc-6b88-4090-8241-46603f6dc330)
+    (property "Reference" "R5" (at 182.88 417.41 0) (effects (font (size 1.27 1.27))))
+    (property "Value" "10k" (at 182.88 435.03 0) (effects (font (size 1.27 1.27))))
+    (property "Footprint" "Resistor_SMD:R_0805_2012Metric_Pad1.20x1.40mm_HandSolder" (at 182.88 437.53 0) (effects (font (size 1.27 1.27)) hide))
+    (property "Datasheet" "~" (at 182.88 437.53 0) (effects (font (size 1.27 1.27)) hide))
+    (pin "1" (uuid 2c4721d1-d20c-4f4f-a11f-5bec5de996bb))
+    (pin "2" (uuid 45b35db2-3e0c-4469-af55-b582b05b3ac3))
+    (instances (project "trilumag-panel" (path "/bfa3ae2b-98a9-4b6e-8523-9aa45929c119" (reference "R5") (unit 1))))
   )
-  (wire (pts (xy 185.42 361.95) (xy 185.42 359.41)) (stroke (width 0) (type default)) (uuid efafb02a-611b-4a45-aa6b-e0ca580f6c90))
-  (label "LED_IN" (at 185.42 359.41 90) (fields_autoplaced) (effects (font (size 1.27 1.27)) (justify left bottom)) (uuid 21aad9ff-99aa-4f11-a0c7-cf2c345f65bc))
-  (wire (pts (xy 185.42 369.57) (xy 185.42 372.11)) (stroke (width 0) (type default)) (uuid 7b191c31-43ed-405a-9858-dc3209566e17))
-  (label "GND" (at 185.42 372.11 270) (fields_autoplaced) (effects (font (size 1.27 1.27)) (justify right bottom)) (uuid fcafda58-bbe9-4074-864e-e11fadd578eb))
-  (text "Kanten" (at 25.40 409.30 0) (effects (font (size 2.5 2.5) bold) (justify left bottom)) (uuid 4d75b925-d353-48c2-ae27-1fba639acb96))
-  (symbol (lib_id "Connector_Generic:Conn_01x06") (at 40.64 429.26 0) (unit 1)
-    (in_bom yes) (on_board yes) (dnp no) (uuid 36110394-aebd-4d7a-9f4c-73a8f5bb6b66)
-    (property "Reference" "X1A" (at 40.64 418.68 0) (effects (font (size 1.27 1.27))))
-    (property "Value" "Pogo 6P Stecker (Kabel)" (at 40.64 441.38 0) (effects (font (size 1.27 1.27))))
-    (property "Footprint" "Trilumag:Kabel_6P_Stecker" (at 40.64 443.88 0) (effects (font (size 1.27 1.27)) hide))
-    (property "Datasheet" "~" (at 40.64 443.88 0) (effects (font (size 1.27 1.27)) hide))
-    (property "Bestellnr" "Magnet-Pogo 6-pol. männlich" (at 40.64 446.38 0) (effects (font (size 1.27 1.27)) hide))
-    (property "Hinweis" "Kabel zum Magnet-Pogo-Stecker; Pin 1 und 6 sind die dicken Kontakte" (at 40.64 446.38 0) (effects (font (size 1.27 1.27)) hide))
-    (pin "1" (uuid 6a14602c-2aaf-4a27-aea6-bd1c4e3ec72e))
-    (pin "2" (uuid 4722ea43-125b-45f5-9e14-0de0b32539e8))
-    (pin "3" (uuid 42a110a3-0da6-4488-adbd-3e2bbe951347))
-    (pin "4" (uuid a69f5684-79f1-4e81-a8c8-9d3933202580))
-    (pin "5" (uuid c2a805e2-9206-4209-8a6a-859e65167973))
-    (pin "6" (uuid 0e58ebb8-2e83-469e-ac2b-92269338c524))
-    (instances (project "trilumag-panel" (path "/cfb1f775-3893-4848-b897-c24ea52d7efb" (reference "X1A") (unit 1))))
-  )
-  (wire (pts (xy 35.56 424.18) (xy 33.02 424.18)) (stroke (width 0) (type default)) (uuid c52d856c-2bd8-4fb5-a676-d70c5ea29636))
-  (label "GND" (at 33.02 424.18 180) (fields_autoplaced) (effects (font (size 1.27 1.27)) (justify right bottom)) (uuid f812e17d-2c7a-4614-8f07-01794b24e1ae))
-  (wire (pts (xy 35.56 426.72) (xy 33.02 426.72)) (stroke (width 0) (type default)) (uuid cc9a867d-b1e3-4c72-9cd8-9b94c50f3b75))
-  (label "A" (at 33.02 426.72 180) (fields_autoplaced) (effects (font (size 1.27 1.27)) (justify right bottom)) (uuid 04c9a5e5-9d57-4122-9a5d-9ea1422b0010))
-  (wire (pts (xy 35.56 429.26) (xy 33.02 429.26)) (stroke (width 0) (type default)) (uuid 7a99d421-af51-4079-9a03-9993cd692e8e))
-  (label "B" (at 33.02 429.26 180) (fields_autoplaced) (effects (font (size 1.27 1.27)) (justify right bottom)) (uuid a05f6a1a-c84c-48bc-a20c-ef2a183da30a))
-  (wire (pts (xy 35.56 431.80) (xy 33.02 431.80)) (stroke (width 0) (type default)) (uuid 2e3dacd0-ff18-41c3-b7e9-af3cf069cd54))
-  (label "SNS1" (at 33.02 431.80 180) (fields_autoplaced) (effects (font (size 1.27 1.27)) (justify right bottom)) (uuid 667c36aa-5fbc-4ba4-a43b-a215089c4631))
-  (wire (pts (xy 35.56 434.34) (xy 33.02 434.34)) (stroke (width 0) (type default)) (uuid 52d3496a-3394-44d0-be45-be99b1a2fb98))
-  (label "GND" (at 33.02 434.34 180) (fields_autoplaced) (effects (font (size 1.27 1.27)) (justify right bottom)) (uuid 54040d64-599b-4f75-a9f0-e1f477a802da))
-  (wire (pts (xy 35.56 436.88) (xy 33.02 436.88)) (stroke (width 0) (type default)) (uuid 648a8650-4cd7-4ad1-89aa-66007dee7175))
-  (label "+24V" (at 33.02 436.88 180) (fields_autoplaced) (effects (font (size 1.27 1.27)) (justify right bottom)) (uuid 0a7cdce0-8674-4cf2-88dd-c10146cf962b))
-  (symbol (lib_id "Connector_Generic:Conn_01x06") (at 81.28 429.26 0) (unit 1)
-    (in_bom yes) (on_board yes) (dnp no) (uuid 3a3fb0cd-7bb5-498a-8a39-cf391e0bdc11)
-    (property "Reference" "X1B" (at 81.28 418.68 0) (effects (font (size 1.27 1.27))))
-    (property "Value" "Pogo 6P Buchse (Kabel)" (at 81.28 441.38 0) (effects (font (size 1.27 1.27))))
-    (property "Footprint" "Trilumag:Kabel_6P_Buchse" (at 81.28 443.88 0) (effects (font (size 1.27 1.27)) hide))
-    (property "Datasheet" "~" (at 81.28 443.88 0) (effects (font (size 1.27 1.27)) hide))
-    (property "Bestellnr" "Magnet-Pogo 6-pol. weiblich" (at 81.28 446.38 0) (effects (font (size 1.27 1.27)) hide))
-    (property "Hinweis" "Kabel zur Magnet-Pogo-Buchse; Pin 1 und 6 sind die dicken Kontakte" (at 81.28 446.38 0) (effects (font (size 1.27 1.27)) hide))
-    (pin "1" (uuid 293a5ae7-3834-48b0-9a90-e2899ae53640))
-    (pin "2" (uuid 76c2d1e8-da79-487f-aaf9-9119e8aa1bc5))
-    (pin "3" (uuid 174cf5c9-8157-44d1-9ae8-7b0c52ecf4db))
-    (pin "4" (uuid 40593f11-3aeb-4da4-b90f-f1ab6d2df619))
-    (pin "5" (uuid b0e01214-4e04-4e81-88bc-1d010fc48ebf))
-    (pin "6" (uuid e6cda82d-5b82-4ea4-b06a-edc54deedca6))
-    (instances (project "trilumag-panel" (path "/cfb1f775-3893-4848-b897-c24ea52d7efb" (reference "X1B") (unit 1))))
-  )
-  (wire (pts (xy 76.20 424.18) (xy 73.66 424.18)) (stroke (width 0) (type default)) (uuid dc1930ca-de78-4f1f-ba12-c490c4f4702a))
-  (label "GND" (at 73.66 424.18 180) (fields_autoplaced) (effects (font (size 1.27 1.27)) (justify right bottom)) (uuid 70f3813f-2860-4b68-88cf-99f810130e1e))
-  (wire (pts (xy 76.20 426.72) (xy 73.66 426.72)) (stroke (width 0) (type default)) (uuid 1552b775-aea8-4942-b1fc-e5397737e005))
-  (label "A" (at 73.66 426.72 180) (fields_autoplaced) (effects (font (size 1.27 1.27)) (justify right bottom)) (uuid cb08aa38-662e-4913-97f8-66e46b977b7c))
-  (wire (pts (xy 76.20 429.26) (xy 73.66 429.26)) (stroke (width 0) (type default)) (uuid 7413476a-c2ca-4cf4-a376-cfbeee2088d5))
-  (label "B" (at 73.66 429.26 180) (fields_autoplaced) (effects (font (size 1.27 1.27)) (justify right bottom)) (uuid 50014a2f-1675-454e-8135-0fd82e73bd07))
-  (wire (pts (xy 76.20 431.80) (xy 73.66 431.80)) (stroke (width 0) (type default)) (uuid 418300bb-5cdd-4112-ad46-a0b9f9dd5867))
-  (label "SNS1" (at 73.66 431.80 180) (fields_autoplaced) (effects (font (size 1.27 1.27)) (justify right bottom)) (uuid caa42285-cec2-44da-9182-c7f583a8cf2b))
-  (wire (pts (xy 76.20 434.34) (xy 73.66 434.34)) (stroke (width 0) (type default)) (uuid 15b84afd-2427-4bcd-91f2-8ece86a70abb))
-  (label "GND" (at 73.66 434.34 180) (fields_autoplaced) (effects (font (size 1.27 1.27)) (justify right bottom)) (uuid 81edca38-74f3-4019-ad28-198e00a07f59))
-  (wire (pts (xy 76.20 436.88) (xy 73.66 436.88)) (stroke (width 0) (type default)) (uuid 9b110d1b-0b6b-4ae4-9479-a0a45f2109c0))
-  (label "+24V" (at 73.66 436.88 180) (fields_autoplaced) (effects (font (size 1.27 1.27)) (justify right bottom)) (uuid 4cd466c3-d3a4-49db-811c-4e257cdc3e58))
-  (symbol (lib_id "Connector_Generic:Conn_01x06") (at 119.38 429.26 0) (unit 1)
-    (in_bom yes) (on_board yes) (dnp no) (uuid 2664d2f3-cd32-4c71-933f-7d03b0f8b511)
-    (property "Reference" "X2A" (at 119.38 418.68 0) (effects (font (size 1.27 1.27))))
-    (property "Value" "Pogo 6P Stecker (Kabel)" (at 119.38 441.38 0) (effects (font (size 1.27 1.27))))
-    (property "Footprint" "Trilumag:Kabel_6P_Stecker" (at 119.38 443.88 0) (effects (font (size 1.27 1.27)) hide))
-    (property "Datasheet" "~" (at 119.38 443.88 0) (effects (font (size 1.27 1.27)) hide))
-    (property "Bestellnr" "Magnet-Pogo 6-pol. männlich" (at 119.38 446.38 0) (effects (font (size 1.27 1.27)) hide))
-    (property "Hinweis" "Kabel zum Magnet-Pogo-Stecker; Pin 1 und 6 sind die dicken Kontakte" (at 119.38 446.38 0) (effects (font (size 1.27 1.27)) hide))
-    (pin "1" (uuid 943d7542-3600-48a5-9e3e-f238dee5fbb6))
-    (pin "2" (uuid 11b231af-111f-4990-b76e-172833f88794))
-    (pin "3" (uuid eac8b652-2d06-49f8-8eb4-137ab8890e21))
-    (pin "4" (uuid cb5a7fef-9b56-401c-bcb8-87eea5dc470a))
-    (pin "5" (uuid 18c6d254-298a-45da-b02f-e00baad224f6))
-    (pin "6" (uuid 3cb0e61c-1432-48d2-a949-44d49033c95b))
-    (instances (project "trilumag-panel" (path "/cfb1f775-3893-4848-b897-c24ea52d7efb" (reference "X2A") (unit 1))))
-  )
-  (wire (pts (xy 114.30 424.18) (xy 111.76 424.18)) (stroke (width 0) (type default)) (uuid 3b984187-08b7-4fa4-bd37-0a6c8091b004))
-  (label "GND" (at 111.76 424.18 180) (fields_autoplaced) (effects (font (size 1.27 1.27)) (justify right bottom)) (uuid 8a93f3e3-0cc4-4a33-af48-b4e8b530a834))
-  (wire (pts (xy 114.30 426.72) (xy 111.76 426.72)) (stroke (width 0) (type default)) (uuid 4812ea3a-6284-4ebe-afa7-39dcb2b76c8b))
-  (label "A" (at 111.76 426.72 180) (fields_autoplaced) (effects (font (size 1.27 1.27)) (justify right bottom)) (uuid fd2364fc-af4d-4676-b46f-8616a7bdcb3d))
-  (wire (pts (xy 114.30 429.26) (xy 111.76 429.26)) (stroke (width 0) (type default)) (uuid 437bc261-0d37-4c8e-8237-bf13d2829ccd))
-  (label "B" (at 111.76 429.26 180) (fields_autoplaced) (effects (font (size 1.27 1.27)) (justify right bottom)) (uuid c7ddb4ca-9f5c-43ff-9a8d-0b204604e3b4))
-  (wire (pts (xy 114.30 431.80) (xy 111.76 431.80)) (stroke (width 0) (type default)) (uuid 07bd4636-412e-4a4b-b21a-89a3f9e98c4d))
-  (label "SNS2" (at 111.76 431.80 180) (fields_autoplaced) (effects (font (size 1.27 1.27)) (justify right bottom)) (uuid de588a1d-cc4f-4ba0-aedf-26ee42cbb597))
-  (wire (pts (xy 114.30 434.34) (xy 111.76 434.34)) (stroke (width 0) (type default)) (uuid 00d045f9-8403-4b8f-acd0-a23fda0b2aa6))
-  (label "GND" (at 111.76 434.34 180) (fields_autoplaced) (effects (font (size 1.27 1.27)) (justify right bottom)) (uuid 66041c7a-1b8c-42b0-a58d-e8e0ee34c705))
-  (wire (pts (xy 114.30 436.88) (xy 111.76 436.88)) (stroke (width 0) (type default)) (uuid 976505f5-c66f-4d88-ac31-8b646c06f684))
-  (label "+24V" (at 111.76 436.88 180) (fields_autoplaced) (effects (font (size 1.27 1.27)) (justify right bottom)) (uuid 0c6a1698-8a10-4c8b-8ae0-3c9a56c6df7f))
-  (symbol (lib_id "Connector_Generic:Conn_01x06") (at 160.02 429.26 0) (unit 1)
-    (in_bom yes) (on_board yes) (dnp no) (uuid 4115d070-b249-4266-bfb4-914daaad401f)
-    (property "Reference" "X2B" (at 160.02 418.68 0) (effects (font (size 1.27 1.27))))
-    (property "Value" "Pogo 6P Buchse (Kabel)" (at 160.02 441.38 0) (effects (font (size 1.27 1.27))))
-    (property "Footprint" "Trilumag:Kabel_6P_Buchse" (at 160.02 443.88 0) (effects (font (size 1.27 1.27)) hide))
-    (property "Datasheet" "~" (at 160.02 443.88 0) (effects (font (size 1.27 1.27)) hide))
-    (property "Bestellnr" "Magnet-Pogo 6-pol. weiblich" (at 160.02 446.38 0) (effects (font (size 1.27 1.27)) hide))
-    (property "Hinweis" "Kabel zur Magnet-Pogo-Buchse; Pin 1 und 6 sind die dicken Kontakte" (at 160.02 446.38 0) (effects (font (size 1.27 1.27)) hide))
-    (pin "1" (uuid 33cc3212-f10b-4c26-a69a-55445625d34f))
-    (pin "2" (uuid 71d036e3-d23f-4d25-a7ae-0e046dd8d4d4))
-    (pin "3" (uuid a7ee1ad1-17f0-4996-b444-5f7ccf231008))
-    (pin "4" (uuid 55021099-65c9-410a-b8f4-60487e2746a4))
-    (pin "5" (uuid 12b08dc4-811c-49f5-9f5f-f53fe354ea89))
-    (pin "6" (uuid 2020dc93-437b-4213-ac63-5fc3bcd8b92c))
-    (instances (project "trilumag-panel" (path "/cfb1f775-3893-4848-b897-c24ea52d7efb" (reference "X2B") (unit 1))))
-  )
-  (wire (pts (xy 154.94 424.18) (xy 152.40 424.18)) (stroke (width 0) (type default)) (uuid d9d1f5b6-1415-4054-b0fb-eec1f33b0c3c))
-  (label "GND" (at 152.40 424.18 180) (fields_autoplaced) (effects (font (size 1.27 1.27)) (justify right bottom)) (uuid 5589a810-c5ee-40c8-b864-cf53ee972613))
-  (wire (pts (xy 154.94 426.72) (xy 152.40 426.72)) (stroke (width 0) (type default)) (uuid 55f5b2ad-a72c-454a-9161-1cdc6c1c863e))
-  (label "A" (at 152.40 426.72 180) (fields_autoplaced) (effects (font (size 1.27 1.27)) (justify right bottom)) (uuid c35d65a4-5206-4a93-86a2-a83b9ac33c7e))
-  (wire (pts (xy 154.94 429.26) (xy 152.40 429.26)) (stroke (width 0) (type default)) (uuid f6f59b6a-e64f-4d29-9d60-9740c14e0653))
-  (label "B" (at 152.40 429.26 180) (fields_autoplaced) (effects (font (size 1.27 1.27)) (justify right bottom)) (uuid 2d8c234a-5905-4b84-90d0-7bfd495664c0))
-  (wire (pts (xy 154.94 431.80) (xy 152.40 431.80)) (stroke (width 0) (type default)) (uuid 6814a24c-3462-4a89-a24e-6cbd513c78e6))
-  (label "SNS2" (at 152.40 431.80 180) (fields_autoplaced) (effects (font (size 1.27 1.27)) (justify right bottom)) (uuid bab79d0d-2bdd-46f7-860e-c200107d7deb))
-  (wire (pts (xy 154.94 434.34) (xy 152.40 434.34)) (stroke (width 0) (type default)) (uuid cb6ca2cd-d20a-409b-9fd3-12304813beef))
-  (label "GND" (at 152.40 434.34 180) (fields_autoplaced) (effects (font (size 1.27 1.27)) (justify right bottom)) (uuid 02a2a71a-06a2-4fb5-86de-ded2878559c6))
-  (wire (pts (xy 154.94 436.88) (xy 152.40 436.88)) (stroke (width 0) (type default)) (uuid f4b28a13-bb5a-4ef4-86d9-3b31a87d75fe))
-  (label "+24V" (at 152.40 436.88 180) (fields_autoplaced) (effects (font (size 1.27 1.27)) (justify right bottom)) (uuid 5b735fe1-538a-4f02-b0fb-2ebaf324f163))
-  (symbol (lib_id "Connector_Generic:Conn_01x06") (at 200.66 429.26 0) (unit 1)
-    (in_bom yes) (on_board yes) (dnp no) (uuid efbfbeb2-7309-497f-a3fe-6865567be96c)
-    (property "Reference" "X3A" (at 200.66 418.68 0) (effects (font (size 1.27 1.27))))
-    (property "Value" "Pogo 6P Stecker (Kabel)" (at 200.66 441.38 0) (effects (font (size 1.27 1.27))))
-    (property "Footprint" "Trilumag:Kabel_6P_Stecker" (at 200.66 443.88 0) (effects (font (size 1.27 1.27)) hide))
-    (property "Datasheet" "~" (at 200.66 443.88 0) (effects (font (size 1.27 1.27)) hide))
-    (property "Bestellnr" "Magnet-Pogo 6-pol. männlich" (at 200.66 446.38 0) (effects (font (size 1.27 1.27)) hide))
-    (property "Hinweis" "Kabel zum Magnet-Pogo-Stecker; Pin 1 und 6 sind die dicken Kontakte" (at 200.66 446.38 0) (effects (font (size 1.27 1.27)) hide))
-    (pin "1" (uuid 609eed9c-200f-4a65-ba03-2de375d42234))
-    (pin "2" (uuid 2e943ee6-88bc-4ab8-bfc2-37954e9245dd))
-    (pin "3" (uuid 04ee7e81-2b20-4e01-a0a7-1df5e4e28176))
-    (pin "4" (uuid 72854d09-99e6-447a-aa21-f45f9fe0069b))
-    (pin "5" (uuid 66db25a6-461d-4dff-a444-bddd31faf04d))
-    (pin "6" (uuid 6bdc7ef2-1ccf-49e9-ac01-107512907e72))
-    (instances (project "trilumag-panel" (path "/cfb1f775-3893-4848-b897-c24ea52d7efb" (reference "X3A") (unit 1))))
-  )
-  (wire (pts (xy 195.58 424.18) (xy 193.04 424.18)) (stroke (width 0) (type default)) (uuid 35b7b6fb-718f-42f6-b2c8-257711e0ef53))
-  (label "GND" (at 193.04 424.18 180) (fields_autoplaced) (effects (font (size 1.27 1.27)) (justify right bottom)) (uuid 24f2e45c-76ae-4b7c-b5ba-2767336b29fe))
-  (wire (pts (xy 195.58 426.72) (xy 193.04 426.72)) (stroke (width 0) (type default)) (uuid 95652a75-3171-4fa8-8817-a4e234ebf902))
-  (label "A" (at 193.04 426.72 180) (fields_autoplaced) (effects (font (size 1.27 1.27)) (justify right bottom)) (uuid eb4b252b-31e3-43b7-8c72-aca1b032a942))
-  (wire (pts (xy 195.58 429.26) (xy 193.04 429.26)) (stroke (width 0) (type default)) (uuid d5209f85-5cce-4ca1-b571-b2e67c60f8a7))
-  (label "B" (at 193.04 429.26 180) (fields_autoplaced) (effects (font (size 1.27 1.27)) (justify right bottom)) (uuid d1f81935-359f-40bf-a2b1-550733f4f350))
-  (wire (pts (xy 195.58 431.80) (xy 193.04 431.80)) (stroke (width 0) (type default)) (uuid edda831d-c124-4295-a53b-42432e0ad7e6))
-  (label "SNS3" (at 193.04 431.80 180) (fields_autoplaced) (effects (font (size 1.27 1.27)) (justify right bottom)) (uuid 42c49607-3b75-4ada-9ec0-b4b8c2d3bbf7))
-  (wire (pts (xy 195.58 434.34) (xy 193.04 434.34)) (stroke (width 0) (type default)) (uuid 7db5b7ef-16a4-4291-bc14-8aac4ad601ac))
-  (label "GND" (at 193.04 434.34 180) (fields_autoplaced) (effects (font (size 1.27 1.27)) (justify right bottom)) (uuid 769fbaaf-ac8a-4c2b-8465-0c2be927d64c))
-  (wire (pts (xy 195.58 436.88) (xy 193.04 436.88)) (stroke (width 0) (type default)) (uuid a0f27586-bd8c-487e-800c-65735b9204d1))
-  (label "+24V" (at 193.04 436.88 180) (fields_autoplaced) (effects (font (size 1.27 1.27)) (justify right bottom)) (uuid 902990b4-466e-439e-9174-2d27b548711c))
-  (symbol (lib_id "Connector_Generic:Conn_01x06") (at 40.64 487.68 0) (unit 1)
-    (in_bom yes) (on_board yes) (dnp no) (uuid ac55f53e-078f-4c72-9634-c586026aa084)
-    (property "Reference" "X3B" (at 40.64 477.10 0) (effects (font (size 1.27 1.27))))
-    (property "Value" "Pogo 6P Buchse (Kabel)" (at 40.64 499.80 0) (effects (font (size 1.27 1.27))))
-    (property "Footprint" "Trilumag:Kabel_6P_Buchse" (at 40.64 502.30 0) (effects (font (size 1.27 1.27)) hide))
+  (wire (pts (xy 182.88 422.91) (xy 182.88 420.37)) (stroke (width 0) (type default)) (uuid 0a3373e8-6b3f-4f26-827b-1562489f24bf))
+  (label "LED_IN" (at 182.88 420.37 90) (fields_autoplaced) (effects (font (size 1.27 1.27)) (justify left bottom)) (uuid 99dbcefc-59e5-4ed4-902c-c7fd85db337c))
+  (wire (pts (xy 182.88 430.53) (xy 182.88 433.07)) (stroke (width 0) (type default)) (uuid d2cbec76-0dd8-45cf-a070-f121626ca506))
+  (label "GND" (at 182.88 433.07 270) (fields_autoplaced) (effects (font (size 1.27 1.27)) (justify right bottom)) (uuid e51db544-aa73-41d5-89ab-9f9462e10d00))
+  (symbol (lib_id "Connector_Generic:Conn_01x04") (at 40.64 490.22 0) (unit 1)
+    (in_bom yes) (on_board yes) (dnp no) (uuid 24c5b22a-1505-462c-babb-9fa9163b1890)
+    (property "Reference" "J6" (at 40.64 482.18 0) (effects (font (size 1.27 1.27))))
+    (property "Value" "LED-Streifen 1" (at 40.64 499.80 0) (effects (font (size 1.27 1.27))))
+    (property "Footprint" "Trilumag:Kabel_4P_LED" (at 40.64 502.30 0) (effects (font (size 1.27 1.27)) hide))
     (property "Datasheet" "~" (at 40.64 502.30 0) (effects (font (size 1.27 1.27)) hide))
-    (property "Bestellnr" "Magnet-Pogo 6-pol. weiblich" (at 40.64 504.80 0) (effects (font (size 1.27 1.27)) hide))
-    (property "Hinweis" "Kabel zur Magnet-Pogo-Buchse; Pin 1 und 6 sind die dicken Kontakte" (at 40.64 504.80 0) (effects (font (size 1.27 1.27)) hide))
-    (pin "1" (uuid 0c0234cb-bea8-404a-8e4b-6e11b065af27))
-    (pin "2" (uuid 1e6add7a-90d1-4fb3-9eaa-abfb320b1e31))
-    (pin "3" (uuid f7e6ad37-b5ec-46f9-bb6e-9621aa5b3f79))
-    (pin "4" (uuid b1281ed5-ef66-4ee0-b1d0-2d866c7afa1f))
-    (pin "5" (uuid f5cbb231-7d68-47e3-957b-8777077eb2e1))
-    (pin "6" (uuid 203f485f-9acf-40c3-beda-93b763bfb99d))
-    (instances (project "trilumag-panel" (path "/cfb1f775-3893-4848-b897-c24ea52d7efb" (reference "X3B") (unit 1))))
+    (property "Hinweis" "Kabel zum Anfang von Streifen 1 (24V, DI, BI, GND)" (at 40.64 504.80 0) (effects (font (size 1.27 1.27)) hide))
+    (pin "1" (uuid 95d17294-e005-4b8e-8c13-8b4a05514c27))
+    (pin "2" (uuid d87dc2bf-cf62-446b-aa41-7bad54a2e11d))
+    (pin "3" (uuid 16d15535-abda-415e-80d3-bf38dff0b86a))
+    (pin "4" (uuid 134ea3e3-c236-428e-82d3-ac3bd07cf8eb))
+    (instances (project "trilumag-panel" (path "/bfa3ae2b-98a9-4b6e-8523-9aa45929c119" (reference "J6") (unit 1))))
   )
-  (wire (pts (xy 35.56 482.60) (xy 33.02 482.60)) (stroke (width 0) (type default)) (uuid d6c7a84d-42ad-4c24-baef-c8b17ab7d332))
-  (label "GND" (at 33.02 482.60 180) (fields_autoplaced) (effects (font (size 1.27 1.27)) (justify right bottom)) (uuid a0a2363e-1fc0-41ac-b2ce-20ac44dede1a))
-  (wire (pts (xy 35.56 485.14) (xy 33.02 485.14)) (stroke (width 0) (type default)) (uuid 3c2301b6-cc09-454f-843b-95ce92d6d3e8))
-  (label "A" (at 33.02 485.14 180) (fields_autoplaced) (effects (font (size 1.27 1.27)) (justify right bottom)) (uuid d594b152-5e57-4227-99e7-cd1ab2c30dc2))
-  (wire (pts (xy 35.56 487.68) (xy 33.02 487.68)) (stroke (width 0) (type default)) (uuid 586fd776-5132-4d8c-a03a-1dfb382b2f3d))
-  (label "B" (at 33.02 487.68 180) (fields_autoplaced) (effects (font (size 1.27 1.27)) (justify right bottom)) (uuid 32a5e237-c54c-4f60-b6d7-788119cd2fe9))
-  (wire (pts (xy 35.56 490.22) (xy 33.02 490.22)) (stroke (width 0) (type default)) (uuid 3e2d42f3-03a0-4aa8-9d65-88657a8c4d1b))
-  (label "SNS3" (at 33.02 490.22 180) (fields_autoplaced) (effects (font (size 1.27 1.27)) (justify right bottom)) (uuid 61fd6c03-17ba-4e1e-ab52-2fcd50f19a68))
-  (wire (pts (xy 35.56 492.76) (xy 33.02 492.76)) (stroke (width 0) (type default)) (uuid 0d096212-f025-40d8-87ac-01832bd6c5ca))
-  (label "GND" (at 33.02 492.76 180) (fields_autoplaced) (effects (font (size 1.27 1.27)) (justify right bottom)) (uuid ebbcf5f2-ec92-4c58-b581-5c0679bff13b))
-  (wire (pts (xy 35.56 495.30) (xy 33.02 495.30)) (stroke (width 0) (type default)) (uuid acfb9d98-04c2-4aa1-8953-2cc904cb743c))
-  (label "+24V" (at 33.02 495.30 180) (fields_autoplaced) (effects (font (size 1.27 1.27)) (justify right bottom)) (uuid 3fd2b921-ef4d-4214-99b2-e20dedf09881))
-  (text "LED-Streifen" (at 25.40 535.70 0) (effects (font (size 2.5 2.5) bold) (justify left bottom)) (uuid 57d929bb-dcf6-45bd-bb04-40b71153ba2e))
-  (symbol (lib_id "Connector_Generic:Conn_01x04") (at 40.64 553.72 0) (unit 1)
-    (in_bom yes) (on_board yes) (dnp no) (uuid f4935f9f-c7d6-4fef-b895-694febab09e5)
-    (property "Reference" "L1S" (at 40.64 545.68 0) (effects (font (size 1.27 1.27))))
-    (property "Value" "Streifen 1 Anfang" (at 40.64 563.30 0) (effects (font (size 1.27 1.27))))
-    (property "Footprint" "Trilumag:WS2814_Anfang" (at 40.64 565.80 0) (effects (font (size 1.27 1.27)) hide))
-    (property "Datasheet" "~" (at 40.64 565.80 0) (effects (font (size 1.27 1.27)) hide))
-    (pin "1" (uuid 33ba3a49-0270-4c9f-898f-2bf458296dab))
-    (pin "2" (uuid c7370390-dec2-4cbd-b218-2850c2f25978))
-    (pin "3" (uuid 535513d2-9a1b-46b5-9183-490ffda520ea))
-    (pin "4" (uuid 16f4a0e4-d5dd-4960-9f2d-e6e43a4bcbd8))
-    (instances (project "trilumag-panel" (path "/cfb1f775-3893-4848-b897-c24ea52d7efb" (reference "L1S") (unit 1))))
+  (wire (pts (xy 35.56 487.68) (xy 33.02 487.68)) (stroke (width 0) (type default)) (uuid 9b309aaf-aabf-4ce9-a066-873ce42dbcca))
+  (label "+24V" (at 33.02 487.68 180) (fields_autoplaced) (effects (font (size 1.27 1.27)) (justify right bottom)) (uuid cdfeda6b-3c14-48d1-8ed9-747be2ea2a38))
+  (wire (pts (xy 35.56 490.22) (xy 33.02 490.22)) (stroke (width 0) (type default)) (uuid e3fa8a76-a7aa-419b-be43-82304ccc4e53))
+  (label "LED_D1" (at 33.02 490.22 180) (fields_autoplaced) (effects (font (size 1.27 1.27)) (justify right bottom)) (uuid 952722ea-1fa3-43df-9275-49cead2f393d))
+  (wire (pts (xy 35.56 492.76) (xy 33.02 492.76)) (stroke (width 0) (type default)) (uuid 67012f12-f2c9-4868-baa2-582711aa875d))
+  (label "GND" (at 33.02 492.76 180) (fields_autoplaced) (effects (font (size 1.27 1.27)) (justify right bottom)) (uuid 444e2f63-d7bb-494f-98a9-2b478db271d1))
+  (wire (pts (xy 35.56 495.30) (xy 33.02 495.30)) (stroke (width 0) (type default)) (uuid 9e22b5ca-f9d0-45e7-b253-8eab39fdaaf3))
+  (label "GND" (at 33.02 495.30 180) (fields_autoplaced) (effects (font (size 1.27 1.27)) (justify right bottom)) (uuid 178c26aa-cc7a-43b9-99bf-e34c4b139f79))
+  (text "Kanten" (at 25.40 535.70 0) (effects (font (size 2.5 2.5) bold) (justify left bottom)) (uuid 43343091-4655-4700-9681-e827179ebb68))
+  (symbol (lib_id "Connector_Generic:Conn_01x06") (at 40.64 556.26 0) (unit 1)
+    (in_bom yes) (on_board yes) (dnp no) (uuid bd4f5098-7755-4230-bb4e-322de7ed11d7)
+    (property "Reference" "X1A" (at 40.64 545.68 0) (effects (font (size 1.27 1.27))))
+    (property "Value" "Kante 1 Pogo Stecker" (at 40.64 568.38 0) (effects (font (size 1.27 1.27))))
+    (property "Footprint" "Trilumag:Kabel_6P_Stecker" (at 40.64 570.88 0) (effects (font (size 1.27 1.27)) hide))
+    (property "Datasheet" "~" (at 40.64 570.88 0) (effects (font (size 1.27 1.27)) hide))
+    (property "Bestellnr" "Magnet-Pogo 6-pol. männlich" (at 40.64 573.38 0) (effects (font (size 1.27 1.27)) hide))
+    (property "Hinweis" "Kabel zum Pogo-Stecker an Kante 1; Pin 1 und 6 sind die dicken Kontakte" (at 40.64 573.38 0) (effects (font (size 1.27 1.27)) hide))
+    (pin "1" (uuid bf574267-7192-46c0-82fe-91aa21212b7f))
+    (pin "2" (uuid 0d8c25cb-b84b-4afe-a935-abcf43f983b7))
+    (pin "3" (uuid f8287055-087e-4ec9-ba67-8e71579571cb))
+    (pin "4" (uuid 1cbe609b-0fc6-434e-b836-3f1c5f99397d))
+    (pin "5" (uuid 13def7d0-5b77-4113-89a9-3aba8d9cba38))
+    (pin "6" (uuid abf470fd-145a-4966-90f4-a9cba248e226))
+    (instances (project "trilumag-panel" (path "/bfa3ae2b-98a9-4b6e-8523-9aa45929c119" (reference "X1A") (unit 1))))
   )
-  (wire (pts (xy 35.56 551.18) (xy 33.02 551.18)) (stroke (width 0) (type default)) (uuid 869ce57d-84a1-44fc-ad9b-38abf31850e1))
-  (label "+24V" (at 33.02 551.18 180) (fields_autoplaced) (effects (font (size 1.27 1.27)) (justify right bottom)) (uuid 314f630b-ab04-4af3-8654-49ed4b793e8b))
-  (wire (pts (xy 35.56 553.72) (xy 33.02 553.72)) (stroke (width 0) (type default)) (uuid 3332e979-9fcc-42ac-b536-3e771073df8c))
-  (label "LED_D1" (at 33.02 553.72 180) (fields_autoplaced) (effects (font (size 1.27 1.27)) (justify right bottom)) (uuid 0e527319-10a5-4cc3-824d-4d82eb0d853d))
-  (wire (pts (xy 35.56 556.26) (xy 33.02 556.26)) (stroke (width 0) (type default)) (uuid 481085b8-1702-4a00-a32f-160057ca88e7))
-  (label "GND" (at 33.02 556.26 180) (fields_autoplaced) (effects (font (size 1.27 1.27)) (justify right bottom)) (uuid 674466cf-22b9-4da0-913a-84c3f33a7277))
-  (wire (pts (xy 35.56 558.80) (xy 33.02 558.80)) (stroke (width 0) (type default)) (uuid 8d515d2a-63dd-4c9f-ac68-340b50d1589b))
-  (label "GND" (at 33.02 558.80 180) (fields_autoplaced) (effects (font (size 1.27 1.27)) (justify right bottom)) (uuid 19deea41-8c6d-4ec3-ae55-2819cee78753))
-  (symbol (lib_id "Connector_Generic:Conn_01x04") (at 81.28 553.72 0) (unit 1)
-    (in_bom yes) (on_board yes) (dnp no) (uuid ffb809e6-2736-4895-af05-24074ce81e6e)
-    (property "Reference" "L1E" (at 81.28 545.68 0) (effects (font (size 1.27 1.27))))
-    (property "Value" "Streifen 1 Ende" (at 81.28 563.30 0) (effects (font (size 1.27 1.27))))
-    (property "Footprint" "Trilumag:WS2814_Ende" (at 81.28 565.80 0) (effects (font (size 1.27 1.27)) hide))
-    (property "Datasheet" "~" (at 81.28 565.80 0) (effects (font (size 1.27 1.27)) hide))
-    (pin "1" (uuid d3d21f32-b18b-45a0-8c22-1e2a6df2ff0c))
-    (pin "2" (uuid 776b9e34-a368-4e68-813f-2764d4205aac))
-    (pin "3" (uuid a8f3577a-7d61-4c6e-96e2-7066e737d1d9))
-    (pin "4" (uuid fc4ccf65-cdb3-4193-b485-fba64a4a6ee4))
-    (instances (project "trilumag-panel" (path "/cfb1f775-3893-4848-b897-c24ea52d7efb" (reference "L1E") (unit 1))))
+  (wire (pts (xy 35.56 551.18) (xy 33.02 551.18)) (stroke (width 0) (type default)) (uuid 13766d5a-8d08-493b-94bb-111d64eef5f1))
+  (label "GND" (at 33.02 551.18 180) (fields_autoplaced) (effects (font (size 1.27 1.27)) (justify right bottom)) (uuid 0f010ea1-817e-47fc-8a94-47e6669ea31a))
+  (wire (pts (xy 35.56 553.72) (xy 33.02 553.72)) (stroke (width 0) (type default)) (uuid 2e47b11c-1107-4b9c-a5bc-ad575d5ebd22))
+  (label "A" (at 33.02 553.72 180) (fields_autoplaced) (effects (font (size 1.27 1.27)) (justify right bottom)) (uuid 02bb56f0-25f7-4639-9f14-88e3020e5f61))
+  (wire (pts (xy 35.56 556.26) (xy 33.02 556.26)) (stroke (width 0) (type default)) (uuid e0b8eb56-b4c7-4f12-95e3-59d7dd8f9983))
+  (label "B" (at 33.02 556.26 180) (fields_autoplaced) (effects (font (size 1.27 1.27)) (justify right bottom)) (uuid 0907919b-e587-4de2-a490-0f9fe63cf8cd))
+  (wire (pts (xy 35.56 558.80) (xy 33.02 558.80)) (stroke (width 0) (type default)) (uuid 6dc964ee-936f-4eca-8115-c9a2c4eb4af3))
+  (label "SNS1" (at 33.02 558.80 180) (fields_autoplaced) (effects (font (size 1.27 1.27)) (justify right bottom)) (uuid fb11654b-8157-48d0-8a20-6ae528f49b14))
+  (wire (pts (xy 35.56 561.34) (xy 33.02 561.34)) (stroke (width 0) (type default)) (uuid 842cde5f-0c9b-42e6-a65d-86f3d404afa4))
+  (label "GND" (at 33.02 561.34 180) (fields_autoplaced) (effects (font (size 1.27 1.27)) (justify right bottom)) (uuid 54b8a327-ddd9-4378-9e20-8f6dc63263d1))
+  (wire (pts (xy 35.56 563.88) (xy 33.02 563.88)) (stroke (width 0) (type default)) (uuid 7a0911be-c99c-4e17-be1f-df57f73ff4d0))
+  (label "+24V" (at 33.02 563.88 180) (fields_autoplaced) (effects (font (size 1.27 1.27)) (justify right bottom)) (uuid 33b3102a-c8c3-4cdb-90f7-a5c8b0f55fc9))
+  (symbol (lib_id "Connector_Generic:Conn_01x06") (at 81.28 556.26 0) (unit 1)
+    (in_bom yes) (on_board yes) (dnp no) (uuid 127ba025-ddbb-4474-8d1d-ed74c7a3347d)
+    (property "Reference" "X1B" (at 81.28 545.68 0) (effects (font (size 1.27 1.27))))
+    (property "Value" "Kante 1 Pogo Buchse" (at 81.28 568.38 0) (effects (font (size 1.27 1.27))))
+    (property "Footprint" "Trilumag:Kabel_6P_Buchse" (at 81.28 570.88 0) (effects (font (size 1.27 1.27)) hide))
+    (property "Datasheet" "~" (at 81.28 570.88 0) (effects (font (size 1.27 1.27)) hide))
+    (property "Bestellnr" "Magnet-Pogo 6-pol. weiblich" (at 81.28 573.38 0) (effects (font (size 1.27 1.27)) hide))
+    (property "Hinweis" "Kabel zum Pogo-Buchse an Kante 1; Pin 1 und 6 sind die dicken Kontakte" (at 81.28 573.38 0) (effects (font (size 1.27 1.27)) hide))
+    (pin "1" (uuid 81416523-b977-4836-a769-e7af65a1c913))
+    (pin "2" (uuid 1adcc953-88da-4b2b-9428-325b3e3ebacc))
+    (pin "3" (uuid 6768286b-ba16-45bc-929d-838027fc786a))
+    (pin "4" (uuid e264bbff-1334-4614-b00a-f1a772b2d6e0))
+    (pin "5" (uuid 0ca73079-a4f4-421a-9560-b9c859f08965))
+    (pin "6" (uuid ae6e4e91-e062-4746-8f4b-5ef060bb1b63))
+    (instances (project "trilumag-panel" (path "/bfa3ae2b-98a9-4b6e-8523-9aa45929c119" (reference "X1B") (unit 1))))
   )
-  (wire (pts (xy 76.20 551.18) (xy 73.66 551.18)) (stroke (width 0) (type default)) (uuid e4e2d0ed-2094-4c4d-9c80-6a288f900d36))
-  (label "+24V" (at 73.66 551.18 180) (fields_autoplaced) (effects (font (size 1.27 1.27)) (justify right bottom)) (uuid 47bc3192-15b7-418c-88b2-7c0600b52c8e))
-  (wire (pts (xy 76.20 553.72) (xy 73.66 553.72)) (stroke (width 0) (type default)) (uuid d834b736-6810-4847-9d68-79db229f92c4))
-  (label "LED_D2" (at 73.66 553.72 180) (fields_autoplaced) (effects (font (size 1.27 1.27)) (justify right bottom)) (uuid 9406de79-f07e-4d4a-967a-ef34341046bc))
-  (wire (pts (xy 76.20 556.26) (xy 73.66 556.26)) (stroke (width 0) (type default)) (uuid d89189a1-6fb2-4a78-9ff0-01e66349ff14))
-  (label "LED_B2" (at 73.66 556.26 180) (fields_autoplaced) (effects (font (size 1.27 1.27)) (justify right bottom)) (uuid 9677dd46-55ef-41c8-8a7b-cb788142ac62))
-  (wire (pts (xy 76.20 558.80) (xy 73.66 558.80)) (stroke (width 0) (type default)) (uuid 28a725d3-b9e5-4c45-9677-6c750d276bd1))
-  (label "GND" (at 73.66 558.80 180) (fields_autoplaced) (effects (font (size 1.27 1.27)) (justify right bottom)) (uuid 78482e53-d6b4-49b3-bb09-e4a4c497cb63))
-  (symbol (lib_id "Connector_Generic:Conn_01x04") (at 119.38 553.72 0) (unit 1)
-    (in_bom yes) (on_board yes) (dnp no) (uuid 31b30897-4d10-4abf-97fd-4a5f8d75e7f0)
-    (property "Reference" "L2S" (at 119.38 545.68 0) (effects (font (size 1.27 1.27))))
-    (property "Value" "Streifen 2 Anfang" (at 119.38 563.30 0) (effects (font (size 1.27 1.27))))
-    (property "Footprint" "Trilumag:WS2814_Anfang" (at 119.38 565.80 0) (effects (font (size 1.27 1.27)) hide))
-    (property "Datasheet" "~" (at 119.38 565.80 0) (effects (font (size 1.27 1.27)) hide))
-    (pin "1" (uuid b8ec1187-b59b-4472-aeda-63a64b975752))
-    (pin "2" (uuid a8d4e853-28f9-4b0a-a9a0-ebf669642a38))
-    (pin "3" (uuid 1ae909df-1437-44d1-9087-50d70c3cd561))
-    (pin "4" (uuid 0703cf0f-7db7-494c-a612-1f8ff8b2477d))
-    (instances (project "trilumag-panel" (path "/cfb1f775-3893-4848-b897-c24ea52d7efb" (reference "L2S") (unit 1))))
+  (wire (pts (xy 76.20 551.18) (xy 73.66 551.18)) (stroke (width 0) (type default)) (uuid 7338cd78-3a6b-4154-88d1-036c2bd7c259))
+  (label "GND" (at 73.66 551.18 180) (fields_autoplaced) (effects (font (size 1.27 1.27)) (justify right bottom)) (uuid 808a3749-7dff-47ec-8ae7-1259fb28e68d))
+  (wire (pts (xy 76.20 553.72) (xy 73.66 553.72)) (stroke (width 0) (type default)) (uuid 8d8e673c-6dc8-4895-8e5b-29bb7ef473f8))
+  (label "A" (at 73.66 553.72 180) (fields_autoplaced) (effects (font (size 1.27 1.27)) (justify right bottom)) (uuid 566d040f-3465-474e-aa68-acfb24d065a4))
+  (wire (pts (xy 76.20 556.26) (xy 73.66 556.26)) (stroke (width 0) (type default)) (uuid 1df6cf30-eed0-4cbf-b841-3b2e3cdfa08d))
+  (label "B" (at 73.66 556.26 180) (fields_autoplaced) (effects (font (size 1.27 1.27)) (justify right bottom)) (uuid 760942fd-870b-4cb5-8f51-380aa408271d))
+  (wire (pts (xy 76.20 558.80) (xy 73.66 558.80)) (stroke (width 0) (type default)) (uuid 38306401-1393-47c6-b17f-4f3ffea8beb9))
+  (label "SNS1" (at 73.66 558.80 180) (fields_autoplaced) (effects (font (size 1.27 1.27)) (justify right bottom)) (uuid a29dacdc-3a6c-4be1-a193-0eeaae60a3f9))
+  (wire (pts (xy 76.20 561.34) (xy 73.66 561.34)) (stroke (width 0) (type default)) (uuid 26a3458a-eeb3-43f9-bbf4-ce4c8d3aac36))
+  (label "GND" (at 73.66 561.34 180) (fields_autoplaced) (effects (font (size 1.27 1.27)) (justify right bottom)) (uuid 6b1cc2f0-a330-4ab7-9021-f4a99fe42d7f))
+  (wire (pts (xy 76.20 563.88) (xy 73.66 563.88)) (stroke (width 0) (type default)) (uuid 6b41e258-9a06-4e83-93d3-8d2a985e626e))
+  (label "+24V" (at 73.66 563.88 180) (fields_autoplaced) (effects (font (size 1.27 1.27)) (justify right bottom)) (uuid af6ba91b-fc73-4102-be67-e0dd78e82967))
+  (symbol (lib_id "Connector_Generic:Conn_01x06") (at 119.38 556.26 0) (unit 1)
+    (in_bom yes) (on_board yes) (dnp no) (uuid c549c236-f719-4cb3-ade5-baf5a435244f)
+    (property "Reference" "X2A" (at 119.38 545.68 0) (effects (font (size 1.27 1.27))))
+    (property "Value" "Kante 2 Pogo Stecker" (at 119.38 568.38 0) (effects (font (size 1.27 1.27))))
+    (property "Footprint" "Trilumag:Kabel_6P_Stecker" (at 119.38 570.88 0) (effects (font (size 1.27 1.27)) hide))
+    (property "Datasheet" "~" (at 119.38 570.88 0) (effects (font (size 1.27 1.27)) hide))
+    (property "Bestellnr" "Magnet-Pogo 6-pol. männlich" (at 119.38 573.38 0) (effects (font (size 1.27 1.27)) hide))
+    (property "Hinweis" "Kabel zum Pogo-Stecker an Kante 2; Pin 1 und 6 sind die dicken Kontakte" (at 119.38 573.38 0) (effects (font (size 1.27 1.27)) hide))
+    (pin "1" (uuid ea68d4a5-78c8-4fb1-84ba-5377d9de8735))
+    (pin "2" (uuid 7cfd09cd-1146-473e-a76f-4fdba18b3100))
+    (pin "3" (uuid 32a4a954-6a34-42ed-af0b-819c79ffec6b))
+    (pin "4" (uuid b12425b6-dabb-4caa-b2bd-ed643000b360))
+    (pin "5" (uuid c459eff5-8566-4e67-9b5a-d8f50c410848))
+    (pin "6" (uuid 356d7248-52bc-47a6-a25a-2120255c92b0))
+    (instances (project "trilumag-panel" (path "/bfa3ae2b-98a9-4b6e-8523-9aa45929c119" (reference "X2A") (unit 1))))
   )
-  (wire (pts (xy 114.30 551.18) (xy 111.76 551.18)) (stroke (width 0) (type default)) (uuid d8e10763-8207-471f-8409-32a404a3464f))
-  (label "+24V" (at 111.76 551.18 180) (fields_autoplaced) (effects (font (size 1.27 1.27)) (justify right bottom)) (uuid 524b2f58-ac59-4809-9c9b-749f8ed1314e))
-  (wire (pts (xy 114.30 553.72) (xy 111.76 553.72)) (stroke (width 0) (type default)) (uuid dac5be59-1e74-4a41-ba78-79632d5c4d0c))
-  (label "LED_D2" (at 111.76 553.72 180) (fields_autoplaced) (effects (font (size 1.27 1.27)) (justify right bottom)) (uuid 0fd19792-8f2e-453b-b296-76a03bdafb59))
-  (wire (pts (xy 114.30 556.26) (xy 111.76 556.26)) (stroke (width 0) (type default)) (uuid e078932b-8815-4984-8e1d-387a8004eaaa))
-  (label "LED_B2" (at 111.76 556.26 180) (fields_autoplaced) (effects (font (size 1.27 1.27)) (justify right bottom)) (uuid b10080b7-91f9-4006-9fce-adbce0d2c481))
-  (wire (pts (xy 114.30 558.80) (xy 111.76 558.80)) (stroke (width 0) (type default)) (uuid 266b412c-5c55-456e-8bc9-ac54c8375420))
-  (label "GND" (at 111.76 558.80 180) (fields_autoplaced) (effects (font (size 1.27 1.27)) (justify right bottom)) (uuid 5074cb85-94e1-452d-bfff-0f5962c6a1e8))
-  (symbol (lib_id "Connector_Generic:Conn_01x04") (at 160.02 553.72 0) (unit 1)
-    (in_bom yes) (on_board yes) (dnp no) (uuid 191b40ea-cf52-4328-b564-a41e0d49cece)
-    (property "Reference" "L2E" (at 160.02 545.68 0) (effects (font (size 1.27 1.27))))
-    (property "Value" "Streifen 2 Ende" (at 160.02 563.30 0) (effects (font (size 1.27 1.27))))
-    (property "Footprint" "Trilumag:WS2814_Ende" (at 160.02 565.80 0) (effects (font (size 1.27 1.27)) hide))
-    (property "Datasheet" "~" (at 160.02 565.80 0) (effects (font (size 1.27 1.27)) hide))
-    (pin "1" (uuid a62dbb8e-93d6-4d3c-9d9e-04fc8d41b73a))
-    (pin "2" (uuid 5e22282a-01fa-4304-a822-1a04366806ea))
-    (pin "3" (uuid c1e4c2b4-849c-41fb-a963-e78dfa074b2d))
-    (pin "4" (uuid 64ab91ac-82b8-4c39-a244-fe0a4b819890))
-    (instances (project "trilumag-panel" (path "/cfb1f775-3893-4848-b897-c24ea52d7efb" (reference "L2E") (unit 1))))
+  (wire (pts (xy 114.30 551.18) (xy 111.76 551.18)) (stroke (width 0) (type default)) (uuid f52d01bf-184f-4ca0-8a4c-58a74a8ecd76))
+  (label "GND" (at 111.76 551.18 180) (fields_autoplaced) (effects (font (size 1.27 1.27)) (justify right bottom)) (uuid a4ec6aa6-d754-4c30-a9ca-38a10a03c486))
+  (wire (pts (xy 114.30 553.72) (xy 111.76 553.72)) (stroke (width 0) (type default)) (uuid a53075e9-8015-4100-995a-5d8d88402d73))
+  (label "A" (at 111.76 553.72 180) (fields_autoplaced) (effects (font (size 1.27 1.27)) (justify right bottom)) (uuid 6cf48f3d-9343-4d0d-962d-15fafef4627f))
+  (wire (pts (xy 114.30 556.26) (xy 111.76 556.26)) (stroke (width 0) (type default)) (uuid 92c0eac8-e96a-4b38-baac-51ab1fe5e553))
+  (label "B" (at 111.76 556.26 180) (fields_autoplaced) (effects (font (size 1.27 1.27)) (justify right bottom)) (uuid 925698f2-3c19-4484-8083-c6460c19380e))
+  (wire (pts (xy 114.30 558.80) (xy 111.76 558.80)) (stroke (width 0) (type default)) (uuid 851f3fc1-23c1-4d31-862e-2c2672ec17d1))
+  (label "SNS2" (at 111.76 558.80 180) (fields_autoplaced) (effects (font (size 1.27 1.27)) (justify right bottom)) (uuid e87c7e50-e03e-4c3c-8b23-d17cda643d08))
+  (wire (pts (xy 114.30 561.34) (xy 111.76 561.34)) (stroke (width 0) (type default)) (uuid f3214d79-4320-4f05-a0d7-bb034d500059))
+  (label "GND" (at 111.76 561.34 180) (fields_autoplaced) (effects (font (size 1.27 1.27)) (justify right bottom)) (uuid df3b90b7-c5bc-433b-b43a-9358858eebe1))
+  (wire (pts (xy 114.30 563.88) (xy 111.76 563.88)) (stroke (width 0) (type default)) (uuid 32b37162-8980-4e52-ad56-cfc965ef364d))
+  (label "+24V" (at 111.76 563.88 180) (fields_autoplaced) (effects (font (size 1.27 1.27)) (justify right bottom)) (uuid 25321014-7989-44d8-b974-4a61d5c167ad))
+  (symbol (lib_id "Connector_Generic:Conn_01x06") (at 160.02 556.26 0) (unit 1)
+    (in_bom yes) (on_board yes) (dnp no) (uuid 92d437ee-5551-43a7-aa31-6e4eee9f4038)
+    (property "Reference" "X2B" (at 160.02 545.68 0) (effects (font (size 1.27 1.27))))
+    (property "Value" "Kante 2 Pogo Buchse" (at 160.02 568.38 0) (effects (font (size 1.27 1.27))))
+    (property "Footprint" "Trilumag:Kabel_6P_Buchse" (at 160.02 570.88 0) (effects (font (size 1.27 1.27)) hide))
+    (property "Datasheet" "~" (at 160.02 570.88 0) (effects (font (size 1.27 1.27)) hide))
+    (property "Bestellnr" "Magnet-Pogo 6-pol. weiblich" (at 160.02 573.38 0) (effects (font (size 1.27 1.27)) hide))
+    (property "Hinweis" "Kabel zum Pogo-Buchse an Kante 2; Pin 1 und 6 sind die dicken Kontakte" (at 160.02 573.38 0) (effects (font (size 1.27 1.27)) hide))
+    (pin "1" (uuid 56cebf63-9640-4654-89b9-8feb2e6a3a3f))
+    (pin "2" (uuid 3b40f769-ee16-4e5c-b345-814799547085))
+    (pin "3" (uuid 7ed580cb-2160-4c19-bcbd-bb8f91ceba78))
+    (pin "4" (uuid d2cdf917-3f46-425a-83a8-76d8f05297aa))
+    (pin "5" (uuid 4611f7dd-4a76-44d0-bdf7-fea3e26de7a7))
+    (pin "6" (uuid 942222df-82cf-4277-b1d3-6fa10597eb75))
+    (instances (project "trilumag-panel" (path "/bfa3ae2b-98a9-4b6e-8523-9aa45929c119" (reference "X2B") (unit 1))))
   )
-  (wire (pts (xy 154.94 551.18) (xy 152.40 551.18)) (stroke (width 0) (type default)) (uuid 6f39f3fc-9a46-4a91-b8f3-01fb54349f8a))
-  (label "+24V" (at 152.40 551.18 180) (fields_autoplaced) (effects (font (size 1.27 1.27)) (justify right bottom)) (uuid 77c0a57a-887d-4909-a438-c1a1eb28e580))
-  (wire (pts (xy 154.94 553.72) (xy 152.40 553.72)) (stroke (width 0) (type default)) (uuid 4f0c70b8-6837-423a-b28d-c951653eb19d))
-  (label "LED_D3" (at 152.40 553.72 180) (fields_autoplaced) (effects (font (size 1.27 1.27)) (justify right bottom)) (uuid 03f45e4b-997b-44ec-87e3-0fcf8c0b7ce4))
-  (wire (pts (xy 154.94 556.26) (xy 152.40 556.26)) (stroke (width 0) (type default)) (uuid 766d4c2d-0254-4e46-9987-1bf58b99e2da))
-  (label "LED_B3" (at 152.40 556.26 180) (fields_autoplaced) (effects (font (size 1.27 1.27)) (justify right bottom)) (uuid 0b6f7386-35fd-421a-9997-3bcf08c6290f))
-  (wire (pts (xy 154.94 558.80) (xy 152.40 558.80)) (stroke (width 0) (type default)) (uuid a446124d-cef8-4d8f-a86e-166c0a06b5df))
-  (label "GND" (at 152.40 558.80 180) (fields_autoplaced) (effects (font (size 1.27 1.27)) (justify right bottom)) (uuid e39b646f-9c14-4733-87c7-c7ca43bd162b))
-  (symbol (lib_id "Connector_Generic:Conn_01x04") (at 200.66 553.72 0) (unit 1)
-    (in_bom yes) (on_board yes) (dnp no) (uuid fdd74238-45f0-4655-9759-33581b00524c)
-    (property "Reference" "L3S" (at 200.66 545.68 0) (effects (font (size 1.27 1.27))))
-    (property "Value" "Streifen 3 Anfang" (at 200.66 563.30 0) (effects (font (size 1.27 1.27))))
-    (property "Footprint" "Trilumag:WS2814_Anfang" (at 200.66 565.80 0) (effects (font (size 1.27 1.27)) hide))
-    (property "Datasheet" "~" (at 200.66 565.80 0) (effects (font (size 1.27 1.27)) hide))
-    (pin "1" (uuid 08429937-9072-4d59-a99b-bbad9b8bc215))
-    (pin "2" (uuid a314a868-f020-4bc2-b7d8-ea1b3a425412))
-    (pin "3" (uuid 0eeaedcf-35ee-4832-96ae-3eacdc6eae41))
-    (pin "4" (uuid 7ff05a98-ba3c-40fd-9f4a-a420512713dc))
-    (instances (project "trilumag-panel" (path "/cfb1f775-3893-4848-b897-c24ea52d7efb" (reference "L3S") (unit 1))))
+  (wire (pts (xy 154.94 551.18) (xy 152.40 551.18)) (stroke (width 0) (type default)) (uuid 8df5824d-edf8-45fe-879e-bf5accb60972))
+  (label "GND" (at 152.40 551.18 180) (fields_autoplaced) (effects (font (size 1.27 1.27)) (justify right bottom)) (uuid 0054aaaf-4d01-4711-86f3-616d9ece332c))
+  (wire (pts (xy 154.94 553.72) (xy 152.40 553.72)) (stroke (width 0) (type default)) (uuid 9b8de623-e15b-4234-8acb-e2ac63c0d263))
+  (label "A" (at 152.40 553.72 180) (fields_autoplaced) (effects (font (size 1.27 1.27)) (justify right bottom)) (uuid 4f478d3d-fc5a-4abc-a985-c3db6ac79e98))
+  (wire (pts (xy 154.94 556.26) (xy 152.40 556.26)) (stroke (width 0) (type default)) (uuid 7e720a9e-817e-4826-ae38-d995ddb5976f))
+  (label "B" (at 152.40 556.26 180) (fields_autoplaced) (effects (font (size 1.27 1.27)) (justify right bottom)) (uuid 073e7669-b48d-4b72-b81c-596a68b48e3a))
+  (wire (pts (xy 154.94 558.80) (xy 152.40 558.80)) (stroke (width 0) (type default)) (uuid 8d51c2d8-7d8f-48d6-a49b-9db11e3edba7))
+  (label "SNS2" (at 152.40 558.80 180) (fields_autoplaced) (effects (font (size 1.27 1.27)) (justify right bottom)) (uuid 74e91254-7574-43de-b85a-22ec258247f5))
+  (wire (pts (xy 154.94 561.34) (xy 152.40 561.34)) (stroke (width 0) (type default)) (uuid 55e0d078-6b5f-4316-ae6b-1400b5095b9b))
+  (label "GND" (at 152.40 561.34 180) (fields_autoplaced) (effects (font (size 1.27 1.27)) (justify right bottom)) (uuid d1bb491b-582c-4f51-9466-655b82d61d89))
+  (wire (pts (xy 154.94 563.88) (xy 152.40 563.88)) (stroke (width 0) (type default)) (uuid f8099c9f-a935-4990-a7e6-1337cb2cffbf))
+  (label "+24V" (at 152.40 563.88 180) (fields_autoplaced) (effects (font (size 1.27 1.27)) (justify right bottom)) (uuid 5b53917c-36bb-4cf7-98de-d7b292889165))
+  (symbol (lib_id "Connector_Generic:Conn_01x06") (at 200.66 556.26 0) (unit 1)
+    (in_bom yes) (on_board yes) (dnp no) (uuid a30fa16c-7dee-46ff-8f9b-30f70d5160bb)
+    (property "Reference" "X3A" (at 200.66 545.68 0) (effects (font (size 1.27 1.27))))
+    (property "Value" "Kante 3 Pogo Stecker" (at 200.66 568.38 0) (effects (font (size 1.27 1.27))))
+    (property "Footprint" "Trilumag:Kabel_6P_Stecker" (at 200.66 570.88 0) (effects (font (size 1.27 1.27)) hide))
+    (property "Datasheet" "~" (at 200.66 570.88 0) (effects (font (size 1.27 1.27)) hide))
+    (property "Bestellnr" "Magnet-Pogo 6-pol. männlich" (at 200.66 573.38 0) (effects (font (size 1.27 1.27)) hide))
+    (property "Hinweis" "Kabel zum Pogo-Stecker an Kante 3; Pin 1 und 6 sind die dicken Kontakte" (at 200.66 573.38 0) (effects (font (size 1.27 1.27)) hide))
+    (pin "1" (uuid f566bd1a-60b5-4948-8511-65ebc3a1dd5b))
+    (pin "2" (uuid d23883d7-4013-4124-9024-611cbd547094))
+    (pin "3" (uuid 8ef570dc-2971-42a5-8d20-35d94ff62e95))
+    (pin "4" (uuid 894ec8e4-c57e-4905-a8cc-3a3116e86fc4))
+    (pin "5" (uuid 76e9206f-0a32-4f74-9d3e-493c2af35d71))
+    (pin "6" (uuid 1a9b8a8a-22c5-4ffa-b904-2fe1d0104948))
+    (instances (project "trilumag-panel" (path "/bfa3ae2b-98a9-4b6e-8523-9aa45929c119" (reference "X3A") (unit 1))))
   )
-  (wire (pts (xy 195.58 551.18) (xy 193.04 551.18)) (stroke (width 0) (type default)) (uuid 03b4057a-21f7-4365-8a4a-0b3f7d75cdfe))
-  (label "+24V" (at 193.04 551.18 180) (fields_autoplaced) (effects (font (size 1.27 1.27)) (justify right bottom)) (uuid 0e8a18d1-2c09-4b05-85e3-8fdcab177f7c))
-  (wire (pts (xy 195.58 553.72) (xy 193.04 553.72)) (stroke (width 0) (type default)) (uuid 12f50354-fc8e-4ccc-89c7-5a76a28cbca8))
-  (label "LED_D3" (at 193.04 553.72 180) (fields_autoplaced) (effects (font (size 1.27 1.27)) (justify right bottom)) (uuid e6a4c98a-1565-4e90-ab01-7b38b9530afa))
-  (wire (pts (xy 195.58 556.26) (xy 193.04 556.26)) (stroke (width 0) (type default)) (uuid 8c1618a3-9a24-4daa-b5c8-ec886e4b28b3))
-  (label "LED_B3" (at 193.04 556.26 180) (fields_autoplaced) (effects (font (size 1.27 1.27)) (justify right bottom)) (uuid 1c3d893a-90f2-4eb1-9aa7-ca7cb482bc64))
-  (wire (pts (xy 195.58 558.80) (xy 193.04 558.80)) (stroke (width 0) (type default)) (uuid 4f669c3f-94ed-474f-b687-1c947117e6bc))
-  (label "GND" (at 193.04 558.80 180) (fields_autoplaced) (effects (font (size 1.27 1.27)) (justify right bottom)) (uuid a48d4e57-93f4-4b82-86b7-d20dba93679d))
-  (symbol (lib_id "Connector_Generic:Conn_01x04") (at 40.64 607.06 0) (unit 1)
-    (in_bom yes) (on_board yes) (dnp no) (uuid d35e6a1d-fe9b-4da4-8839-e8def88e1f0d)
-    (property "Reference" "L3E" (at 40.64 599.02 0) (effects (font (size 1.27 1.27))))
-    (property "Value" "Streifen 3 Ende" (at 40.64 616.64 0) (effects (font (size 1.27 1.27))))
-    (property "Footprint" "Trilumag:WS2814_Ende" (at 40.64 619.14 0) (effects (font (size 1.27 1.27)) hide))
-    (property "Datasheet" "~" (at 40.64 619.14 0) (effects (font (size 1.27 1.27)) hide))
-    (pin "1" (uuid 842bcc6a-ca38-4ad0-ab72-0db5f147ba70))
-    (pin "2" (uuid 83ffb31c-1fcf-40c6-bacc-81446d5473b4))
-    (pin "3" (uuid f3d7e2ae-8573-49f5-b3cd-5c5789f6f181))
-    (pin "4" (uuid 7aaf7e50-25c9-459e-84be-adbedea26e3e))
-    (instances (project "trilumag-panel" (path "/cfb1f775-3893-4848-b897-c24ea52d7efb" (reference "L3E") (unit 1))))
+  (wire (pts (xy 195.58 551.18) (xy 193.04 551.18)) (stroke (width 0) (type default)) (uuid 7c8292f0-a06e-4f31-bc7f-680a606e5cd0))
+  (label "GND" (at 193.04 551.18 180) (fields_autoplaced) (effects (font (size 1.27 1.27)) (justify right bottom)) (uuid f2054243-113d-4327-8800-40b473af93e9))
+  (wire (pts (xy 195.58 553.72) (xy 193.04 553.72)) (stroke (width 0) (type default)) (uuid b1ab8fc3-12bb-4998-95f2-0bcea5be4bdb))
+  (label "A" (at 193.04 553.72 180) (fields_autoplaced) (effects (font (size 1.27 1.27)) (justify right bottom)) (uuid 82aabbd7-332c-4f86-8e29-42d212ef767f))
+  (wire (pts (xy 195.58 556.26) (xy 193.04 556.26)) (stroke (width 0) (type default)) (uuid 8c4339e7-1ade-42ab-83ad-fe449d5ab11f))
+  (label "B" (at 193.04 556.26 180) (fields_autoplaced) (effects (font (size 1.27 1.27)) (justify right bottom)) (uuid 89b6495f-14ea-4d98-ad28-f861b4a7881a))
+  (wire (pts (xy 195.58 558.80) (xy 193.04 558.80)) (stroke (width 0) (type default)) (uuid bbaf3563-1f2a-46a1-a8aa-71610c06997f))
+  (label "SNS3" (at 193.04 558.80 180) (fields_autoplaced) (effects (font (size 1.27 1.27)) (justify right bottom)) (uuid d3bc4f69-ccee-4504-81a5-c36362cfae90))
+  (wire (pts (xy 195.58 561.34) (xy 193.04 561.34)) (stroke (width 0) (type default)) (uuid e7fa2c34-ab63-4a16-b251-7a9a49c4eccc))
+  (label "GND" (at 193.04 561.34 180) (fields_autoplaced) (effects (font (size 1.27 1.27)) (justify right bottom)) (uuid 17591769-3486-451a-bc99-ccd94a756349))
+  (wire (pts (xy 195.58 563.88) (xy 193.04 563.88)) (stroke (width 0) (type default)) (uuid 8b372d59-8d5c-48b2-b501-7f68e6cf12f6))
+  (label "+24V" (at 193.04 563.88 180) (fields_autoplaced) (effects (font (size 1.27 1.27)) (justify right bottom)) (uuid 0676cc6f-dce4-46a3-a959-7045415b06ac))
+  (symbol (lib_id "Connector_Generic:Conn_01x06") (at 40.64 614.68 0) (unit 1)
+    (in_bom yes) (on_board yes) (dnp no) (uuid 7ceda255-25e0-4581-9e7f-002cab341e42)
+    (property "Reference" "X3B" (at 40.64 604.10 0) (effects (font (size 1.27 1.27))))
+    (property "Value" "Kante 3 Pogo Buchse" (at 40.64 626.80 0) (effects (font (size 1.27 1.27))))
+    (property "Footprint" "Trilumag:Kabel_6P_Buchse" (at 40.64 629.30 0) (effects (font (size 1.27 1.27)) hide))
+    (property "Datasheet" "~" (at 40.64 629.30 0) (effects (font (size 1.27 1.27)) hide))
+    (property "Bestellnr" "Magnet-Pogo 6-pol. weiblich" (at 40.64 631.80 0) (effects (font (size 1.27 1.27)) hide))
+    (property "Hinweis" "Kabel zum Pogo-Buchse an Kante 3; Pin 1 und 6 sind die dicken Kontakte" (at 40.64 631.80 0) (effects (font (size 1.27 1.27)) hide))
+    (pin "1" (uuid 2020fdfc-11bc-4104-a1d1-4c05b18d1090))
+    (pin "2" (uuid ae8462d1-374c-4f68-8087-be8a4cd0afb8))
+    (pin "3" (uuid 940584f8-16f7-4308-8a9a-f1d2d4bd75b7))
+    (pin "4" (uuid bf5227e2-62fe-4c78-a46e-d685c70caaff))
+    (pin "5" (uuid d423fa4e-7c0d-46b0-8672-5383e83c378f))
+    (pin "6" (uuid 4f1484f2-54ed-4e45-bdec-86720473edb9))
+    (instances (project "trilumag-panel" (path "/bfa3ae2b-98a9-4b6e-8523-9aa45929c119" (reference "X3B") (unit 1))))
   )
-  (wire (pts (xy 35.56 604.52) (xy 33.02 604.52)) (stroke (width 0) (type default)) (uuid f4ebcfb5-f1a4-4168-81ca-7996d41b69b0))
-  (label "+24V" (at 33.02 604.52 180) (fields_autoplaced) (effects (font (size 1.27 1.27)) (justify right bottom)) (uuid ff08370b-98d0-4de0-97ab-ac750381c304))
-  (no_connect (at 35.56 607.06) (uuid 50c7045a-7e17-4a32-bd84-aa44f54f83ab))
-  (no_connect (at 35.56 609.60) (uuid 16279004-e77e-42ed-a6ab-1c00a61a4ce4))
-  (wire (pts (xy 35.56 612.14) (xy 33.02 612.14)) (stroke (width 0) (type default)) (uuid 7677ecde-ede5-4832-b27f-07becdd8381a))
-  (label "GND" (at 33.02 612.14 180) (fields_autoplaced) (effects (font (size 1.27 1.27)) (justify right bottom)) (uuid 8e67395d-2376-4fdb-9483-e1d826aab949))
-  (symbol (lib_id "power:PWR_FLAG") (at 25.40 664.94 0) (unit 1) (in_bom yes) (on_board yes) (dnp no) (uuid 211e1a62-4814-46ae-bf77-59ba217d9df2)
-    (property "Reference" "#FLG01" (at 25.40 659.94 0) (effects (font (size 1.27 1.27)) hide))
-    (property "Value" "PWR_FLAG" (at 25.40 660.94 0) (effects (font (size 1.27 1.27))))
-    (property "Footprint" "" (at 25.40 664.94 0) (effects (font (size 1.27 1.27)) hide))
-    (pin "1" (uuid 235ca0f2-2b93-4038-9b2d-52cbde87b8c7))
-    (instances (project "trilumag-panel" (path "/cfb1f775-3893-4848-b897-c24ea52d7efb" (reference "#FLG01") (unit 1)))))
-  (wire (pts (xy 25.40 664.94) (xy 25.40 667.48)) (stroke (width 0) (type default)) (uuid 5608046b-c578-4363-aa54-d9b7d37d3ee0))
-  (label "GND" (at 25.40 667.48 270) (effects (font (size 1.27 1.27)) (justify right bottom)) (uuid 62b230e3-b337-449e-92e3-9907b528f395))
-  (symbol (lib_id "power:PWR_FLAG") (at 50.80 664.94 0) (unit 1) (in_bom yes) (on_board yes) (dnp no) (uuid db10e86b-1b17-42e0-aa2a-1461d6ed5037)
-    (property "Reference" "#FLG02" (at 50.80 659.94 0) (effects (font (size 1.27 1.27)) hide))
-    (property "Value" "PWR_FLAG" (at 50.80 660.94 0) (effects (font (size 1.27 1.27))))
-    (property "Footprint" "" (at 50.80 664.94 0) (effects (font (size 1.27 1.27)) hide))
-    (pin "1" (uuid 91bc4947-6814-475a-b047-e13ecba57287))
-    (instances (project "trilumag-panel" (path "/cfb1f775-3893-4848-b897-c24ea52d7efb" (reference "#FLG02") (unit 1)))))
-  (wire (pts (xy 50.80 664.94) (xy 50.80 667.48)) (stroke (width 0) (type default)) (uuid fc3b410e-5bdf-443e-bc39-9c593abb408e))
-  (label "V24_LDO" (at 50.80 667.48 270) (effects (font (size 1.27 1.27)) (justify right bottom)) (uuid 7fbc271a-7b70-48af-943d-aa39f9f98c98))
+  (wire (pts (xy 35.56 609.60) (xy 33.02 609.60)) (stroke (width 0) (type default)) (uuid 94f367a5-c30e-479b-9a34-831b1c3ec87d))
+  (label "GND" (at 33.02 609.60 180) (fields_autoplaced) (effects (font (size 1.27 1.27)) (justify right bottom)) (uuid 729dd725-fdff-478e-8ab2-a9e45654e10a))
+  (wire (pts (xy 35.56 612.14) (xy 33.02 612.14)) (stroke (width 0) (type default)) (uuid d9ae74ef-35a0-48a1-97ff-d42229bded39))
+  (label "A" (at 33.02 612.14 180) (fields_autoplaced) (effects (font (size 1.27 1.27)) (justify right bottom)) (uuid 7ec0a9ce-c8d1-495a-aafa-6802981698ed))
+  (wire (pts (xy 35.56 614.68) (xy 33.02 614.68)) (stroke (width 0) (type default)) (uuid 3df0fc19-5ee7-4200-8ab2-8d33e67c8904))
+  (label "B" (at 33.02 614.68 180) (fields_autoplaced) (effects (font (size 1.27 1.27)) (justify right bottom)) (uuid ac8a7770-33fa-4d5a-ab5e-9d9b1cc80ed5))
+  (wire (pts (xy 35.56 617.22) (xy 33.02 617.22)) (stroke (width 0) (type default)) (uuid 414fad5c-d48d-474b-b9b7-e26b549ab628))
+  (label "SNS3" (at 33.02 617.22 180) (fields_autoplaced) (effects (font (size 1.27 1.27)) (justify right bottom)) (uuid d3dbf620-9a14-4474-a2d8-2bf5a5f72e39))
+  (wire (pts (xy 35.56 619.76) (xy 33.02 619.76)) (stroke (width 0) (type default)) (uuid 7edd938b-bec2-4466-8058-2eacf3661d9b))
+  (label "GND" (at 33.02 619.76 180) (fields_autoplaced) (effects (font (size 1.27 1.27)) (justify right bottom)) (uuid 344b33dc-de35-42e9-a7be-d5f7c6abd954))
+  (wire (pts (xy 35.56 622.30) (xy 33.02 622.30)) (stroke (width 0) (type default)) (uuid 1b093627-f13e-4592-8173-02b9bdb99b37))
+  (label "+24V" (at 33.02 622.30 180) (fields_autoplaced) (effects (font (size 1.27 1.27)) (justify right bottom)) (uuid 7188ddca-f3ed-43d3-88c3-a47c5df785d1))
+  (symbol (lib_id "power:PWR_FLAG") (at 25.40 675.10 0) (unit 1) (in_bom yes) (on_board yes) (dnp no) (uuid 71c4466a-ac67-4b30-928b-82c52e721455)
+    (property "Reference" "#FLG01" (at 25.40 670.10 0) (effects (font (size 1.27 1.27)) hide))
+    (property "Value" "PWR_FLAG" (at 25.40 671.10 0) (effects (font (size 1.27 1.27))))
+    (property "Footprint" "" (at 25.40 675.10 0) (effects (font (size 1.27 1.27)) hide))
+    (pin "1" (uuid e50c0328-e662-47ae-b8d9-6f08c85d82c0))
+    (instances (project "trilumag-panel" (path "/bfa3ae2b-98a9-4b6e-8523-9aa45929c119" (reference "#FLG01") (unit 1)))))
+  (wire (pts (xy 25.40 675.10) (xy 25.40 677.64)) (stroke (width 0) (type default)) (uuid e644bbd5-b089-428c-948f-4d502964bdd5))
+  (label "GND" (at 25.40 677.64 270) (effects (font (size 1.27 1.27)) (justify right bottom)) (uuid ffcfc1b6-891a-47ff-b7d4-6286f5e3ae8f))
+  (symbol (lib_id "power:PWR_FLAG") (at 50.80 675.10 0) (unit 1) (in_bom yes) (on_board yes) (dnp no) (uuid e43d37a5-e70c-4a90-a2fe-7f5c575828a5)
+    (property "Reference" "#FLG02" (at 50.80 670.10 0) (effects (font (size 1.27 1.27)) hide))
+    (property "Value" "PWR_FLAG" (at 50.80 671.10 0) (effects (font (size 1.27 1.27))))
+    (property "Footprint" "" (at 50.80 675.10 0) (effects (font (size 1.27 1.27)) hide))
+    (pin "1" (uuid 5f4b629f-a3b7-4588-adec-6a20d5060506))
+    (instances (project "trilumag-panel" (path "/bfa3ae2b-98a9-4b6e-8523-9aa45929c119" (reference "#FLG02") (unit 1)))))
+  (wire (pts (xy 50.80 675.10) (xy 50.80 677.64)) (stroke (width 0) (type default)) (uuid 7dbb5c1c-d3e1-4de6-b650-b64de716f9d4))
+  (label "V24_LDO" (at 50.80 677.64 270) (effects (font (size 1.27 1.27)) (justify right bottom)) (uuid 832dfe07-dba3-4774-b80c-3e3f1c26f64d))
   (sheet_instances (path "/" (page "1")))
 )

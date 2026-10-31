@@ -74,7 +74,7 @@
         "item_on_disabled_layer": "error",
         "items_not_allowed": "error",
         "length_out_of_range": "error",
-        "lib_footprint_issues": "warning", "lib_footprint_mismatch": "ignore",
+        "lib_footprint_issues": "warning",
         "lib_footprint_mismatch": "warning",
         "malformed_courtyard": "error",
         "microvia_drill_out_of_range": "error",
@@ -220,7 +220,7 @@
       },
       {
         "bus_width": 12,
-        "clearance": 0.3,
+        "clearance": 0.2,
         "diff_pair_gap": 0.25,
         "diff_pair_via_gap": 0.25,
         "diff_pair_width": 0.2,

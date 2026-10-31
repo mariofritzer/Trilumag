@@ -6,12 +6,7 @@ Menge;Referenzen;Wert;Footprint;Bestellhinweis
 1;D1;SMBJ26A;D_SMB_Handsoldering;SMBJ26A
 1;J3;LIS3DH-Modul;PinSocket_1x08_P2.54mm_Vertical;
 1;J5;SWD;PinHeader_1x03_P2.54mm_Vertical;
-1;L1E;Streifen 1 Ende;WS2814_Ende;
-1;L1S;Streifen 1 Anfang;WS2814_Anfang;
-1;L2E;Streifen 2 Ende;WS2814_Ende;
-1;L2S;Streifen 2 Anfang;WS2814_Anfang;
-1;L3E;Streifen 3 Ende;WS2814_Ende;
-1;L3S;Streifen 3 Anfang;WS2814_Anfang;
+1;J6;LED-Streifen 1;Kabel_4P_LED;
 3;R1 R2 R3;100Ω;R_0805_2012Metric_Pad1.20x1.40mm_HandSolder;
 1;R4;33Ω;R_0805_2012Metric_Pad1.20x1.40mm_HandSolder;
 1;R5;10k;R_0805_2012Metric_Pad1.20x1.40mm_HandSolder;
@@ -22,5 +17,9 @@ Menge;Referenzen;Wert;Footprint;Bestellhinweis
 1;U3;78L05;SOT-89-3_Handsoldering;78L05 SOT-89 (≥30 V Eingang)
 1;U4;XC6206P332MR;SOT-23_Handsoldering;XC6206P332MR (3,3 V)
 1;U6;74AHCT1G125;SOT-23-5_HandSoldering;74AHCT1G125 SOT-23-5
-3;X1A X2A X3A;Pogo 6P Stecker (Kabel);Kabel_6P_Stecker;Magnet-Pogo 6-pol. männlich
-3;X1B X2B X3B;Pogo 6P Buchse (Kabel);Kabel_6P_Buchse;Magnet-Pogo 6-pol. weiblich
+1;X1A;Kante 1 Pogo Stecker;Kabel_6P_Stecker;Magnet-Pogo 6-pol. männlich
+1;X1B;Kante 1 Pogo Buchse;Kabel_6P_Buchse;Magnet-Pogo 6-pol. weiblich
+1;X2A;Kante 2 Pogo Stecker;Kabel_6P_Stecker;Magnet-Pogo 6-pol. männlich
+1;X2B;Kante 2 Pogo Buchse;Kabel_6P_Buchse;Magnet-Pogo 6-pol. weiblich
+1;X3A;Kante 3 Pogo Stecker;Kabel_6P_Stecker;Magnet-Pogo 6-pol. männlich
+1;X3B;Kante 3 Pogo Buchse;Kabel_6P_Buchse;Magnet-Pogo 6-pol. weiblich

@@ -6,6 +6,7 @@ MM = pcbnew.ToMM
 from board import Builder, outline
 
 which = sys.argv[1]
+router.G = float(os.environ.get('GRID', router.G))
 d, cfg = getattr(designs, which)()
 out = os.path.join(make.OUT, d.name + '-self')
 if os.path.exists(out): shutil.rmtree(out)
@@ -30,7 +31,8 @@ def pad(ref, num):
 def span(n):
     ps = [pad(r, k).GetPosition() for r, k in nets[n]]
     return max(math.hypot(pcbnew.ToMM(a.x - c.x), pcbnew.ToMM(a.y - c.y)) for a in ps for c in ps)
-order = sorted(nets, key=lambda n: (n in power, span(n)))
+tight = set(os.environ.get('FIRST', '').split(','))
+order = sorted(nets, key=lambda n: (n in power, not any(r in tight for r, _ in nets[n]), span(n)))
 fail = []
 for n in order:
     w, c = (2.0, 0.3) if n in power else (0.3, 0.2)

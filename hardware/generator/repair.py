@@ -16,7 +16,8 @@ for bl in re.split(r'\n(?=\[)', t):
             if m not in todo: todo.append(m)
 import os
 prio = open('/tmp/prio.txt').read().split(',') if os.path.exists('/tmp/prio.txt') else ['TINT']
-todo.sort(key=lambda m: m[1] not in prio)
+todo.sort(key=lambda m: prio.index(m[1]) if m[1] in prio else 99)
+if os.environ.get('ONLY'): todo = [m for m in todo if m[1] in prio]
 b = pcbnew.LoadBoard(path)
 fps = {f.GetReference(): f for f in b.GetFootprints()}
 for num, net, ref in todo:
