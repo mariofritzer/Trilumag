@@ -1,0 +1,4 @@
+(fp_lib_table
+  (version 7)
+  (lib (name "Trilumag")(type "KiCad")(uri "${KIPRJMOD}/Trilumag.pretty")(options "")(descr "Trilumag-Footprints"))
+)

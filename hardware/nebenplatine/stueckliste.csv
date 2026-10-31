@@ -1,0 +1,26 @@
+Menge;Referenzen;Wert;Footprint;Bestellhinweis
+1;C1;10µF 50V;C_1206_3216Metric_Pad1.33x1.80mm_HandSolder;X5R/X7R 1206 50 V
+1;C2;1µF 50V;C_0805_2012Metric_Pad1.18x1.45mm_HandSolder;
+3;C3 C6 C7;1µF;C_0805_2012Metric_Pad1.18x1.45mm_HandSolder;
+4;C4 C5 C8 C9;100nF;C_0805_2012Metric_Pad1.18x1.45mm_HandSolder;
+1;D1;SMBJ26A;D_SMB_Handsoldering;SMBJ26A
+1;J3;LIS3DH-Modul;PinSocket_1x08_P2.54mm_Vertical;
+1;J5;SWD;PinHeader_1x03_P2.54mm_Vertical;
+1;L1E;Streifen 1 Ende;WS2814_Ende;
+1;L1S;Streifen 1 Anfang;WS2814_Anfang;
+1;L2E;Streifen 2 Ende;WS2814_Ende;
+1;L2S;Streifen 2 Anfang;WS2814_Anfang;
+1;L3E;Streifen 3 Ende;WS2814_Ende;
+1;L3S;Streifen 3 Anfang;WS2814_Anfang;
+3;R1 R2 R3;100Ω;R_0805_2012Metric_Pad1.20x1.40mm_HandSolder;
+1;R4;33Ω;R_0805_2012Metric_Pad1.20x1.40mm_HandSolder;
+1;R5;10k;R_0805_2012Metric_Pad1.20x1.40mm_HandSolder;
+2;R6 R7;4.7k;R_0805_2012Metric_Pad1.20x1.40mm_HandSolder;
+1;R8;10Ω;R_1206_3216Metric_Pad1.30x1.75mm_HandSolder;
+1;U1;CH32V003F4P6;TSSOP-20_4.4x6.5mm_P0.65mm;CH32V003F4P6
+1;U2;MAX3485;SOIC-8_3.9x4.9mm_P1.27mm;MAX3485ESA / SP3485EN
+1;U3;78L05;SOT-89-3_Handsoldering;78L05 SOT-89 (≥30 V Eingang)
+1;U4;XC6206P332MR;SOT-23_Handsoldering;XC6206P332MR (3,3 V)
+1;U6;74AHCT1G125;SOT-23-5_HandSoldering;74AHCT1G125 SOT-23-5
+3;X1A X2A X3A;Pogo 5P Stecker;Pogo_5P_Stecker;
+3;X1B X2B X3B;Pogo 5P Buchse;Pogo_5P_Buchse;
