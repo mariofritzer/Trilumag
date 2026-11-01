@@ -893,7 +893,7 @@ function syncColUi(){
   if(document.activeElement!==$('hex'))$('hex').value=rgbHex(...hsv2rgb(...hsv));
 }
 function drawWheel(){
-  const cv=$('wcv'),n=Math.round($('wheel').clientWidth*(devicePixelRatio||1));if(!n||cv.width===n)return;cv.width=cv.height=n;
+  const cv=$('wcv'),n=Math.round($('wheel').clientWidth*(devicePixelRatio||1));if(!n||cv.dataset.n==n)return;cv.dataset.n=n;cv.width=cv.height=n;
   const ctx=cv.getContext('2d'),img=ctx.createImageData(n,n),R=n/2;
   for(let y=0;y<n;y++)for(let x=0;x<n;x++){const dx=x-R+.5,dy=y-R+.5,d=Math.hypot(dx,dy);const i=(y*n+x)*4;
     if(d>R){img.data[i+3]=0;continue;}let h=Math.atan2(dy,dx)/(2*Math.PI);if(h<0)h+=1;const c=hsv2rgb(h,Math.min(1,d/R),1);

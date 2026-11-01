@@ -121,6 +121,8 @@ jobs:
 
           cp installer/* site/
           sed -i "s/__VERSION__/${VERSION}/g" site/manifest.json site/index.html
+          # Simulationsseite: die echte App, das Hauptpanel spielt sim.js im Browser
+          python3 .github/scripts/sim_page.py site "${VERSION}"
           touch site/.nojekyll
           echo "VERSION=${VERSION}" >> "$GITHUB_ENV"
 
